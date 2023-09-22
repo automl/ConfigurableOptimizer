@@ -89,3 +89,7 @@ prof/
 
 # Data
 data/
+scripts/datasets/
+
+# Weights and Biases
+wandb/
