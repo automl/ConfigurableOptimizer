@@ -18,8 +18,8 @@ class MixedOp(nn.Module):
         self._ops = nn.ModuleList()
         for primitive in PRIMITIVES:
             op = OPS[primitive](C, stride, False)
-            if "pool" in primitive:
-                op = nn.Sequential(op, nn.BatchNorm2d(C, affine=False))
+            # if "pool" in primitive:
+            #     op = nn.Sequential(op, nn.BatchNorm2d(C, affine=False))
             self._ops.append(op)
 
     def forward(self, x: torch.Tensor, weights: list[torch.Tensor]) -> torch.Tensor:
@@ -60,7 +60,11 @@ class Cell(nn.Module):
                 self._ops.append(op)
 
     def forward(
-        self, s0: torch.Tensor, s1: torch.Tensor, weights: list[torch.Tensor]
+        self,
+        s0: torch.Tensor,
+        s1: torch.Tensor,
+        weights: list[torch.Tensor],
+        beta_weights: torch.Tensor | None = None,
     ) -> torch.Tensor:
         s0 = self.preprocess0(s0)
         s1 = self.preprocess1(s1)
@@ -69,7 +73,8 @@ class Cell(nn.Module):
         offset = 0
         for _i in range(self._steps):
             s = sum(
-                self._ops[offset + j](h, weights[offset + j])
+                (beta_weights[offset + j] if beta_weights is not None else 1)
+                * self._ops[offset + j](h, weights[offset + j])
                 for j, h in enumerate(states)
             )
             offset += len(states)
@@ -88,7 +93,8 @@ class Network(nn.Module):
         steps: int = 4,
         multiplier: int = 4,
         stem_multiplier: int = 3,
-    ):
+        edge_normalization: bool = False,
+    ) -> None:
         super().__init__()
         self._C = C
         self._num_classes = num_classes
@@ -96,7 +102,7 @@ class Network(nn.Module):
         self._criterion = criterion
         self._steps = steps
         self._multiplier = multiplier
-
+        self.edge_normalization = edge_normalization
         C_curr = stem_multiplier * C
         self.stem = nn.Sequential(
             nn.Conv2d(3, C_curr, 3, padding=1, bias=False), nn.BatchNorm2d(C_curr)
@@ -127,7 +133,7 @@ class Network(nn.Module):
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.classifier = nn.Linear(C_prev, num_classes)
 
-        self._initialize_alphas()
+        self._initialize_parameters()
 
     def new(self) -> Network:
         model_new = Network(
@@ -135,16 +141,43 @@ class Network(nn.Module):
         ).to(DEVICE)
         for x, y in zip(model_new.arch_parameters(), self.arch_parameters()):
             x.data.copy_(y.data)
+        for x, y in zip(model_new.beta_parameters(), self.beta_parameters()):
+            x.data.copy_(y.data)
         return model_new
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         s0 = s1 = self.stem(x)
         for _i, cell in enumerate(self.cells):
-            if cell.reduction:
-                weights = F.softmax(self.alphas_reduce, dim=-1)
+            if self.edge_normalization:
+                if cell.reduction:
+                    weights = F.softmax(self.alphas_reduce, dim=-1)
+                    n = 3
+                    start = 2
+                    weights2 = F.softmax(self.betas_reduce[0:2], dim=-1)
+                    for _i in range(self._steps - 1):
+                        end = start + n
+                        tw2 = F.softmax(self.betas_reduce[start:end], dim=-1)
+                        start = end
+                        n += 1
+                        weights2 = torch.cat([weights2, tw2], dim=0)
+                else:
+                    weights = F.softmax(self.alphas_normal, dim=-1)
+                    n = 3
+                    start = 2
+                    weights2 = F.softmax(self.betas_normal[0:2], dim=-1)
+                    for _i in range(self._steps - 1):
+                        end = start + n
+                        tw2 = F.softmax(self.betas_normal[start:end], dim=-1)
+                        start = end
+                        n += 1
+                        weights2 = torch.cat([weights2, tw2], dim=0)
+                s0, s1 = s1, cell(s0, s1, weights, weights2)
             else:
-                weights = F.softmax(self.alphas_normal, dim=-1)
-            s0, s1 = s1, cell(s0, s1, weights)
+                if cell.reduction:
+                    weights = F.softmax(self.alphas_reduce, dim=-1)
+                else:
+                    weights = F.softmax(self.alphas_normal, dim=-1)
+                s0, s1 = s1, cell(s0, s1, weights)
         out = self.global_pooling(s1)
         logits = self.classifier(out.view(out.size(0), -1))
         return torch.squeeze(out, dim=(-1, -2)), logits  # type: ignore
@@ -153,7 +186,7 @@ class Network(nn.Module):
         logits = self(x)
         return self._criterion(logits, target)  # type: ignore
 
-    def _initialize_alphas(self) -> None:
+    def _initialize_parameters(self) -> None:
         k = sum(1 for i in range(self._steps) for n in range(2 + i))
         num_ops = len(PRIMITIVES)
 
@@ -164,8 +197,18 @@ class Network(nn.Module):
             self.alphas_reduce,
         ]
 
+        self.betas_normal = nn.Parameter(1e-3 * torch.randn(k).to(DEVICE))
+        self.betas_reduce = nn.Parameter(1e-3 * torch.randn(k).to(DEVICE))
+        self._betas = [
+            self.betas_normal,
+            self.betas_reduce,
+        ]
+
     def arch_parameters(self) -> list[torch.nn.Parameter]:
         return self._arch_parameters  # type: ignore
+
+    def beta_parameters(self) -> list[torch.nn.Parameter]:
+        return self._betas
 
     def genotype(self) -> Genotype:
         def _parse(weights: list[torch.Tensor]) -> list[tuple[str, int]]:

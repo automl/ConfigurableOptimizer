@@ -8,6 +8,7 @@ dependencies = [
     "ConfigSpace",
     "nasbench@git+https://github.com/automl-classroom/nasbench-for-automl-lectures",
     "protobuf==3.20.*",
+    "wandb",
 ]
 requires-python = ">=3.8"
 authors = [{ name = "Arjun Krishnakumar", email = "arjun.krishnakumar.mec@gmail.com" }]

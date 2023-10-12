@@ -109,6 +109,19 @@ class NASBench1Shot1SearchSpace(SearchSpace):
     def arch_parameters(self) -> list[nn.Parameter]:
         return self.model.arch_parameters()  # type: ignore
 
+    def set_arch_parameters(self, arch_parameters: list[nn.Parameter]) -> None:
+        (
+            self.model.alphas_mixed_op.data,
+            self.model.alphas_output.data,
+            _,
+            _,
+        ) = arch_parameters
+        self.model._arch_parameters = [
+            self.model.alphas_mixed_op,
+            self.model.alphas_output,
+            *self.model.alphas_inputs,
+        ]
+
     def create_nasbench_adjacency_matrix(self, parents: dict[str, Any]) -> np.ndarray:
         """Based on given connectivity pattern create the corresponding adjacency
         matrix.

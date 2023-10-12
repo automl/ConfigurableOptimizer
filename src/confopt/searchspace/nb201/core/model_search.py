@@ -22,14 +22,18 @@ class NB201SearchModel(nn.Module):
         N: int = 5,
         max_nodes: int = 4,
         num_classes: int = 10,
+        steps: int = 3,
         search_space: list[str] = NAS_BENCH_201,
         affine: bool = False,
         track_running_stats: bool = False,
+        edge_normalization: bool = False,
     ):
         super().__init__()
         self._C = C
         self._layerN = N
         self.max_nodes = max_nodes
+        self._steps = steps
+        self.edge_normalization = edge_normalization
         self.stem = nn.Sequential(
             nn.Conv2d(3, C, kernel_size=3, padding=1, bias=False), nn.BatchNorm2d(C)
         )
@@ -75,6 +79,9 @@ class NB201SearchModel(nn.Module):
         self.arch_parameters = nn.Parameter(
             1e-3 * torch.randn(num_edge, len(search_space))  # type: ignore
         )
+        self.beta_parameters = nn.Parameter(
+            1e-3 * torch.randn(num_edge)  # type: ignore
+        )
 
     def get_weights(self) -> list[nn.Parameter]:
         xlist = list(self.stem.parameters()) + list(self.cells.parameters())
@@ -87,10 +94,19 @@ class NB201SearchModel(nn.Module):
     def get_alphas(self) -> list[torch.Tensor]:
         return [self.arch_parameters]
 
+    def get_betas(self) -> list[torch.Tensor]:
+        return [self.beta_parameters]
+
     def show_alphas(self) -> str:
         with torch.no_grad():
             return "arch-parameters :\n{:}".format(
                 nn.functional.softmax(self.arch_parameters, dim=-1).cpu()
+            )
+
+    def show_betas(self) -> str:
+        with torch.no_grad():
+            return "beta-parameters:\n{:}".format(
+                nn.functional.softmax(self.beta_parameters, dim=-1).cpu()
             )
 
     def get_message(self) -> str:
@@ -114,6 +130,7 @@ class NB201SearchModel(nn.Module):
                 node_str = f"{i}<-{j}"
                 with torch.no_grad():
                     weights = self.arch_parameters[self.edge2index[node_str]]
+                    # betas = self.beta_parameters[self.edge2index[node_str]]
                     op_name = self.op_names[weights.argmax().item()]  # type: ignore
                 xlist.append((op_name, j))
             genotypes.append(tuple(xlist))
@@ -125,7 +142,21 @@ class NB201SearchModel(nn.Module):
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
             if isinstance(cell, SearchCell):
-                feature = cell(feature, alphas)
+                if self.edge_normalization:
+                    betas = torch.empty((0,)).to(alphas.device)
+                    for v in range(1, self.max_nodes):
+                        idx_nodes = []
+                        for u in range(v):
+                            node_str = f"{v}<-{u}"
+                            idx_nodes.append(cell.edge2index[node_str])
+                        beta_node_v = nn.functional.softmax(
+                            self.beta_parameters[idx_nodes], dim=-1
+                        )
+                        betas = torch.cat([betas, beta_node_v], dim=0)
+
+                    feature = cell(feature, alphas, betas)
+                else:
+                    feature = cell(feature, alphas)
             else:
                 feature = cell(feature)
 

@@ -67,7 +67,10 @@ class NAS201SearchCell(nn.Module):
         return string
 
     def forward(
-        self, inputs: torch.Tensor, weightss: list[torch.Tensor]
+        self,
+        inputs: torch.Tensor,
+        weightss: list[torch.Tensor],
+        beta_weightss: list[torch.Tensor] | None = None,
     ) -> torch.Tensor:
         nodes = [inputs]
         for i in range(1, self.max_nodes):
@@ -75,7 +78,13 @@ class NAS201SearchCell(nn.Module):
             for j in range(i):
                 node_str = f"{i}<-{j}"
                 weights = weightss[self.edge2index[node_str]]
-                inter_nodes.append(self.edges[node_str](nodes[j], weights))
+                if beta_weightss is not None:
+                    beta_weights = beta_weightss[self.edge2index[node_str]]
+                    inter_nodes.append(
+                        beta_weights * self.edges[node_str](nodes[j], weights)
+                    )
+                else:
+                    inter_nodes.append(self.edges[node_str](nodes[j], weights))
             nodes.append(sum(inter_nodes))
         return nodes[-1]
 

@@ -9,7 +9,6 @@ from .checkpoints import (
     save_checkpoint,
 )
 from .logger import Logger, prepare_logger
-from .profile import BaseProfile
 from .time import get_time_as_string
 
 

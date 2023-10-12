@@ -26,7 +26,7 @@ class MixedOp(nn.Module):
             self._ops.append(op)
 
     def forward(self, x: torch.Tensor, weights: list[torch.Tensor]) -> torch.float:
-        return sum(w * op(x) for w, op in zip(weights, self._ops))
+        return sum(w * op(x) for w, op in zip(weights, self._ops))  # type: ignore
 
 
 class ChoiceBlock(nn.Module):
@@ -217,8 +217,8 @@ class Network(nn.Module):
             arch_sum = torch.sum(x, dim=-1)
             if arch_sum > 0:
                 return x / arch_sum
-            else:
-                return x
+
+            return x
         else:
             # Normal search softmax over the inputs and mixed ops.
             return F.softmax(x, dim=-1)
@@ -297,5 +297,5 @@ class Network(nn.Module):
             *self.alphas_inputs,
         ]
 
-    def arch_parameters(self) -> list[torch.Tensor]:
+    def arch_parameters(self) -> list[nn.Parameter]:
         return self._arch_parameters

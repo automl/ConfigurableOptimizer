@@ -4,22 +4,23 @@ import unittest
 
 import torch
 
+from confopt.oneshot.archmodifier import SDARTSSampler
 from confopt.oneshot.archsampler import (
     BaseSampler,
     DARTSSampler,
     DRNASSampler,
     GDASSampler,
-    SNASSampler
+    SNASSampler,
 )
 from confopt.searchspace import NASBench201SearchSpace
 
+DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
 
 class TestArchSamplers(unittest.TestCase):
-
-    def _sampler_new_step_or_epoch(self,
-        sampler: BaseSampler,
-        sample_frequency: str
-        ) -> None:
+    def _sampler_new_step_or_epoch(
+        self, sampler: BaseSampler, sample_frequency: str
+    ) -> None:
         if sample_frequency == "epoch":
             sampler.new_epoch()
         elif sample_frequency == "step":
@@ -47,7 +48,7 @@ class TestArchSamplers(unittest.TestCase):
         searchspace = NASBench201SearchSpace(N=1)
         sampler = DARTSSampler(
             arch_parameters=searchspace.arch_parameters,
-            sample_frequency=sample_frequency
+            sample_frequency=sample_frequency,
         )
 
         alphas_before = searchspace.arch_parameters
@@ -59,7 +60,7 @@ class TestArchSamplers(unittest.TestCase):
             assert torch.allclose(arch_param_before, arch_param_after)
 
     def test_darts_sampler_new_step(self) -> None:
-       self._test_darts_sampler_new_step_epoch(sample_frequency="step")
+        self._test_darts_sampler_new_step_epoch(sample_frequency="step")
 
     def test_darts_sampler_new_epoch(self) -> None:
         self._test_darts_sampler_new_step_epoch(sample_frequency="epoch")
@@ -79,7 +80,7 @@ class TestArchSamplers(unittest.TestCase):
         searchspace = NASBench201SearchSpace(N=1)
         sampler = GDASSampler(
             arch_parameters=searchspace.arch_parameters,
-            sample_frequency=sample_frequency
+            sample_frequency=sample_frequency,
         )
 
         alphas_before = searchspace.arch_parameters
@@ -107,13 +108,13 @@ class TestArchSamplers(unittest.TestCase):
             assert not torch.allclose(arch_param_before, arch_param_after)
 
             for row in arch_param_after:
-                assert torch.allclose(torch.sum(row), torch.Tensor([1.]))
+                assert torch.allclose(torch.sum(row), torch.Tensor([1.0]).to(DEVICE))
 
     def _test_drnas_sampler_new_step_epoch(self, sample_frequency: str) -> None:
         searchspace = NASBench201SearchSpace(N=1)
         sampler = DRNASSampler(
             arch_parameters=searchspace.arch_parameters,
-            sample_frequency=sample_frequency
+            sample_frequency=sample_frequency,
         )
 
         alphas_before = searchspace.arch_parameters
@@ -124,13 +125,70 @@ class TestArchSamplers(unittest.TestCase):
             assert not torch.allclose(arch_param_before, arch_param_after)
 
             for row in arch_param_after:
-                assert torch.allclose(torch.sum(row), torch.Tensor([1.]))
+                assert torch.allclose(torch.sum(row), torch.Tensor([1.0]).to(DEVICE))
 
     def test_drnas_sampler_new_step(self) -> None:
         self._test_drnas_sampler_new_step_epoch(sample_frequency="step")
 
     def test_drnas_sampler_new_epoch(self) -> None:
         self._test_drnas_sampler_new_step_epoch(sample_frequency="epoch")
+
+    def test_sdarts_sampler(self) -> None:
+        searchspace = NASBench201SearchSpace(N=1)
+        epsilon = 0.03
+        loss_criterion = torch.nn.CrossEntropyLoss()
+        X = torch.randn(2, 3, 32, 32).to(DEVICE)
+        target = torch.randint(0, 9, (2,)).to(DEVICE)
+
+        sampler = SDARTSSampler(
+            search_space=searchspace,
+            loss_criterion=loss_criterion,
+            arch_parameters=searchspace.arch_parameters,
+            epsilon=epsilon,
+            data=(X, target),
+        )
+
+        # Random Attack
+        alphas_before = searchspace.arch_parameters
+        alphas_after = sampler.sample_alphas(alphas_before)
+
+        for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
+            assert not torch.allclose(arch_param_before, arch_param_after)
+
+        # Adverserial Attack
+        # Changes the model's alpha as well, but if the loss does not decrease, it does
+        # not change alpha
+        # TODO Improve this test
+        sampler.attack_type = "adverserial"
+        alphas_before = [
+            arch_param.clone() for arch_param in searchspace.arch_parameters
+        ]
+
+        alphas_after = sampler.sample_alphas(searchspace.arch_parameters)
+
+    def _test_sdarts_sampler_new_step_epoch(self, sample_frequency: str) -> None:
+        test_epsilon = 0.03
+        searchspace = NASBench201SearchSpace(N=1)
+        sampler = SDARTSSampler(
+            search_space=searchspace,
+            sample_frequency=sample_frequency,
+            arch_parameters=searchspace.arch_parameters,
+            epsilon=test_epsilon,
+        )
+
+        # Random Attack
+        alphas_before = searchspace.arch_parameters
+        self._sampler_new_step_or_epoch(sampler, sample_frequency)
+        alphas_after = sampler.sampled_alphas
+
+        for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
+            assert not torch.allclose(arch_param_before, arch_param_after)
+
+    def test_sdarts_sampler_new_step(self) -> None:
+        self._test_sdarts_sampler_new_step_epoch(sample_frequency="step")
+
+    def test_sdarts_sampler_new_epoch(self) -> None:
+        self._test_sdarts_sampler_new_step_epoch(sample_frequency="epoch")
 
     def test_snas_sampler(self) -> None:
         searchspace = NASBench201SearchSpace(N=1)
@@ -141,12 +199,12 @@ class TestArchSamplers(unittest.TestCase):
 
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
             assert not torch.allclose(arch_param_before, arch_param_after)
-    
+
     def _test_snas_sampler_new_step_epoch(self, sample_frequency: str) -> None:
         searchspace = NASBench201SearchSpace(N=1)
         sampler = SNASSampler(
             arch_parameters=searchspace.arch_parameters,
-            sample_frequency=sample_frequency
+            sample_frequency=sample_frequency,
         )
 
         alphas_before = searchspace.arch_parameters
@@ -161,19 +219,21 @@ class TestArchSamplers(unittest.TestCase):
 
     def test_snas_sampler_new_epoch(self) -> None:
         self._test_snas_sampler_new_step_epoch(sample_frequency="epoch")
-    
-    def _test_snas_illegal_temperatures(self, temp_init: float, temp_min: float) -> None:
+
+    def _test_snas_illegal_temperatures(
+        self, temp_init: float, temp_min: float
+    ) -> None:
         arch_parameters = [torch.randn(5, 5)]
         with self.assertRaises(AssertionError):
             SNASSampler(
                 arch_parameters=arch_parameters,
                 temp_init=temp_init,
-                temp_min=temp_min    
+                temp_min=temp_min,
             )
 
     def test_snas_temperature_lower_bound(self) -> None:
         self._test_snas_illegal_temperatures(1.0, -1.0)
-    
+
     def test_snas_temperature_upper_bound(self) -> None:
         self._test_snas_illegal_temperatures(1.1, 0.1)
 
@@ -183,28 +243,27 @@ class TestArchSamplers(unittest.TestCase):
     def test_illegal_sample_frequency(self) -> None:
         arch_parameters = [torch.randn(5, 5)]
         with self.assertRaises(AssertionError):
-            DARTSSampler(
-                arch_parameters=arch_parameters,
-                sample_frequency="illegal"
-            )
+            DARTSSampler(arch_parameters=arch_parameters, sample_frequency="illegal")
 
         with self.assertRaises(AssertionError):
-            GDASSampler(
-                arch_parameters=arch_parameters,
-                sample_frequency="illegal"
-            )
+            GDASSampler(arch_parameters=arch_parameters, sample_frequency="illegal")
 
         with self.assertRaises(AssertionError):
-            DRNASSampler(
+            DRNASSampler(arch_parameters=arch_parameters, sample_frequency="illegal")
+
+        with self.assertRaises(AssertionError):
+            SDARTSSampler(
                 arch_parameters=arch_parameters,
-                sample_frequency="illegal"
+                sample_frequency="illegal",
+                epsilon=0.03,
             )
 
         with self.assertRaises(AssertionError):
             SNASSampler(
                 arch_parameters=arch_parameters,
-                sample_frequency="illegal"
+                sample_frequency="illegal",
             )
+
 
 if __name__ == "__main__":
     unittest.main()

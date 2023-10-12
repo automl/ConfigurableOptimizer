@@ -9,6 +9,5 @@ __all__ = [
     "DARTSSearchSpace",
     "NASBench1Shot1SearchSpace",
     "TransNASBench101SearchSpace",
-    "adapt_search_space",
     "SearchSpace",
 ]
