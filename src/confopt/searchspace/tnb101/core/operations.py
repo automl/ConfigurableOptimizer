@@ -45,6 +45,29 @@ OPS = {
 
 
 class ReLUConvBN(nn.Module):
+    """ReLU-Convolution-BatchNorm Block Class.
+
+    Args:
+        C_in (int): Number of input channels.
+        C_out (int): Number of output channels.
+        kernel_size (int or tuple[int, int]): Size of the convolutional kernel.
+        stride (int or tuple[int, int]): Stride for the convolution operation.
+        padding (int or tuple[int, int]): Padding for the convolution operation.
+        dilation (int or tuple[int, int]): Dilation rate for the convolution operation.
+        affine (bool): Whether to apply affine transformations in BatchNorm.
+        track_running_stats (bool, optional): Whether to track running statistics in
+        BatchNorm.
+        activation (str): Activation used in operation. "relu" and "leaky" are defined.
+        Default to "relu".
+
+    Attributes:
+        ops (nn.Sequential): Sequential block containing Activation, Convolution,
+        and BatchNorm operations.
+        C_in (int): Number of input channels.
+        C_out (int): Number of output channels.
+        stride (int or tuple[int, int]): Stride for the convolution operation.
+    """
+
     def __init__(
         self,
         C_in: int,
@@ -84,29 +107,93 @@ class ReLUConvBN(nn.Module):
         self.stride = stride
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the ReLUConvBN block.
+
+        Args:
+            x (torch.Tensor): Input tensor to the block.
+
+        Returns:
+            torch.Tensor: The output tensor of the forward pass.
+        """
         return self.ops(x)  # type: ignore
 
     def change_channel_size(self, k: int, device: torch.device = DEVICE) -> None:
+        """Change the number of input and output channels in the ReLUConvBN block.
+
+        Args:
+            k (int): The new number of input and output channels would be 1/k of the
+            original size.
+            device (torch.device, optional): The device to which the operations are
+            moved. Defaults to DEVICE.
+        """
         # TODO: make this change dynamic
         self.ops[1] = reduce_conv_channels(self.ops[1], k, device)
         self.ops[2] = reduce_bn_features(self.ops[2], k, device)
 
     def extra_repr(self) -> str:
+        """Create class representation.
+
+        Returns:
+            str: Class representation based on C_in, C_out and stride.
+        """
         return "C_in={C_in}, C_out={C_out}, stride={stride}".format(**self.__dict__)
 
 
 class Identity(nn.Module):
+    """Identity Block Class.
+
+    This class represents an identity block, which simply passes the input tensor
+    through without any changes.
+
+    Attributes:
+        None
+    """
+
     def __init__(self) -> None:
         super().__init__()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: The input tensor unchanged.
+        """
         return x
 
     def change_channel_size(self, k: int, device: torch.device = DEVICE) -> None:
-        pass
+        """Change the number of input and output channels in the Identity block
+        (no operation performed).
+
+        Args:
+            k (int): The new number of input and output channels would be 1/k of the
+            original size.
+            device (torch.device, optional): The device to which the operations are
+            moved. Defaults to DEVICE.
+        """
 
 
 class Zero(nn.Module):
+    """Zero Block Class.
+
+    This class represents a block that performs a zero operation on the input
+    tensor, adjusting the output tensor's dimensions based on the specified
+    parameters.
+
+    Args:
+        C_in (int): Number of input channels.
+        C_out (int): Number of output channels.
+        stride (int): Stride for the zero operation.
+
+    Attributes:
+        C_in (int): Number of input channels.
+        C_out (int): Number of output channels.
+        stride (int): Stride for the zero operation.
+        is_zero (bool): Flag indicating whether this block performs a zero operation.
+    """
+
     def __init__(self, C_in: int, C_out: int, stride: int):
         super().__init__()
         self.C_in = C_in
@@ -115,6 +202,14 @@ class Zero(nn.Module):
         self.is_zero = True
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor with zeros, adjusted based on block parameters.
+        """
         if self.C_in == self.C_out:
             if self.stride == 1:
                 return x.mul(0.0)
@@ -127,15 +222,53 @@ class Zero(nn.Module):
         ]
 
     def change_channel_size(self, k: int, device: torch.device = DEVICE) -> None:
+        """Change the number of input and output channels in the Zero block.
+
+        This method will not change the functionality, as the Zero block does not
+        change the number of channels anyway.
+
+        Args:
+            k (int): The new number of input and output channels would be 1/k of the
+            original size.
+            device (torch.device, optional): The device to which the operations are
+            moved. Defaults to DEVICE.
+        """
         self.C_in = self.C_in // k
         self.C_out = self.C_out // k
         self.device = device
 
     def extra_repr(self) -> str:
+        """Create class representation.
+
+        Returns:
+            str: Class representation based on C_in, C_out and stride.
+        """
         return "C_in={C_in}, C_out={C_out}, stride={stride}".format(**self.__dict__)
 
 
 class FactorizedReduce(nn.Module):
+    """Factorized Reduce Block Class.
+
+    Args:
+        C_in (int): Number of input channels.
+        C_out (int): Number of output channels.
+        stride (int or tuple[int, int]): Stride for the factorized reduce operation.
+        affine (bool): Whether to apply affine transformations in BatchNorm.
+        track_running_stats (bool): Whether to track running statistics in BatchNorm.
+
+    Attributes:
+        stride (int or tuple[int, int]): Stride for the factorized reduce operation.
+        C_in (int): Number of input channels.
+        C_out (int): Number of output channels.
+        relu (nn.ReLU): ReLU activation layer.
+        convs (nn.ModuleList): List of Conv2d layers for factorized reduction when
+        stride is 2.
+        pad (nn.ConstantPad2d): Padding layer used for factorized reduction when stride
+        is 2.
+        conv (nn.Conv2d): Conv2d layer for factorized reduction when stride is 1.
+        bn (nn.BatchNorm2d): BatchNorm layer.
+    """
+
     def __init__(
         self,
         C_in: int,
@@ -177,6 +310,14 @@ class FactorizedReduce(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the Factorized Reduce block.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor after factorized reduction.
+        """
         if self.stride == 2:
             x = self.relu(x)
             y = self.pad(x)
@@ -187,6 +328,18 @@ class FactorizedReduce(nn.Module):
         return out
 
     def change_channel_size(self, k: int, device: torch.device = DEVICE) -> None:
+        """Change the number of input and output channels in the Factorized Reduce
+        block.
+
+        This method dynamically changes the number of output channels in the block's
+        convolutional layers and BatchNorm.
+
+        Args:
+            k (int): The new number of input and output channels would be 1/k of the
+            original size.
+            device (torch.device, optional): The device to which the operations are
+            moved. Defaults to DEVICE.
+        """
         if self.stride == 2:
             for i in range(2):
                 self.convs[i] = reduce_conv_channels(self.convs[i], k, device)
@@ -198,10 +351,33 @@ class FactorizedReduce(nn.Module):
         self.bn = reduce_bn_features(self.bn, k)
 
     def extra_repr(self) -> str:
+        """Create class representation.
+
+        Returns:
+            str: Class representation based on C_in, C_out and stride.
+        """
         return "C_in={C_in}, C_out={C_out}, stride={stride}".format(**self.__dict__)
 
 
 class ConvLayer(nn.Module):
+    """Convolution Class.
+
+    Args:
+        in_channel (int): Number of input channels.
+        out_channel (int): Number of output channels.
+        kernel (int or tuple[int, int]): Size of convolutional kernel.
+        stride (int or tuple[int, int]): Stride for the convolutional operation.
+        padding (int or tuple[int, int] or str): Padding for the convolutional
+        operation.
+        activation (nn.Module): Activation layer.
+        norm (nn.Module, optional): Normalization layer.
+
+    Attributes:
+        conv (nn.Conv2d): Convolution layer.
+        activation (nn.Module): Activation layer.
+        norm (nn.Module): Normalization layer.
+    """
+
     def __init__(
         self,
         in_channel: int,
@@ -227,6 +403,14 @@ class ConvLayer(nn.Module):
             self.norm = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the Convolution, Normalization and Activation..
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         x = self.conv(x)
         if self.norm and isinstance(self.norm, nn.BatchNorm2d):
             x = self.norm(x)
@@ -236,6 +420,26 @@ class ConvLayer(nn.Module):
 
 
 class DeconvLayer(nn.Module):
+    """Deconvolution Class.
+
+    Reverses the process of convolution. Essentially a Transposed Convolution layer.
+
+    Args:
+        in_channel (int): Number of input channels.
+        out_channel (int): Number of output channels.
+        kernel (int or tuple[int, int]): Size of deconvolutional kernel.
+        stride (int or tuple[int, int]): Stride for the deconvolutional operation.
+        padding (int or tuple[int, int] or str): Padding for the deconvolutional
+        operation.
+        activation (nn.Module): Activation layer.
+        norm (nn.Module): Normalization layer.
+
+    Attributes:
+        conv (nn.ConvTranspose2d): Deconvolution layer.
+        activation (nn.Module): Activation layer.
+        norm (nn.Module): Normalization layer.
+    """
+
     def __init__(
         self,
         in_channel: int,
@@ -262,6 +466,14 @@ class DeconvLayer(nn.Module):
             self.norm = norm
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the Deconvolution, Normalization and Activation.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         x = self.conv(x)
         if self.norm and isinstance(self.norm, nn.BatchNorm2d):
             x = self.norm(x)
@@ -273,6 +485,13 @@ class DeconvLayer(nn.Module):
 class Stem(nn.Module):
     """This is used as an initial layer directly after the
     image input.
+
+    Args:
+        C_in (int): Number of input channels.
+        C_out (int): Number of output channels.
+
+    Attributes:
+        seq (nn.Sequential): Contains one Convolution and one Normalisation layer
     """
 
     def __init__(self, C_in: int = 3, C_out: int = 64):
@@ -283,12 +502,27 @@ class Stem(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the Stem.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         return self.seq(x)
 
 
 class StemJigsaw(nn.Module):
     """This is used as an initial layer directly after the
     image input.
+
+    Args:
+        C_in (int): Number of input channels.
+        C_out (int): Number of output channels.
+
+    Attributes:
+        seq (nn.Sequential): Contains one Convolution and one Normalisation layer
     """
 
     def __init__(self, C_in: int = 3, C_out: int = 64):
@@ -299,6 +533,14 @@ class StemJigsaw(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the Stem.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         _, _, s3, s4, s5 = x.size()
         x = x.reshape(-1, s3, s4, s5)
         return self.seq(x)
@@ -306,7 +548,14 @@ class StemJigsaw(nn.Module):
 
 class SequentialJigsaw(nn.Module):
     """Implementation of `torch.nn.Sequential` to be used
-    as op on edges.
+    as op on edges. Special to the `Jigsaw` task.
+
+    Args:
+        *args: Positional arguments to pass to the Sequential Module.
+        Have to be nn.Module.
+
+    Attributes:
+        seq (nn.Sequential): Contains all given layers.
     """
 
     def __init__(self, *args):  # type: ignore
@@ -315,6 +564,14 @@ class SequentialJigsaw(nn.Module):
         self.op = nn.Sequential(*args)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the Sequential Module.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         _, s2, s3, s4 = x.size()
         x = x.reshape(-1, 9, s2, s3, s4)
         enc_out = []
@@ -327,6 +584,14 @@ class SequentialJigsaw(nn.Module):
 class Sequential(nn.Module):
     """Implementation of `torch.nn.Sequential` to be used
     as op on edges.
+
+    Args:
+        *args: Positional arguments to pass to the Sequential Module.
+        Have to be nn.Module.
+
+    Attributes:
+        primitives (list[nn.Modules]): Contains a list of all given modules.
+        op (nn.Sequential): Contains all given layers.
     """
 
     def __init__(self, *args):  # type: ignore
@@ -339,6 +604,31 @@ class Sequential(nn.Module):
 
 
 class GenerativeDecoder(nn.Module):
+    """Args:
+        in_dim (tuple[int, int]): Number of input channels and width.
+        target_dim (tuple[int, int]): Number of output channels and width.
+        target_num_channel (int, optional): Number of channels in the output.
+        Default is 3.
+        norm (nn.Module, optional): Normalization layer. Default is `nn.BatchNorm2d`.
+
+    Attributes:
+        conv1 (ConvLayer): ConvLayer, channels: input_dim -> 1024
+        conv2 (ConvLayer): ConvLayer, channels: 1024 -> 1024
+        conv3 (nn.Module): DeconvLayer or ConvLayer, channels: 1024 -> 512
+        conv4 (ConvLayer): ConvLayer, channels: 512 -> 512
+        conv5 (nn.Module): DeconvLayer or ConvLayer, channels: 512 -> 256
+        conv6 (ConvLayer): ConvLayer, channels: 256 -> 128
+        conv7 (nn.Module): DeconvLayer or ConvLayer, channels: 128 -> 64
+        conv8 (ConvLayer): ConvLayer, channels: 64 -> 64
+        conv9 (nn.Module): DeconvLayer or ConvLayer, channels: 64 -> 32
+        conv10 (ConvLayer): ConvLayer, channels: 32 -> 32
+        conv11 (DeconvLayer): DeconvLayer, channels: 32 -> 16
+        conv12 (ConvLayer): ConvLayer with LeakyReLU as activation layer.
+        conv13 (DeconvLayer):
+        conv14 (ConvLayer): ConvLayer with Tanh as activation layer.
+
+    """
+
     def __init__(
         self,
         in_dim: tuple[int, int],

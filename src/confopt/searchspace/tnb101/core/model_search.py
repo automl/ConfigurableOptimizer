@@ -14,6 +14,36 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 
 class TNB101SearchModel(nn.Module):
+    """Implementation of a TransNASBench-101 network.
+
+    Args:
+        C (int, optional): Number of channels. Defaults to 16.
+        stride (int, optional): Stride for the deconvolutional operation.
+        Defaults to 1.
+        max_nodes (int, optional): Total amount of nodes in one cell.
+        Defaults to 4.
+        num_classes (int, optional): Number of classes for classification.
+        Defaults to 10.
+        op_names (list[str], optional): List of operations names used for
+        cell structure.
+        Defaults to TRANS_NAS_BENCH_101.
+        affine (bool, optional): Whether to use affine transformations in BatchNorm in
+        cells. Defaults to False.
+        track_running_stats (bool, optional): Whether to track running statistics in
+        BatchNorm in cells. Defaults to False.
+        dataset (str, optional): Name of the dataset used. Defaults to "cifar10".
+        edge_normalization (bool, optional): Whether to enable edge normalization for
+        partial connection. Defaults to False.
+        discretized (bool, optional): Shows if we have a supernet or a discretized
+        search space with one operation on each edge. Defaults to False.
+
+    Attributes:
+        cells (nn.ModuleList): List of cells in the search space.
+        stem (nn.Module): Stem network tailored to the dataset at hand.
+        decoder (nn.Module): Decoder network tailored to the dataset at hand.
+
+    """
+
     def __init__(
         self,
         C: int = 16,
@@ -27,17 +57,6 @@ class TNB101SearchModel(nn.Module):
         edge_normalization: bool = False,
         discretized: bool = False,
     ):
-        """Initialize a TransNasBench-101 network consisting of one cell
-        Args:
-            C_in: in channel
-            C_out: out channel
-            stride: 1 or 2
-            max_nodes: total amount of nodes in one cell
-            num_classes: classes
-            op_names: operations for cell structure
-            affine: used for torch.nn.BatchNorm2D
-            track_running_stats: used for torch.nn.BatchNorm2D.
-        """
         super().__init__()
         assert stride == 1 or stride == 2, f"invalid stride {stride}"
 
@@ -104,12 +123,31 @@ class TNB101SearchModel(nn.Module):
         self._beta_parameters = nn.Parameter(1e-3 * torch.randn(self.num_edge))
 
     def arch_parameters(self) -> nn.Parameter:
+        """Getter function for the private architecture parameters.
+
+        Returns:
+            nn.Parameter: Alpha parameters of the model.
+        """
         return self._arch_parameters
 
     def beta_parameters(self) -> nn.Parameter:
+        """Getter function for the private beta parameters used for edge normalization.
+
+        Returns:
+            nn.Parameter: Beta parameters of the model.
+        """
         return self._beta_parameters
 
     def forward(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Forward pass of the model.
+
+        Args:
+            inputs (torch.Tensor): Input tensor to the model.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: A tuple containing the output of the
+            model twice.
+        """
         if self.discretized:
             alphas = self._arch_parameters
         else:
@@ -141,6 +179,14 @@ class TNB101SearchModel(nn.Module):
         return out, out
 
     def _get_stem_for_task(self, task: str) -> nn.Module:
+        """Builds a task dependant stem network.
+
+        Args:
+            task (str): Name of the dataset/task.
+
+        Returns:
+            nn.Module: Stem network
+        """
         if task == "jigsaw":
             return ops.StemJigsaw(C_out=self.C)
         if task in ["class_object", "class_scene"]:
@@ -150,6 +196,16 @@ class TNB101SearchModel(nn.Module):
         return ops.Stem(C_in=3, C_out=self.C)
 
     def _get_decoder_for_task(self, task: str, n_channels: int) -> nn.Module:
+        """Builds a task dependant decoder network.
+
+        Args:
+            task (str): Name of the dataset/task.
+            n_channels (int): Number of channels.
+
+
+        Returns:
+            nn.Module: Decoder network.
+        """
         if task == "jigsaw":
             return ops.SequentialJigsaw(
                 nn.AdaptiveAvgPool2d(1),
@@ -206,6 +262,30 @@ class TNB101SearchModel(nn.Module):
 
 
 class TNB101SearchCell(nn.Module):
+    """Initialize a TransNasBench-101 cell.
+
+    Args:
+        C_in (int, optional): Number of input channels.
+        C_out (int, optional): Number of output channels.
+        stride (int, optional): Stride for the deconvolutional operation. Defaults to 1.
+        max_nodes (int, optional): Total amount of nodes in one cell. Defaults to 4.
+        op_names (list[str], optional): List of operations names used for
+        cell structure. Defaults to TRANS_NAS_BENCH_101.
+        affine (bool, optional): Whether to use affine transformations in BatchNorm in
+        cells. Defaults to False.
+        track_running_stats (bool, optional): Whether to track running statistics in
+        BatchNorm in cells. Defaults to False
+        downsample (bool, optional):
+
+    Attributes:
+        edges (nn.ModuleDict): Contains OperationChoices for every edge in the cell.
+        Keys are formatted as edge from node j to node i: "{i}<-{j}"
+        edge_keys (Iterable[str]): Sorted Iterable over all possible keys in the cell.
+        edge2index (dict(str, int)): Dictionary from edge keys to indices of the
+        edge_keys iterable.
+        num_edges (int): Number of edges in a cell.
+    """
+
     expansion = 1
 
     def __init__(
@@ -219,16 +299,6 @@ class TNB101SearchCell(nn.Module):
         track_running_stats: bool = True,
         downsample: bool = True,
     ):
-        """Initialize a TransNasBench-101 cell
-        Args:
-            C_in: in channel
-            C_out: out channel
-            stride: 1 or 2
-            max_nodes: total amount of nodes in one cell
-            op_names: operations for cell structure
-            affine: used for torch.nn.BatchNorm2D
-            track_running_stats: used for torch.nn.BatchNorm2D.
-        """
         super().__init__()
         assert stride == 1 or stride == 2, f"invalid stride {stride}"
 
@@ -274,6 +344,17 @@ class TNB101SearchCell(nn.Module):
         alphas: torch.Tensor,
         betas: list[torch.Tensor] | None = None,
     ) -> torch.Tensor:
+        """Forward pass of the model.
+
+        Args:
+            inputs (torch.Tensor): Input tensor to the model.
+            alphas (torch.Tensor): Alpha parameters of the model
+            betas (list[torch.Tensor], optional): Beta parameters of the model.
+            Defaults to None.
+
+        Returns:
+            torch.Tensor:
+        """
         nodes = [inputs]
         for i in range(1, self.max_nodes):
             inter_nodes = []
