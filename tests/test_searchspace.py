@@ -93,7 +93,8 @@ class TestNASBench201SearchSpace(unittest.TestCase):
         arch_params = search_space.arch_parameters[0]
         assert torch.count_nonzero(arch_params) == len(arch_params)
         assert torch.equal(
-            torch.count_nonzero(arch_params, dim=-1), torch.ones(len(arch_params)).to(DEVICE)
+            torch.count_nonzero(arch_params, dim=-1),
+            torch.ones(len(arch_params)).to(DEVICE),
         )
         out = search_space(x)
 
@@ -170,7 +171,9 @@ class TestDARTSSearchSpace(unittest.TestCase):
         arch_params = search_space.arch_parameters
         for p in arch_params:
             assert torch.count_nonzero(p) == len(p)
-            assert torch.equal(torch.count_nonzero(p, dim=-1), torch.ones(len(p)).to(DEVICE))
+            assert torch.equal(
+                torch.count_nonzero(p, dim=-1), torch.ones(len(p)).to(DEVICE)
+            )
 
         out = search_space(x)
 
@@ -249,7 +252,9 @@ class TestNASBench1Shot1SearchSpace(unittest.TestCase):
         arch_params = search_space.arch_parameters
         for p in arch_params:
             assert torch.count_nonzero(p) == len(p)
-            assert torch.equal(torch.count_nonzero(p, dim=-1), torch.ones(len(p)).to(DEVICE))
+            assert torch.equal(
+                torch.count_nonzero(p, dim=-1), torch.ones(len(p)).to(DEVICE)
+            )
 
         self._test_forward_pass(search_space)
 
@@ -307,7 +312,8 @@ class TestTransNASBench101SearchSpace(unittest.TestCase):
         arch_params = search_space.arch_parameters[0]
         assert torch.count_nonzero(arch_params) == len(arch_params)
         assert torch.equal(
-            torch.count_nonzero(arch_params, dim=-1), torch.ones(len(arch_params)).to(DEVICE)
+            torch.count_nonzero(arch_params, dim=-1),
+            torch.ones(len(arch_params)).to(DEVICE),
         )
         out = search_space(x)
 

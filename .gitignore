@@ -92,4 +92,14 @@ data/
 
 # Datasets
 src/confopt/train/datasets/
+datasets/
 
+# Debugging tool
+vscode_remote_debugging
+runner.sh
+
+# logs
+logs/
+
+# wandb
+wandb/

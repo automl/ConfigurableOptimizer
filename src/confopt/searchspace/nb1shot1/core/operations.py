@@ -59,8 +59,20 @@ BN_EPSILON = 1e-5
 
 
 class ConvBnRelu(nn.Module):
-    """Equivalent to conv_bn_relu
+    """Convolutional layer followed by batch normalization and ReLU activation.
+
+    Equivalent to conv_bn_relu.
     https://github.com/google-research/nasbench/blob/master/nasbench/lib/base_ops.py#L32.
+
+    Args:
+        C_in (int): Number of input channels.
+        C_out (int): Number of output channels.
+        kernel_size (int): Size of the convolutional kernel.
+        stride (int): Stride for the convolution (default: 1).
+        padding (int): Padding for the convolution (default: 1).
+
+    Returns:
+        None
     """
 
     def __init__(
@@ -88,16 +100,57 @@ class ConvBnRelu(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the ConvBnRelu module.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor after applying Convolution, Batch Normalization,
+                        and ReLU activation.
+        """
         return self.op(x)
 
     def change_channel_size(self, k: int, device: torch.device = DEVICE) -> None:
+        """Change the channel size of the ConvBnRelu module.
+
+        Args:
+            k (int): New channel size would be 1/k of the original size.
+            device (torch.device, optional): The device where the operation is performed
+                Default is DEVICE.
+
+        Returns:
+            None
+        """
         self.op[0] = reduce_conv_channels(self.op[0], k, device)
         self.op[1] = reduce_bn_features(self.op[1], k, device)
 
 
 class Conv3x3BnRelu(nn.Module):
-    """Equivalent to Conv3x3BnRelu
+    """Convolutional operation with 3x3 kernel, batch normalization, and ReLU
+    activation.
+
+    This class represents a convolutional operation with a 3x3 kernel, followed by
+    batch normalization and ReLU activation. It is equivalent to the Conv3x3BnRelu
+    operation from the NASBench library.
     https://github.com/google-research/nasbench/blob/master/nasbench/lib/base_ops.py#L96.
+
+    Args:
+        channels (int): The number of input and output channels.
+        stride (int): The stride for the convolution operation.
+
+    Attributes:
+        op (ConvBnRelu): The ConvBnRelu module that performs the convolution operation.
+
+    Methods:
+        forward(x: torch.Tensor) -> torch.Tensor:
+            Forward pass of the Conv3x3BnRelu module.
+
+        change_channel_size(k: int, device: torch.device = DEVICE) -> None:
+            Change the channel size of the Conv3x3BnRelu module.
+
+    Default device: torch.device
+        The device where the operation is performed. Default is DEVICE.
     """
 
     def __init__(self, channels: int, stride: int):
@@ -107,15 +160,45 @@ class Conv3x3BnRelu(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the Conv3x3BnRelu layer.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor after applying the convolution, batch
+            normalization, and ReLU operations.
+        """
         return self.op(x)
 
     def change_channel_size(self, k: int, device: torch.device = DEVICE) -> None:
+        """Change the channel size for Conv3x3BnRelu.
+
+        Args:
+            k (int): New channel size.
+            device (torch.device, optional): The device where the operation is performed
+                Defaults to the DEVICE constant.
+
+        Returns:
+            None
+        """
         self.op.change_channel_size(k, device)
 
 
 class Conv1x1BnRelu(nn.Module):
-    """Equivalent to Conv1x1BnRelu
+    """Equivalent to Conv1x1BnRelu.
+
+    This class defines a 1x1 convolution layer followed by batch normalization
+    and ReLU activation.
     https://github.com/google-research/nasbench/blob/master/nasbench/lib/base_ops.py#L107.
+
+    Args:
+        channels (int): Number of input and output channels.
+        stride (int): Stride value for the convolution operation.
+
+    Attributes:
+        op (ConvBnRelu): A sequence of 1x1 convolution, batch normalization, and ReLU.
+
     """
 
     def __init__(self, channels: int, stride: int):
@@ -129,9 +212,28 @@ class Conv1x1BnRelu(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the Conv1x1BnRelu layer.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor after applying the convolution, batch
+            normalization, and ReLU operations.
+        """
         return self.op(x)
 
     def change_channel_size(self, k: int, device: torch.device = DEVICE) -> None:
+        """Change the channel size for Conv1x1BnRelu.
+
+        Args:
+            k (int): New channel size.
+            device (torch.device, optional): The device where the operation is performed
+                Defaults to the DEVICE constant.
+
+        Returns:
+            None
+        """
         self.op.change_channel_size(k, device)
 
 
@@ -148,6 +250,24 @@ class ReLUConvBN(nn.Module):
         padding: int,
         affine: bool = True,
     ) -> None:
+        """ReLU-Convolution-BatchNorm Block Class.
+
+        Args:
+            C_in (int): Number of input channels.
+            C_out (int): Number of output channels.
+            kernel_size (int or tuple[int, int]): Size of the convolutional kernel.
+            stride (int or tuple[int, int]): Stride for the convolution operation.
+            padding (int or tuple[int, int]): Padding for the convolution operation.
+            affine (bool): Whether to apply affine transformations in BatchNorm.
+
+        Attributes:
+            op (nn.Sequential): Sequential block containing ReLU, Convolution,
+            and BatchNorm operations.
+
+        Note:
+            This class represents a ReLU-Convolution-BatchNorm block commonly used in
+            neural network architectures.
+        """
         super().__init__()
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
@@ -163,10 +283,34 @@ class ReLUConvBN(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the ReLUConvBN block.
+
+        Args:
+            x (torch.Tensor): Input tensor to the block.
+
+        Returns:
+            torch.Tensor: The output tensor of the forward pass.
+
+        Note:
+            This method performs a forward pass through the ReLUConvBN block, applying
+            ReLU activation,
+            convolution, and BatchNorm operations to the input tensor.
+        """
         return self.op(x)  # type: ignore
 
     def change_channel_size(self, k: int, device: torch.device = DEVICE) -> None:
-        # TODO: make this change dynamic
+        """Change the number of input and output channels in the ReLUConvBN block.
+
+        Args:
+            k (int): The new number of input and output channels would be 1/k of the
+            original size.
+            device (torch.device, optional): The device to which the operations are
+            moved. Defaults to DEVICE.
+
+        Note:
+            This method dynamically changes the number of output channels in the
+            ReLUConvBN block.
+        """
         self.op[1] = reduce_conv_channels(self.op[1], k, device)
         self.op[2] = reduce_bn_features(self.op[2], k, device)
 
@@ -178,7 +322,23 @@ class Pooling(nn.Module):
         stride: int | tuple[int, int],
         mode: str,
         affine: bool = False,
-    ):
+    ) -> None:
+        """Pooling Block Class.
+
+        Args:
+            C (int): Number of channels.
+            stride (int or tuple[int, int]): Stride for the pooling operation.
+            mode (str): Pooling mode, either "avg" for average pooling or "max" for
+            max pooling.
+            affine (bool, optional): Whether to apply affine transformations in
+            BatchNorm (if preprocess is used). Defaults to True.
+
+        Attributes:
+            op (nn.Sequential): The pooling operation used inside this operation
+
+        Note:
+            This class represents a pooling block with optional mode.
+        """
         super().__init__()
         if mode == "avg":
             op = nn.AvgPool2d(3, stride=stride, padding=1, count_include_pad=False)
@@ -189,9 +349,30 @@ class Pooling(nn.Module):
         self.op = nn.Sequential(op, nn.BatchNorm2d(C, affine=affine))
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the Pooling block.
+
+        Args:
+            inputs (torch.Tensor): Input tensor to the block.
+
+        Returns:
+            torch.Tensor: The output tensor of the forward pass.
+
+        Note:
+            This method performs a forward pass through the Pooling block
+            applying pooling based on the specified mode.
+        """
         return self.op(inputs)  # type: ignore
 
     def change_channel_size(self, k: int, device: torch.device = DEVICE) -> None:
+        """Change the number of input and output channels in the Pooling block's batch
+        norm features.
+
+        Args:
+            k (int): The new number of input and output channels would be 1/k of the
+            original size.
+            device (torch.device, optional): The device to which the operations are
+            moved. Defaults to DEVICE.
+        """
         self.op[1] = reduce_bn_features(self.op[1], k, device)
 
 
@@ -206,6 +387,25 @@ class DilConv(nn.Module):
         dilation: int,
         affine: bool = True,
     ) -> None:
+        """Dilated Convolution operation.
+
+        This class defines a Dilated Convolution operation, which consists of two
+        convolutional layers with different dilation rates. It is commonly used in
+        neural network architectures for various tasks.
+
+        Args:
+            C_in (int): Number of input channels.
+            C_out (int): Number of output channels.
+            kernel_size (int): Size of the convolutional kernel.
+            stride (int): Stride for the convolution.
+            padding (int): Padding for the convolution.
+            dilation (int): Dilation factor for the convolution operation.
+            affine (bool): If True, use affine transformations in Batch Normalization.
+
+        Attributes:
+            op (nn.Sequential): Sequential Block containing ReLU, Conv2d and
+            BatchNorm2d.
+        """
         super().__init__()
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
@@ -224,9 +424,25 @@ class DilConv(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Perform a forward pass through the Dilated Convolution operation.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: The output tensor after applying the Dilated Convolution.
+        """
         return self.op(x)
 
     def change_channel_size(self, k: int, device: torch.device = DEVICE) -> None:
+        """Change the number of input and output channels in the DilConv's ops.
+
+        Args:
+            k (int): The new number of input and output channels would be 1/k of the
+            original size.
+            device (torch.device, optional): The device to which the operations are
+            moved. Defaults to DEVICE.
+        """
         self.op[1] = reduce_conv_channels(self.op[1], k, device)
         self.op[2] = reduce_conv_channels(self.op[2], k, device)
         self.op[3] = reduce_bn_features(self.op[3], k, device)
@@ -242,6 +458,26 @@ class SepConv(nn.Module):
         padding: int,
         affine: bool = True,
     ) -> None:
+        """Separable Convolution-BatchNorm Block Class.
+
+        Args:
+            C_in (int): Number of input channels.
+            C_out (int): Number of output channels.
+            kernel_size (int or tuple[int, int]): Size of the convolutional kernel.
+            stride (int or tuple[int, int]): Stride for the convolution operation.
+            padding (int or tuple[int, int]): Padding for the convolution operation.
+            dilation (int or tuple[int, int]): Dilation rate for the convolution
+            operation.
+            affine (bool): Whether to apply affine transformations in BatchNorm.
+
+        Attributes:
+            op (nn.Sequential): Sequential block containing ReLU, Depthwise Convolution,
+                Pointwise Convolution, and BatchNorm operations.
+
+        Note:
+            This class represents a separable convolutional block, commonly used in
+            neural network architectures.
+        """
         super().__init__()
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
@@ -271,9 +507,25 @@ class SepConv(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Perform a forward pass through the Seperated Convolution operation.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: The output tensor after applying the Dilated Convolution.
+        """
         return self.op(x)
 
     def change_channel_size(self, k: int, device: torch.device = DEVICE) -> None:
+        """Change the number of input and output channels in the SepConv's ops.
+
+        Args:
+            k (int): The new number of input and output channels would be 1/k of the
+            original size.
+            device (torch.device, optional): The device to which the operations are
+            moved. Defaults to DEVICE.
+        """
         self.op[1] = reduce_conv_channels(self.op[1], k, device)
         self.op[2] = reduce_conv_channels(self.op[2], k, device)
         self.op[3] = reduce_bn_features(self.op[3], k, device)
@@ -284,31 +536,115 @@ class SepConv(nn.Module):
 
 class Identity(nn.Module):
     def __init__(self) -> None:
+        """Identity Block Class.
+
+        Note:
+            This class represents an identity block, which simply passes the input
+            tensor through without any changes.
+
+        Attributes:
+            None
+        """
         super().__init__()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the Identity block.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: The input tensor unchanged.
+
+        Note:
+            This method performs a forward pass through the Identity block, returning
+            the input tensor as-is.
+        """
         return x
 
     def change_channel_size(self, k: int, device: torch.device = DEVICE) -> None:
-        pass
+        """Change the number of input and output channels in the Identity block
+        (no operation performed).
+
+        Args:
+            k (int): The new number of input and output channels would be 1/k of the
+            original size.
+            device (torch.device, optional): The device to which the operations are
+            moved. Defaults to DEVICE.
+
+        Note:
+            This method does not perform any operations, as the Identity block does
+            not change the number of channels.
+        """
 
 
 class Zero(nn.Module):
     def __init__(self, stride: int) -> None:
+        """Zero Block Class.
+
+        Args:
+            stride (int): Stride for the zero operation.
+
+        Attributes:
+            stride (int): Stride for the zero operation.
+
+        Note:
+            This class represents a block that performs a zero operation on the input
+            tensor, adjusting the output tensor's dimensions based on the specified
+            parameters.
+        """
         super().__init__()
         self.stride = stride
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the Zero block.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor with zeros, adjusted based on block parameters.
+
+        Note:
+            This method performs a forward pass through the Zero block,
+            applying a zero operation to the input tensor and adjusting its dimensions
+            accordingly.
+        """
         if self.stride == 1:
             return x.mul(0.0)
         return x[:, :, :: self.stride, :: self.stride].mul(0.0)
 
     def change_channel_size(self, k: int, device: torch.device = DEVICE) -> None:
-        pass
+        """Change the number of input and output channels in the Zero block
+        (no operation performed).
+
+        Args:
+            k (int): The new number of input and output channels would be 1/k of the
+            original size.
+            device (torch.device, optional): The device to which the operations are
+            moved. Defaults to DEVICE.
+
+        Note:
+            This method does not perform any operations, as the Zero block does not
+            change the number of channels.
+        """
 
 
 class FactorizedReduce(nn.Module):
     def __init__(self, C_in: int, C_out: int, affine: bool = True):
+        """Factorized Reduce Block Class.
+
+        Args:
+            C_in (int): Number of input channels.
+            C_out (int): Number of output channels.
+            affine (bool): Whether to apply affine transformations in BatchNorm.
+
+        Attributes:
+            relu (nn.ReLU): ReLU activation layer.
+            conv1 (nn.Conv2d): First Conv2d layer for factorized reduction.
+            conv2 (nn.Conv2d): Second Conv2d layer for factorized reduction.
+            bn (nn.BatchNorm2d): BatchNorm layer.
+        """
         super().__init__()
         assert C_out % 2 == 0
         self.relu = nn.ReLU(inplace=False)
@@ -317,12 +653,33 @@ class FactorizedReduce(nn.Module):
         self.bn = nn.BatchNorm2d(C_out, affine=affine)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the Factorized Reduce block.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor after factorized reduction.
+        """
         x = self.relu(x)
         out = torch.cat([self.conv_1(x), self.conv_2(x[:, :, 1:, 1:])], dim=1)
         out = self.bn(out)
         return out
 
     def change_channel_size(self, k: int, device: torch.device = DEVICE) -> None:
+        """Change the number of input and output channels in the Factorized Reduce
+        block.
+
+        Args:
+            k (int): The new number of input and output channels would be 1/k of the
+            original size.
+            device (torch.device, optional): The device to which the operations are
+            moved. Defaults to DEVICE.
+
+        Note:
+            This method dynamically changes the number of output channels in the block's
+            convolutional layers and BatchNorm.
+        """
         self.conv_1 = reduce_conv_channels(self.conv_1, k, device)
         self.conv_2 = reduce_conv_channels(self.conv_2, k, device)
         self.bn = reduce_bn_features(self.bn, k, device)
@@ -335,6 +692,17 @@ class Conv7x1Conv1x7BN(nn.Module):
         stride: int,
         affine: bool = True,
     ) -> None:
+        """Convolution operation using 7x1 and 1x7 kernels with Batch Normalization.
+
+        Args:
+            C (int): Number of input channels.
+            stride (int): Stride for the convolution.
+            affine (bool): If True, use affine transformations in Batch Normalization.
+
+        Note: This class defines a convolution operation that uses two different
+        convolutional kernels, 7x1 and 1x7, with Batch Normalization. This operation
+        can be useful in neural network architectures for various tasks.
+        """
         super().__init__()
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
@@ -344,10 +712,27 @@ class Conv7x1Conv1x7BN(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Perform a forward pass through the Convolution operation.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: The output tensor after applying the convolution operation.
+
+        """
         return self.op(x)
 
     def change_channel_size(self, k: int, device: torch.device = DEVICE) -> None:
-        # TODO: make this change dynamic
+        """Modify the channel sizes of the operation by reducing them to 'k' channels.
+
+        Args:
+            k (int): The new number of channels.
+            device (torch.device): The target device (default is 'DEVICE').
+
+        Note: This method is used for architectural search and adjusts the number of
+        channels in the Convolution operation.
+        """
         self.op[1] = reduce_conv_channels(self.op[1], k, device)
         self.op[2] = reduce_conv_channels(self.op[2], k, device)
         self.op[3] = reduce_bn_features(self.op[3], k, device)

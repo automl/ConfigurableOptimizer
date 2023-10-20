@@ -168,6 +168,21 @@ class Network(nn.Module):
         output_weights: bool = True,
         steps: int = 4,
     ):
+        """Initialize a neural network architecture of the search space.
+
+        Args:
+            search_space_info (dict): Information about the search space.
+            C (int): Number of channels in the architecture (default: 16).
+            num_classes (int): Number of output classes (default: 10).
+            layers (int): Number of layers in the architecture (default: 8).
+            criterion (nn.modules.loss._Loss): Loss criterion
+            (default: CrossEntropyLoss).
+            output_weights (bool): Whether to include output weights (default: True).
+            steps (int): Number of steps or intermediate nodes (default: 4).
+
+        Returns:
+            None
+        """
         super().__init__()
         self._C = C
         self._num_classes = num_classes
@@ -210,6 +225,12 @@ class Network(nn.Module):
         self._initialize_alphas()
 
     def new(self) -> Network:
+        """Create a new Network with the same architecture parameters as the current
+        instance.
+
+        Returns:
+            Network: A new instance of the Network class.
+        """
         model_new = Network(
             C=self._C,
             num_classes=self._num_classes,
@@ -226,6 +247,16 @@ class Network(nn.Module):
     def _preprocess_op(
         self, x: torch.Tensor, discrete: bool, normalize: bool
     ) -> torch.Tensor:
+        """Preprocess architecture weights.
+
+        Args:
+            x (torch.Tensor): The input tensor representing architecture weights.
+            discrete (bool): Whether to use discrete architecture weights.
+            normalize (bool): Whether to normalize weights.
+
+        Returns:
+            torch.Tensor: original or normalized or softmax of x
+        """
         if discrete and normalize:
             raise ValueError("architecture can't be discrete and normalized")
         # If using discrete architecture from random_ws search with weight sharing
@@ -248,6 +279,18 @@ class Network(nn.Module):
         discrete: bool = False,
         normalize: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Forward pass through the model.
+
+        Args:
+            input (torch.Tensor): The input tensor.
+            discrete (bool, optional): Whether to use discrete weights. Defaults to
+            False.
+            normalize (bool, optional): Whether to normalize weights. Defaults to False.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: Tuple containing two tensors,
+            the intermediate output and the final logits.
+        """
         # NASBench only has one input to each cell
         s0 = self.stem(input)
         for i, cell in enumerate(self.cells):
@@ -286,10 +329,35 @@ class Network(nn.Module):
     def _loss(
         self, input: torch.Tensor, target: torch.Tensor  # noqa: A002
     ) -> torch.Tensor:
+        """Compute the loss for a given input and target.
+
+        Args:
+            input (torch.Tensor): The input data.
+            target (torch.Tensor): The target data.
+
+        Returns:
+            torch.Tensor: The computed loss.
+        """
         logits = self(input)
         return self._criterion(logits, target)
 
     def _initialize_alphas(self) -> None:
+        """Initialize the architecture parameters.
+
+        This method initializes the weights for the mixed operations, the alphas on
+        the output node, and the weights for the inputs to each choice block. It also
+        sets the total architecture parameters.
+
+        Note:
+            The initial weights are generated with random values.
+            In comparison to the original paper of https://arxiv.org/pdf/2001.10422.pdf
+            alphas_mixed_op is equivalent to beta
+            alphas_output is equivalent to alpha
+            alphas_input is equivalent to gama
+
+        Returns:
+            None
+        """
         # Initializes the weights for the mixed ops.
         num_ops = len(PRIMITIVES)
         self.alphas_mixed_op = nn.Parameter(
@@ -319,6 +387,11 @@ class Network(nn.Module):
         ]
 
     def arch_parameters(self) -> list[nn.Parameter]:
+        """Get architecture parameters.
+
+        Returns:
+            list[nn.Parameter]: A list of architecture parameters.
+        """
         return self._arch_parameters
 
     def _discretize(self, op_sparsity: float) -> None:
