@@ -32,6 +32,15 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 
 def parent_combinations(node: int, num_parents: int) -> Any:
+    """Generate parent combinations for a given node.
+
+    Args:
+        node (int): Node index.
+        num_parents (int): Number of parents for the node.
+
+    Returns:
+        Any: List of parent combinations.
+    """
     if node == 1 and num_parents == 1:
         return [(0,)]
     else:  # noqa: RET505
@@ -39,6 +48,19 @@ def parent_combinations(node: int, num_parents: int) -> Any:
 
 
 class NASBench1Shot1SearchSpace(SearchSpace):
+    """Initialize the NASBench1Shot1SearchSpace.
+
+    Args:
+        num_intermediate_nodes (int): Number of intermediate nodes in the cell.
+        search_space_type (str): Type of search space, should be "S1", "S2", or "S3".
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+
+    Raises:
+        ValueError: If the given search_space_type is invalid or the total number
+            of parents per node exceeds 9.
+    """
+
     def __init__(
         self,
         num_intermediate_nodes: int = 4,
@@ -114,9 +136,18 @@ class NASBench1Shot1SearchSpace(SearchSpace):
 
     @property
     def arch_parameters(self) -> list[nn.Parameter]:
+        """Return the architecture parameters of the search space."""
         return self.model.arch_parameters()  # type: ignore
 
     def set_arch_parameters(self, arch_parameters: list[nn.Parameter]) -> None:
+        """Set the architecture parameters of the search space.
+
+        Args:
+            arch_parameters (list[nn.Parameter]): The architecture parameters to set.
+
+        Returns:
+            None
+        """
         (
             self.model.alphas_mixed_op.data,
             self.model.alphas_output.data,
@@ -132,6 +163,12 @@ class NASBench1Shot1SearchSpace(SearchSpace):
     def create_nasbench_adjacency_matrix(self, parents: dict[str, Any]) -> np.ndarray:
         """Based on given connectivity pattern create the corresponding adjacency
         matrix.
+
+        Args:
+            parents (dict[str, Any]): Parent nodes for each node.
+
+        Returns:
+            np.ndarray: The created adjacency matrix.
         """
         if self.search_space_type == "S1" or self.search_space_type == "S2":
             adjacency_matrix = self._create_adjacency_matrix(
@@ -150,6 +187,14 @@ class NASBench1Shot1SearchSpace(SearchSpace):
     def create_nasbench_adjacency_matrix_with_loose_ends(
         self, parents: dict[str, Any]
     ) -> np.ndarray:
+        """Create the NASBench adjacency matrix based on given parent nodes.
+
+        Args:
+            parents (dict[str, Any]): Parent nodes for each node.
+
+        Returns:
+            np.ndarray: The created adjacency matrix.
+        """
         if self.search_space_type == "S1" or self.search_space_type == "S2":
             return upscale_to_nasbench_format(
                 self._create_adjacency_matrix_with_loose_ends(parents)
@@ -158,6 +203,16 @@ class NASBench1Shot1SearchSpace(SearchSpace):
         return self._create_adjacency_matrix_with_loose_ends(parents)
 
     def sample(self, with_loose_ends: bool, upscale: bool = True) -> tuple:
+        """Sample an adjacency matrix and node operations.
+
+        Args:
+            with_loose_ends (bool): Whether to allow loose ends in the adjacency matrix.
+            upscale (bool, optional): Whether to upscale the adjacency matrix for
+            certain search space types (default is True).
+
+        Returns:
+            tuple: A tuple containing the sampled adjacency matrix and node operations.
+        """
         if with_loose_ends:
             adjacency_matrix_sample = self._sample_adjacency_matrix_with_loose_ends()
         else:
@@ -183,6 +238,11 @@ class NASBench1Shot1SearchSpace(SearchSpace):
         )
 
     def _sample_adjacency_matrix_with_loose_ends(self) -> np.ndarray:
+        """Sample an adjacency matrix with loose ends.
+
+        Returns:
+            np.ndarray: The sampled adjacency matrix.
+        """
         parents_per_node = [
             random.sample(
                 list(itertools.combinations(list(range(int(node))), num_parents)),
@@ -199,6 +259,15 @@ class NASBench1Shot1SearchSpace(SearchSpace):
     def _sample_adjacency_matrix_without_loose_ends(
         self, adjacency_matrix: np.ndarray, node: int
     ) -> np.ndarray:
+        """Sample an adjacency matrix without loose ends recursively.
+
+        Args:
+            adjacency_matrix (np.ndarray): The adjacency matrix to be modified.
+            node (int): The current node being processed.
+
+        Returns:
+            np.ndarray: The modified adjacency matrix.
+        """
         req_num_parents = self.num_parents_per_node[str(node)]
         current_num_parents = np.sum(adjacency_matrix[:, node], dtype=np.int)
         num_parents_left = req_num_parents - current_num_parents
@@ -233,6 +302,32 @@ class NASBench1Shot1SearchSpace(SearchSpace):
     def convert_config_to_nasbench_format(
         self, config: ConfigSpace.configuration_space.ConfigurationSpace
     ) -> tuple:
+        """Convert a configuration to the NASBench-compatible format.
+
+        This method takes a ConfigurationSpace object representing an architectural
+        configuration and converts it to the format compatible with NASBench, which
+        includes the adjacency matrix and operations for each choice block.
+
+        Args:
+            config (ConfigurationSpace): A ConfigurationSpace object containing
+            architectural hyperparameters.
+
+        Returns:
+            tuple: A tuple containing the adjacency matrix and a list of operations for
+            each choice block.
+
+        The method extracts parent combinations and choice block operations from the
+        input configuration and uses them to construct an adjacency matrix and a list
+        of operations that define the neural architecture.
+
+        Example:
+            This method is essential for converting a configuration generated during the
+            architecture search process into a format that can be queried using
+            NASBench.
+
+        Returns:
+            tuple: A tuple containing the adjacency matrix and operations.
+        """
         parents = {
             node: config[f"choice_block_{node}_parents"]
             for node in list(self.num_parents_per_node.keys())[1:]
@@ -248,6 +343,31 @@ class NASBench1Shot1SearchSpace(SearchSpace):
         return adjacency_matrix, ops
 
     def get_configuration_space(self) -> Any:
+        """Get the configuration space for the search space.
+
+        This method constructs a configuration space representing the search space of
+        neural architectures. The configuration space includes hyperparameters for
+        choosing node operations and specifying parent combinations for each choice
+        block.
+
+        Returns:
+            Any: A ConfigurationSpace object that defines the search space.
+
+        The configuration space is used for hyperparameter optimization and searching
+        within the defined neural architecture search space. It includes categorical
+        hyperparameters for selecting the operations of choice blocks and specifying
+        combinations of parent nodes for each choice block.
+
+        Example:
+            This method can be used to define the configuration space for architecture
+            search algorithms, enabling the exploration of different architectural
+            configurations within the search space.
+
+        Returns:
+            ConfigurationSpace: A ConfigurationSpace object that defines the search
+            space.
+
+        """
         cs = ConfigSpace.ConfigurationSpace()
 
         for node in list(self.num_parents_per_node.keys())[1:-1]:
@@ -271,6 +391,29 @@ class NASBench1Shot1SearchSpace(SearchSpace):
         return cs
 
     def generate_search_space_without_loose_ends(self) -> Generator:
+        """Generate the search space without loose ends.
+
+        This method generates the search space for the neural architecture without loose
+        ends. It explores different connectivity patterns and node operations within the
+        search space, ensuring that all generated architectures adhere to the search
+        space constraints.
+
+        Yields:
+            Tuple: A tuple containing the adjacency matrix, node operations, and the
+            corresponding ModelSpec for architectures within the search space.
+
+        The search space is constructed by iteratively generating valid connectivity
+        patterns and evaluating all possible combinations of node operations. The
+        resulting architectures are represented as adjacency matrices and their
+        corresponding node operations.
+
+        Example:
+            This method can be used to explore the search space for neural architectures
+            without loose ends, generating various valid architectures.
+
+        Yields the generated architectures within the search space.
+
+        """
         # Create all possible connectivity patterns
         for iter, adjacency_matrix in enumerate(  # noqa: A001
             self.generate_adjacency_matrix_without_loose_ends()
@@ -310,6 +453,36 @@ class NASBench1Shot1SearchSpace(SearchSpace):
     def _generate_adjacency_matrix(
         self, adjacency_matrix: np.ndarray, node: int
     ) -> np.ndarray:
+        """Generate valid adjacency matrices for a given node in the search space.
+
+        This method generates valid adjacency matrices for a specific node in the search
+        space. It explores different combinations of parent nodes for the given node
+        while ensuring that the resulting graphs adhere to the search space constraints.
+
+        Args:
+            adjacency_matrix (np.ndarray): The current adjacency matrix representing the
+                graph.
+            node (int): The node for which adjacency matrices are generated.
+
+        Yields:
+            np.ndarray: Valid adjacency matrices that adhere to the search space
+            constraints.
+
+        The adjacency matrix represents the current state of the graph. The method
+        explores various parent node combinations for the specified node to create valid
+        graphs within the search space.
+
+        Example:
+            Given a node with the requirement of 2 parents, calling this method for that
+            node generates valid adjacency matrices with different parent combinations.
+
+        Yields the valid adjacency matrices.
+
+        Notes:
+            This method utilizes a depth-first approach and may yield multiple valid
+            adjacency matrices.
+
+        """
         if self._check_validity_of_adjacency_matrix(adjacency_matrix):
             # If graph from search space then yield.
             yield adjacency_matrix
@@ -334,6 +507,39 @@ class NASBench1Shot1SearchSpace(SearchSpace):
     def _create_adjacency_matrix(
         self, parents: dict[str, Any], adjacency_matrix: np.ndarray, node: int
     ) -> np.ndarray:
+        """Create an adjacency matrix for a given node's parents and its ancestors.
+
+        This method constructs an adjacency matrix based on the provided parents for a
+        specific node and its ancestors. It ensures that the generated graph adheres to
+        the search space constraints.
+
+        Args:
+            parents (dict[str, Any]): A dictionary specifying parent nodes for each node
+            in the graph.
+            adjacency_matrix (np.ndarray): The current adjacency matrix of the graph.
+            node (int): The node for which the adjacency matrix is being constructed.
+
+        Returns:
+            np.ndarray: An updated adjacency matrix.
+
+        The adjacency matrix is initially provided, and it represents the current state
+        of the graph. The method adds connections based on the specified parents for the
+        given node and its ancestors while ensuring that the graph remains valid within
+        the search space.
+
+        Example:
+            For a node with parents {'0': [0], '1': [0], '2': [1, 2]}, and an initial
+            adjacency matrix of
+            [[0, 0, 0],
+             [0, 0, 0],
+             [0, 0, 0]],
+            calling this method for node 2 will update the adjacency matrix to:
+            [[0, 0, 0],
+             [0, 0, 1],
+             [0, 0, 1]]
+
+        Returns the updated adjacency matrix.
+        """
         if self._check_validity_of_adjacency_matrix(adjacency_matrix):
             # If graph from search space then yield.
             return adjacency_matrix
@@ -351,6 +557,32 @@ class NASBench1Shot1SearchSpace(SearchSpace):
     def _create_adjacency_matrix_with_loose_ends(
         self, parents: dict[str, Any]
     ) -> np.ndarray:
+        """Create an adjacency matrix with loose ends for the specified parent nodes.
+
+        This method generates an adjacency matrix that represents connections between
+        nodes in a graph, considering the provided parents for each node. The resulting
+        adjacency matrix accounts for loose ends (nodes without incoming connections).
+
+        Args:
+            parents (dict[str, Any]): A dictionary specifying parent nodes for each node
+            in the graph.
+
+        Returns:
+            np.ndarray: An adjacency matrix representing the graph with loose ends.
+
+        The adjacency matrix is constructed based on the provided parents for each node.
+        A '1' in the matrix indicates a connection between nodes, while '0' represents
+        no connection.
+
+        Example:
+            If parents = {'0': [], '1': [0], '2': [0, 1]}, the resulting adjacency
+            matrix will have connections as follows:
+            [[0, 1, 1],
+             [0, 0, 1],
+             [0, 0, 0]]
+
+        Returns the generated adjacency matrix.
+        """
         # Create the adjacency_matrix on a per node basis
         adjacency_matrix = np.zeros([len(parents), len(parents)])
         for node, node_parents in parents.items():
@@ -359,15 +591,25 @@ class NASBench1Shot1SearchSpace(SearchSpace):
         return adjacency_matrix
 
     def _check_validity_of_adjacency_matrix(self, adjacency_matrix: np.ndarray) -> bool:
-        """Checks whether a graph is a valid graph in the search space.
-        1. Checks that the graph is non empty
-        2. Checks that every node has the correct number of inputs
-        3. Checks that if a node has outgoing edges then it should also have incoming
-           edges
-        4. Checks that input node is connected
-        5. Checks that the graph has no more than 9 edges
-        :param adjacency_matrix:
-        :return:.
+        """Check the validity of an adjacency matrix representing a graph in the search
+        space.
+
+        This method performs several checks to determine whether the provided adjacency
+        matrix is a valid graph in the specified search space.
+
+        Args:
+            adjacency_matrix (np.ndarray): The adjacency matrix to be checked.
+
+        Returns:
+            bool: True if the graph is valid; otherwise, False.
+
+        The method performs the following checks:
+        1. Checks that the graph is non-empty.
+        2. Verifies that every node has the correct number of inputs.
+        3. Ensures that if a node has outgoing edges, it also has incoming edges (apart
+           from the input node).
+        4. Validates that the input node is connected.
+        5. Confirms that the graph has no more than 9 edges.
         """
         # Check that the graph contains nodes
         num_intermediate_nodes = sum(
@@ -403,6 +645,14 @@ class NASBench1Shot1SearchSpace(SearchSpace):
         return True
 
     def generate_with_loose_ends(self) -> Any:
+        """Generate adjacency matrices with loose ends for the specified search space.
+
+        This method generates adjacency matrices with loose ends for the given search
+        space type. The generated adjacency matrices are yielded one by one.
+
+        Yields:
+            Any: Adjacency matrix with loose ends based on the search space type.
+        """
         if self.search_space_type == "S1" or self.search_space_type == "S2":
             for (
                 parent_node_2,
@@ -471,6 +721,24 @@ class NASBench1Shot1SearchSpace(SearchSpace):
         config: ConfigSpace.configuration_space.ConfigurationSpace,
         budget: int = 108,
     ) -> tuple:
+        """Calculate the objective function (validation_accuracy and training_time)
+        value for a given NASBench configuration.
+
+        This method computes the objective function value for a given NASBench
+        configuration by querying the NASBench dataset. It records data to the history
+        if the search space type is "S2".
+
+        Args:
+            nasbench (api.NASBench): The NASBench API for querying architecture data.
+            config (ConfigSpace.configuration_space.ConfigurationSpace): The
+                configuration to evaluate.
+            budget (int, optional): The budget for evaluating the configuration.
+                Defaults to 108.
+
+        Returns:
+            tuple: A tuple containing the validation accuracy and training time for the
+                evaluated configuration.
+        """
         adjacency_matrix, node_list = self.convert_config_to_nasbench_format(config)
         # adjacency_matrix = upscale_to_nasbench_format(adjacency_matrix)
         if self.search_space_type == "S3":

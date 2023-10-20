@@ -100,3 +100,6 @@ runner.sh
 
 # logs
 logs/
+
+# wandb
+wandb/

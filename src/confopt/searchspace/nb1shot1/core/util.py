@@ -72,6 +72,16 @@ class Model:
         nasbench_data: dict[str, int],
         budget: int | None = None,
     ) -> None:
+        """Update the data for a specific architecture.
+
+        Args:
+            arch (Any): The architecture to update the data for.
+            nasbench_data (dict[str, int]): Data obtained from NASBench.
+            budget (int | None): The budget for which the data is collected.
+
+        Returns:
+            None
+        """
         self.arch = arch
         self.validation_accuracy = nasbench_data["validation_accuracy"]
         self.test_accuracy = nasbench_data["test_accuracy"]
@@ -84,6 +94,16 @@ class Model:
         nasbench: api.NASBench,
         sample: bool,
     ) -> None:
+        """Query NASBench for data for a specific architecture.
+
+        Args:
+            search_space_object (SearchSpace): The search space object.
+            nasbench (api.NASBench): The NASBench API.
+            sample (bool): Whether to sample configurations.
+
+        Returns:
+            None
+        """
         config = ConfigSpace.Configuration(
             search_space_object.get_configuration_space(), vector=sample
         )
@@ -188,13 +208,48 @@ class NasbenchWrapper(api.NASBench):
 
 
 def get_top_k(array: np.ndarray, k: int) -> list:
+    """Get the indices of the top k elements in an array.
+
+    Args:
+        array (np.ndarray): The input array.
+        k (int): The number of top elements to retrieve.
+
+    Returns:
+        list: A list of indices corresponding to the top k elements.
+
+    Example:
+        >>> import numpy as np
+        >>> arr = np.array([5, 8, 1, 9, 3, 7])
+        >>> get_top_k(arr, 3)
+        >>> # Output: [1, 3, 5]
+    """
     return list(np.argpartition(array[0], -k)[-k:])
 
 
 def parent_combinations(
     adjacency_matrix: np.ndarray, node: int, n_parents: int = 2
 ) -> Any:
-    """Get all possible parent combinations for the current node."""
+    """Get all possible parent combinations for the current node.
+
+    Args:
+        adjacency_matrix (np.ndarray): The adjacency matrix of the graph.
+        node (int): The index of the current node.
+        n_parents (int, optional): The number of parents for the current node.
+
+    Returns:
+        Any: A list of possible parent combinations for the node.
+
+    Example:
+        >>> import numpy as np
+        >>> adjacency_matrix = np.array([
+        >>>     [0, 0, 0, 0],
+        >>>     [1, 0, 0, 0],
+        >>>     [1, 1, 0, 0],
+        >>>     [1, 1, 1, 0],
+        >>> ])
+        >>> parent_combinations(adjacency_matrix, 3, 2)
+        >>> # Output: [(0, 1), (0, 2), (1, 2)]
+    """
     if node != 1:
         # Parents can only be nodes which have an index that is lower than the current
         # index, because of the upper triangular adjacency matrix and because the index
@@ -209,9 +264,23 @@ def parent_combinations(
 
 
 def draw_graph_to_adjacency_matrix(graph: dict | None) -> None:
-    """Draws the graph in circular format for easier debugging.
-    :param graph:
-    :return:.
+    """Draw the graph in circular format for easier debugging.
+
+    Args:
+        graph (dict or None): A dictionary representing the graph or None if
+        no graph is provided.
+
+    Returns:
+        None
+
+    Example:
+        >>> sample_graph = {
+        >>>     0: [1],
+        >>>     1: [2, 3],
+        >>>     2: [],
+        >>>     3: [],
+        >>> }
+        >>> draw_graph_to_adjacency_matrix(sample_graph)
     """
     dag = nx.DiGraph(graph)
     nx.draw_circular(dag, with_labels=True)
@@ -222,8 +291,16 @@ def upscale_to_nasbench_format(adjacency_matrix: np.ndarray) -> np.ndarray:
     nasbench.
     This method adds a dummy node to the graph which is never used to be compatible with
     nasbench.
-    :param adjacency_matrix:
-    :return:.
+
+    Args:
+        adjacency_matrix (np.ndarray): The input adjacency matrix.
+
+    Returns:
+        np.ndarray: The upscaled adjacency matrix with an additional unused node.
+
+    Example:
+        >>> adjacency_matrix = np.zeros((6, 6))
+        >>> nasbench_adjacency = upscale_to_nasbench_format(adjacency_matrix)
     """
     return np.insert(
         np.insert(adjacency_matrix, 5, [0, 0, 0, 0, 0, 0], axis=1),
@@ -234,6 +311,19 @@ def upscale_to_nasbench_format(adjacency_matrix: np.ndarray) -> np.ndarray:
 
 
 def parse_log(path: str) -> tuple:
+    """Parse a log file to extract train and validation errors.
+
+    Args:
+        path (str): The path to the directory containing the log.txt file.
+
+    Returns:
+        tuple[list[float], list[float]]: A tuple containing two lists:
+            - The first list contains validation errors as floats.
+            - The second list contains train errors as floats.
+
+    Example:
+        >>> valid_errors, train_errors = parse_log("/path/to/logs")
+    """
     f = open(os.path.join(path, "log.txt"))  # noqa: SIM115
     # Read in the relevant information
     train_accuracies = []
@@ -261,12 +351,45 @@ def parse_log(path: str) -> tuple:
 
 # https://stackoverflow.com/questions/5967500/how-to-correctly-sort-a-string-with-a-number-inside
 def atoi(text: str) -> str | int:
+    """Converts a string to an integer if it represents a number, or returns the
+        original string.
+
+    Args:
+        text (str): The input text to be converted.
+
+    Returns:
+        str | int: If the input text is a numeric string, it returns an integer;
+        otherwise, it returns the original string.
+
+    Example:
+        >>> atoi("42")
+        42
+        >>> atoi("abc")
+        'abc'
+
+    """
     return int(text) if text.isdigit() else text
 
 
 def natural_keys(text: str) -> list:
-    """alist.sort(key=natural_keys) sorts in human order
-    http://nedbatchelder.com/blog/200712/human_sorting.html
-    (See Toothy's implementation in the comments).
+    """Sorts a list of strings in human order.
+
+    Args:
+        text (str): The text to extract natural keys from.
+
+    Returns:
+        list: A list of natural keys extracted from the input text.
+
+    Example:
+        To sort a list of strings in human order:
+        >>> mylist = ['my2text10', 'my2text2', 'my1text3']
+        >>> mylist.sort(key=natural_keys)
+        >>> print(mylist)
+        ['my1text3', 'my2text2', 'my2text10']
+
+    References:
+        The implementation is based on Ned Batchelder's blog post:
+        http://nedbatchelder.com/blog/200712/human_sorting.html
+
     """
     return [atoi(c) for c in re.split(r"(\d+)", text)]
