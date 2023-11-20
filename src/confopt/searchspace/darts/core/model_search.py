@@ -227,7 +227,7 @@ class Network(nn.Module):
         for _i, cell in enumerate(self.cells):
             if self.edge_normalization:
                 if cell.reduction:
-                    weights = F.softmax(self.alphas_reduce, dim=-1)
+                    weights = F.softmax(self.sampled_alphas_reduce, dim=-1)
                     n = 3
                     start = 2
                     weights2 = F.softmax(self.betas_reduce[0:2], dim=-1)
@@ -238,7 +238,7 @@ class Network(nn.Module):
                         n += 1
                         weights2 = torch.cat([weights2, tw2], dim=0)
                 else:
-                    weights = F.softmax(self.alphas_normal, dim=-1)
+                    weights = F.softmax(self.sampled_alphas_normal, dim=-1)
                     n = 3
                     start = 2
                     weights2 = F.softmax(self.betas_normal[0:2], dim=-1)
@@ -252,13 +252,13 @@ class Network(nn.Module):
             else:
                 if cell.reduction:
                     if self.discretized:
-                        weights = self.alphas_reduce
+                        weights = self.sampled_alphas_reduce
                     else:
-                        weights = F.softmax(self.alphas_reduce, dim=-1)
+                        weights = F.softmax(self.sampled_alphas_reduce, dim=-1)
                 elif self.discretized:
-                    weights = self.alphas_normal
+                    weights = self.sampled_alphas_normal
                 else:
-                    weights = F.softmax(self.alphas_normal, dim=-1)
+                    weights = F.softmax(self.sampled_alphas_normal, dim=-1)
                 s0, s1 = s1, cell(s0, s1, weights)
         out = self.global_pooling(s1)
         logits = self.classifier(out.view(out.size(0), -1))
@@ -294,6 +294,13 @@ class Network(nn.Module):
             self.alphas_reduce,
         ]
 
+        self.sampled_alphas_normal = self.alphas_normal
+        self.sampled_alphas_reduce = self.alphas_reduce
+        self._sampled_arch_parameters = [
+            self.sampled_alphas_normal,
+            self.sampled_alphas_reduce,
+        ]
+
         self.betas_normal = nn.Parameter(1e-3 * torch.randn(k).to(DEVICE))
         self.betas_reduce = nn.Parameter(1e-3 * torch.randn(k).to(DEVICE))
         self._betas = [
@@ -309,6 +316,18 @@ class Network(nn.Module):
             alpha values.
         """
         return self._arch_parameters  # type: ignore
+
+    def sampled_arch_parameters(self) -> list[torch.nn.Parameter]:
+        """Get a list containing the architecture parameters or alphas sampled from the
+        underlying architecture parameters of the model.
+        """
+        return self._sampled_arch_parameters
+
+    def set_sampled_arch_parameters(
+        self, sampled_alphas: list[torch.nn.Parameter]
+    ) -> None:
+        self._sampled_arch_parameters[0] = sampled_alphas[0]
+        self._sampled_arch_parameters[1] = sampled_alphas[1]
 
     def beta_parameters(self) -> list[torch.nn.Parameter]:
         """Get a list containing the beta parameters of partial connection used for
@@ -355,8 +374,12 @@ class Network(nn.Module):
                 n += 1
             return gene
 
-        gene_normal = _parse(F.softmax(self.alphas_normal, dim=-1).data.cpu().numpy())
-        gene_reduce = _parse(F.softmax(self.alphas_reduce, dim=-1).data.cpu().numpy())
+        gene_normal = _parse(
+            F.softmax(self.sampled_alphas_normal, dim=-1).data.cpu().numpy()
+        )
+        gene_reduce = _parse(
+            F.softmax(self.sampled_alphas_reduce, dim=-1).data.cpu().numpy()
+        )
 
         concat = range(2 + self._steps - self._multiplier, self._steps + 2)
         genotype = Genotype(

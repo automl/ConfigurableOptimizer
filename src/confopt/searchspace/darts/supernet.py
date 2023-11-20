@@ -64,6 +64,21 @@ class DARTSSearchSpace(SearchSpace):
         return self.model.arch_parameters()  # type: ignore
 
     @property
+    def sampled_arch_parameters(self) -> list[nn.Parameter]:
+        """Get a list containing the architecture parameters sampled from the underlying
+           architectural parameters of the model. This is applicable for sampling-based
+           optimizers such as DrNAS and GDAS optimizers, but not for other optimizers
+           like DARTS. In the latter case, the architectural parameters of the model
+           are returned.
+
+        Return:
+            arch_parameters (list[nn.Parameter]): A list of sampling architectural
+            parameters
+            (alpha values) to set.
+        """
+        return self.model.sampled_arch_parameters()
+
+    @property
     def beta_parameters(self) -> list[nn.Parameter]:
         """Get a list containing the beta parameters of the model.
 
@@ -85,14 +100,17 @@ class DARTSSearchSpace(SearchSpace):
         """
         assert len(arch_parameters) == len(self.arch_parameters)
         assert arch_parameters[0].shape == self.arch_parameters[0].shape
-        (
-            self.model.alphas_normal.data,
-            self.model.alphas_reduce.data,
-        ) = arch_parameters
-        self.model._arch_parameters = [
-            self.model.alphas_normal,
-            self.model.alphas_reduce,
-        ]
+
+    def set_sampled_arch_parameters(self, sampled_alphas: list[nn.Parameter]) -> None:
+        current_sampled_alphas = self.model.sampled_arch_parameters()
+        assert len(sampled_alphas) == len(current_sampled_alphas)
+
+        for current_alpha, new_alpha in zip(current_sampled_alphas, sampled_alphas):
+            assert current_alpha.shape == new_alpha.shape
+
+        self.model.set_sampled_arch_parameters(sampled_alphas)
+
+        print("ARCH_PARAM_HASH", sum(self.model.arch_parameters()[0]))
 
     def discretize(self, wider: int | None = None) -> None:
         sparsity = 0.125

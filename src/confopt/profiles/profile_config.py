@@ -86,7 +86,7 @@ class ProfileConfig:
             "momentum": 0.9,
             "nesterov": 0,
             "criterion": "cross_entropy",
-            "batch_size": 96,
+            "batch_size": 4,
             "learning_rate_min": 0.0,
             "weight_decay": 3e-4,
             "cutout": -1,

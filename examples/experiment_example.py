@@ -1,21 +1,21 @@
 from __future__ import annotations
 
-from confopt.profiles import GDASProfile
+from confopt.profiles import GDASProfile, DRNASProfile
 from confopt.train import DatasetType, Experiment, SearchSpaceType
 
 if __name__ == "__main__":
-    searchspace = SearchSpaceType("nb201")
+    searchspace = SearchSpaceType("darts")
     dataset = DatasetType("cifar10")
     seed = 100
 
     # Sampler and Perturbator have different sample_frequency
-    profile = GDASProfile(
+    profile = DRNASProfile(
         is_partial_connection=True,
-        perturbation="random",
+        perturbation="none",
         sampler_sample_frequency="step",
-        perturbator_sample_frequency="epoch",
-        tau_max=20,
-        tau_min=0.2,
+        # perturbator_sample_frequency="epoch",
+        # tau_max=20,
+        # tau_min=0.2,
     )
 
     config = profile.get_config()

@@ -53,7 +53,7 @@ class TestArchSamplers(unittest.TestCase):
 
         alphas_before = searchspace.arch_parameters
         self._sampler_new_step_or_epoch(sampler, sample_frequency)
-        alphas_after = sampler.sampled_alphas
+        alphas_after = sampler.sampled_arch_parameters
 
         # assert that the tensors are close
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
@@ -85,7 +85,7 @@ class TestArchSamplers(unittest.TestCase):
 
         alphas_before = searchspace.arch_parameters
         self._sampler_new_step_or_epoch(sampler, sample_frequency)
-        alphas_after = sampler.sampled_alphas
+        alphas_after = sampler.sampled_arch_parameters
 
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
             assert not torch.allclose(arch_param_before, arch_param_after)
@@ -119,7 +119,7 @@ class TestArchSamplers(unittest.TestCase):
 
         alphas_before = searchspace.arch_parameters
         self._sampler_new_step_or_epoch(sampler, sample_frequency)
-        alphas_after = sampler.sampled_alphas
+        alphas_after = sampler.sampled_arch_parameters
 
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
             assert not torch.allclose(arch_param_before, arch_param_after)
@@ -179,7 +179,7 @@ class TestArchSamplers(unittest.TestCase):
         # Random Attack
         alphas_before = searchspace.arch_parameters
         self._sampler_new_step_or_epoch(sampler, sample_frequency)
-        alphas_after = sampler.sampled_alphas
+        alphas_after = sampler.sampled_arch_parameters
 
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
             assert not torch.allclose(arch_param_before, arch_param_after)
@@ -209,7 +209,7 @@ class TestArchSamplers(unittest.TestCase):
 
         alphas_before = searchspace.arch_parameters
         self._sampler_new_step_or_epoch(sampler, sample_frequency)
-        alphas_after = sampler.sampled_alphas
+        alphas_after = sampler.sampled_arch_parameters
 
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
             assert not torch.allclose(arch_param_before, arch_param_after)

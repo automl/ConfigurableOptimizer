@@ -21,7 +21,7 @@ class SearchSpace(nn.Module, ABC):
         pass
 
     @abstractmethod
-    def set_arch_parameters(self, arch_parameters: list[nn.Parameter]) -> None:
+    def set_sampled_arch_parameters(self, arch_parameters: list[nn.Parameter]) -> None:
         pass
 
     def model_weight_parameters(self) -> list[nn.Parameter]:
@@ -48,4 +48,4 @@ class SearchSpace(nn.Module, ABC):
                 isinstance(component, BaseSampler)
                 and component.sample_frequency == "step"
             ):
-                self.set_arch_parameters(component.arch_parameters)
+                self.set_sampled_arch_parameters(component.sampled_arch_parameters)
