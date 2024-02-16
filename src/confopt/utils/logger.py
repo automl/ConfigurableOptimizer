@@ -20,7 +20,7 @@ def prepare_logger(
     exp_name: str,
     xargs: argparse.Namespace | None = None,
 ) -> Logger:
-    logger = Logger(save_dir, seed, exp_name=exp_name)
+    logger = Logger(save_dir, seed=str(seed), exp_name=exp_name)
     logger.log(f"Main Function with logger : {logger}")
     logger.log("Arguments : -------------------------------")
 
@@ -47,87 +47,78 @@ class Logger:
     def __init__(
         self,
         log_dir: str,
-        seed: str | int,
-        # create_model_dir: bool = True,
         exp_name: str = "",
         search_space: str = "",
+        dataset: str = "cifar10",
+        seed: str | int = 2,
         run_time: str | None = None,
+        use_supernet_checkpoint: bool = False,
         last_run: bool = False,
     ) -> None:
+        self.log_dir = log_dir
+        self.exp_name = exp_name
+        self.search_space = search_space
+        self.dataset = dataset
+        self.seed = str(seed)
+        self.use_supernet_checkpoint = use_supernet_checkpoint
+        self.last_run = last_run
+
+        assert sum([last_run, run_time is not None]) <= 1
         """Create a summary writer logging to log_dir."""
         if last_run:
-            run_time = self.load_last_run(log_dir, exp_name, search_space, str(seed))
-        elif run_time is None:
-            run_time = time.strftime("%Y-%d-%h-%H:%M:%S", time.gmtime(time.time()))
+            assert os.path.exists(self.expr_log_path() / "last_run")
+            last_run_time = self.load_last_run()
+            self.set_up_run(last_run_time)
+        elif run_time is not None:
+            assert os.path.exists(self.expr_log_path() / run_time)
+            self.set_up_run(run_time)
         else:
-            print(
-                "loading from the provided run time."
-                "Please make sure that the run folder is avialable"
-            )
-
-        self.log_dir = Path(log_dir) / exp_name / search_space / str(seed) / run_time
-        self.seed = int(seed)
-
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-        (Path(self.log_dir) / "checkpoints").mkdir(parents=True, exist_ok=True)
-        self.tensorboard_dir = self.log_dir / (
-            "tensorboard-{:}".format(time.strftime("%d-%h", time.gmtime(time.time())))
-        )
-
-        self.logger_path = self.log_dir / "log"
-        self.logger_file = open(self.logger_path, "w")  # noqa: SIM115
-        self.writer = None
+            self.set_up_new_run()
 
     def set_up_new_run(self) -> None:
         run_time = time.strftime("%Y-%d-%h-%H:%M:%S", time.gmtime(time.time()))
-        self.set_up_run(run_time)
+        if hasattr(self, "logger_file"):
+            self.close()
+        self.set_up_run(run_time=run_time)
 
-    def set_up_run(self, new_run_time: str | None = None) -> None:
-        parts = self.log_dir.parts
-        log_dir = "/".join(parts[:-4])
-        exp_name = parts[-4]
-        search_space = parts[-3]
-        seed = parts[-2]
-        run_time = parts[-1]
-
-        if new_run_time:
-            run_time = new_run_time
-
-        self.save_last_run(
-            run_time=run_time,
-            log_dir=log_dir,
-            exp_name=exp_name,
-            search_space=search_space,
-            seed=seed,
+    def set_up_run(self, run_time: str) -> None:
+        self.run_time = run_time
+        (self.expr_log_path() / self.run_time).mkdir(parents=True, exist_ok=True)
+        (self.expr_log_path() / self.run_time / "checkpoints").mkdir(
+            parents=True, exist_ok=True
         )
-        self.log_dir = Path(log_dir) / exp_name / search_space / seed / run_time
-
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-        (Path(self.log_dir) / "checkpoints").mkdir(parents=True, exist_ok=True)
-        self.tensorboard_dir = self.log_dir / (
+        self.tensorboard_dir = (self.expr_log_path() / self.run_time) / (
             "tensorboard-{:}".format(time.strftime("%d-%h", time.gmtime(time.time())))
         )
-
-        self.logger_path = self.log_dir / "log"
+        self.save_last_run()
+        self.logger_path = self.expr_log_path() / self.run_time / "log"
         self.logger_file = open(self.logger_path, "w")  # noqa: SIM115
+        self.writer = None
 
-    def load_last_run(
-        self, log_dir: str, exp_name: str, search_space: str, seed: str
-    ) -> str:
-        file_path = Path(log_dir) / exp_name / search_space / seed / "last_run"
+    def expr_log_path(self) -> Path:
+        path_componenets = [
+            self.log_dir,
+            self.exp_name,
+            self.search_space,
+            self.dataset,
+            self.seed,
+            "supernet" if self.use_supernet_checkpoint else "discrete",
+        ]
+        expr_log_path_str = "/".join(path_componenets)
+        return Path(expr_log_path_str)
+
+    def load_last_run(self) -> str:
+        file_path = self.expr_log_path() / "last_run"
 
         with open(file_path) as f:
             run_time = f.read().strip()
         return run_time
 
-    def save_last_run(
-        self, run_time: str, log_dir: str, exp_name: str, search_space: str, seed: str
-    ) -> str:
-        file_path = Path(log_dir) / exp_name / search_space / seed / "last_run"
+    def save_last_run(self) -> None:
+        file_path = self.expr_log_path() / "last_run"
 
         with open(file_path, "w") as f:
-            f.write(run_time)
-        return run_time
+            f.write(self.run_time)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(dir={self.log_dir}, writer={self.writer})"
@@ -144,14 +135,22 @@ class Logger:
         if mode not in valids:
             raise TypeError(f"Unknow mode = {mode}, valid modes = {valids}")
         if mode == "best_model":
-            return str(self.log_dir / (mode + ".pth"))
+            return str((self.expr_log_path() / self.run_time) / (mode + ".pth"))
         if mode == "last_checkpoint":
-            last_checkpoint_path = self.log_dir / "checkpoints" / "last_checkpoint"
+            last_checkpoint_path = (
+                (self.expr_log_path() / self.run_time)
+                / "checkpoints"
+                / "last_checkpoint"
+            )
             with open(last_checkpoint_path) as f:
-                return str(self.log_dir / "checkpoints" / f.read().strip())
+                return str(
+                    (self.expr_log_path() / self.run_time)
+                    / "checkpoints"
+                    / f.read().strip()
+                )
         if mode is None:
-            return str(self.log_dir)
-        return str(self.log_dir / mode)
+            return str(self.expr_log_path() / self.run_time)
+        return str((self.expr_log_path() / self.run_time) / mode)
 
     def extract_log(self) -> IO[Any]:
         return self.logger_file
