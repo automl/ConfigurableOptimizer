@@ -76,9 +76,9 @@ class Trainer:
                 "epoch": epoch + 1,
                 "model": self.model.state_dict(),
                 "w_optimizer": self.model_optimizer.state_dict(),
-                "w_scheduler": self.scheduler.state_dict()
-                if self.scheduler is not None
-                else [],
+                "w_scheduler": (
+                    self.scheduler.state_dict() if self.scheduler is not None else []
+                ),
                 "valid_losses": self.valid_losses,
                 "valid_accs_top1": self.valid_accs_top1,
                 "valid_accs_top5": self.valid_accs_top5,

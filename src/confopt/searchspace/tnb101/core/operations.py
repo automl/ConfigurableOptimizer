@@ -28,9 +28,11 @@ OPS = {
         affine,
         track_running_stats,
     ),
-    "skip_connect": lambda C_in, C_out, stride, affine, track_running_stats: Identity()
-    if (stride == 1 and C_in == C_out)
-    else FactorizedReduce(C_in, C_out, stride, affine, track_running_stats),
+    "skip_connect": lambda C_in, C_out, stride, affine, track_running_stats: (
+        Identity()
+        if (stride == 1 and C_in == C_out)
+        else FactorizedReduce(C_in, C_out, stride, affine, track_running_stats)
+    ),
     "nor_conv_3x3": lambda C_in, C_out, stride, affine, track_running_stats: ReLUConvBN(
         C_in,
         C_out,

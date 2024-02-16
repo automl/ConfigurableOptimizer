@@ -13,9 +13,9 @@ OPS = {
     "none": lambda C, stride, affine: Zero(stride),  # noqa: ARG005
     "avg_pool_3x3": lambda C, stride, affine: Pooling(C, stride, "avg", affine=affine),
     "max_pool_3x3": lambda C, stride, affine: Pooling(C, stride, "max", affine=affine),
-    "skip_connect": lambda C, stride, affine: Identity()
-    if stride == 1
-    else FactorizedReduce(C, C, affine=affine),
+    "skip_connect": lambda C, stride, affine: (
+        Identity() if stride == 1 else FactorizedReduce(C, C, affine=affine)
+    ),
     "sep_conv_3x3": lambda C, stride, affine: SepConv(
         C, C, 3, stride, 1, affine=affine
     ),

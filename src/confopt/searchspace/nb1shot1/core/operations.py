@@ -28,9 +28,9 @@ OPS = {
         "avg",
         affine,
     ),
-    "skip_connect": lambda C, stride, affine: Identity()
-    if stride == 1
-    else FactorizedReduce(C, C, affine=affine),
+    "skip_connect": lambda C, stride, affine: (
+        Identity() if stride == 1 else FactorizedReduce(C, C, affine=affine)
+    ),
     "sep_conv_3x3": lambda C, stride, affine: SepConv(
         C, C, 3, stride, 1, affine=affine
     ),
