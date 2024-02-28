@@ -8,6 +8,7 @@ from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import BasePerturbator
 from confopt.searchspace import DARTSSearchSpace
 from confopt.searchspace.common import (
+    LoRALayer,
     OperationBlock,
     OperationChoices,
     SearchSpace,
@@ -72,6 +73,11 @@ class Profile:
             ops, is_reduction_cell, self.partial_connector, self.dropout
         )
         return op_block
+
+    def activate_lora(self, searchspace: SearchSpace, r_value: int) -> None:
+        for _, module in searchspace.named_modules(remove_duplicate=False):
+            if isinstance(module, LoRALayer):
+                module.activate_lora_component(r=r_value)
 
     def get_parent_and_attribute(self, module_name: str) -> tuple[str, str]:
         split_index = module_name.rfind(".")
