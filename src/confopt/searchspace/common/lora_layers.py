@@ -1,6 +1,6 @@
-##################################################
+############################################################
 # Copyright (c) Microsoft Corporation [Github LoRA], 2021.
-##################################################
+############################################################
 
 from __future__ import annotations  # noqa: I001
 
@@ -35,6 +35,12 @@ class LoRALayer:
     @abstractmethod
     def _initialize_AB(self) -> None:  # noqa: N802
         pass
+
+    @abstractmethod
+    def activate_lora_component(self, r: int) -> None:
+        assert self.r == 0, "rank can only be changed once"
+        self.r = r
+        self._initialize_AB()
 
 
 class ConvLoRA(nn.Module, LoRALayer):
@@ -80,11 +86,6 @@ class ConvLoRA(nn.Module, LoRALayer):
             self._initialize_AB()
         self.reset_parameters()
         self.merged = False
-
-    def activate_lora_component(self, r: int) -> None:
-        assert self.r == 0, "rank can only be changed once"
-        self.r = r
-        self._initialize_AB()
 
     def _initialize_AB(self) -> None:  # noqa: N802
         assert (
