@@ -6,6 +6,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
+from confopt.searchspace.common import Conv2DLoRA
 from confopt.utils.reduce_channels import (
     reduce_bn_features,
     reduce_conv_channels,
@@ -94,9 +95,11 @@ OPS = {
         affine,
         track_running_stats,
     ),
-    "skip_connect": lambda C_in, C_out, stride, affine, track_running_stats: Identity()
-    if stride == 1 and C_in == C_out
-    else FactorizedReduce(C_in, C_out, stride, affine, track_running_stats),
+    "skip_connect": lambda C_in, C_out, stride, affine, track_running_stats: (
+        Identity()
+        if stride == 1 and C_in == C_out
+        else FactorizedReduce(C_in, C_out, stride, affine, track_running_stats)
+    ),
 }
 
 NAS_BENCH_201 = [
@@ -160,7 +163,7 @@ class ReLUConvBN(nn.Module):
         super().__init__()
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
-            nn.Conv2d(
+            Conv2DLoRA(
                 C_in,
                 C_out,
                 kernel_size,
@@ -205,6 +208,9 @@ class ReLUConvBN(nn.Module):
         self.op[1] = reduce_conv_channels(self.op[1], k, device)
         self.op[2] = reduce_bn_features(self.op[2], k, device)
 
+    def activate_lora(self, r: int) -> None:
+        self.op[1].activate_lora_component(r)
+
 
 class SepConv(nn.Module):
     """Separable Convolution-BatchNorm Block Class.
@@ -243,17 +249,17 @@ class SepConv(nn.Module):
         super().__init__()
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
-            nn.Conv2d(
+            Conv2DLoRA(
                 C_in,
                 C_in,
-                kernel_size=kernel_size,
+                kernel_size,
                 stride=stride,
                 padding=padding,
                 dilation=dilation,
                 groups=C_in,
                 bias=False,
             ),
-            nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=not affine),
+            Conv2DLoRA(C_in, C_out, kernel_size=1, padding=0, bias=not affine),
             nn.BatchNorm2d(
                 C_out, affine=affine, track_running_stats=track_running_stats
             ),
@@ -291,6 +297,10 @@ class SepConv(nn.Module):
         self.op[1] = reduce_conv_channels(self.op[1], k, device)
         self.op[2] = reduce_conv_channels(self.op[2], k, device)
         self.op[3] = reduce_bn_features(self.op[3], k, device)
+
+    def activate_lora(self, r: int) -> None:
+        self.op[1].activate_lora_component(r)
+        self.op[2].activate_lora_component(r)
 
 
 class DualSepConv(nn.Module):
@@ -381,6 +391,10 @@ class DualSepConv(nn.Module):
         """
         self.op_b.change_channel_size(k, device)
         self.op_b.change_channel_size(k, device)
+
+    def activate_lora(self, r: int) -> None:
+        self.op_a.activate_lora(r)
+        self.op_b.activate_lora(r)
 
 
 class ResNetBasicblock(nn.Module):
@@ -750,10 +764,10 @@ class FactorizedReduce(nn.Module):
             self.convs = nn.ModuleList()
             for i in range(2):
                 self.convs.append(
-                    nn.Conv2d(
+                    Conv2DLoRA(
                         C_in,
                         C_outs[i],
-                        1,
+                        kernel_size=1,
                         stride=stride,
                         padding=0,
                         bias=not affine,
@@ -761,8 +775,8 @@ class FactorizedReduce(nn.Module):
                 )
             self.pad = nn.ConstantPad2d((0, 1, 0, 1), 0)
         elif stride == 1:
-            self.conv = nn.Conv2d(
-                C_in, C_out, 1, stride=stride, padding=0, bias=not affine
+            self.conv = Conv2DLoRA(
+                C_in, C_out, kernel_size=1, stride=stride, padding=0, bias=not affine
             )
         else:
             raise ValueError(f"Invalid stride: {stride}")
@@ -815,6 +829,15 @@ class FactorizedReduce(nn.Module):
             raise ValueError(f"Invalid stride: {self.stride}")
 
         self.bn = reduce_bn_features(self.bn, k)
+
+    def activate_lora(self, r: int) -> None:
+        if self.stride == 2:
+            for i in range(2):
+                self.convs[i].activate_lora_component(r)
+        elif self.stride == 1:
+            self.conv.activate_lora_component(r)
+        else:
+            raise ValueError(f"Invalid stride: {self.stride}")
 
     def extra_repr(self) -> str:
         """Return an informative string representation of the Factorized Reduce block.

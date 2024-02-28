@@ -3,6 +3,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
+from confopt.searchspace.common import Conv2DLoRA
 from confopt.utils.reduce_channels import (
     reduce_bn_features,
     reduce_conv_channels,
@@ -13,9 +14,9 @@ OPS = {
     "none": lambda C, stride, affine: Zero(stride),  # noqa: ARG005
     "avg_pool_3x3": lambda C, stride, affine: Pooling(C, stride, "avg", affine=affine),
     "max_pool_3x3": lambda C, stride, affine: Pooling(C, stride, "max", affine=affine),
-    "skip_connect": lambda C, stride, affine: Identity()
-    if stride == 1
-    else FactorizedReduce(C, C, affine=affine),
+    "skip_connect": lambda C, stride, affine: (
+        Identity() if stride == 1 else FactorizedReduce(C, C, affine=affine)
+    ),
     "sep_conv_3x3": lambda C, stride, affine: SepConv(
         C, C, 3, stride, 1, affine=affine
     ),
@@ -68,7 +69,7 @@ class ReLUConvBN(nn.Module):
         super().__init__()
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
-            nn.Conv2d(
+            Conv2DLoRA(
                 C_in,
                 C_out,
                 kernel_size,
@@ -110,6 +111,9 @@ class ReLUConvBN(nn.Module):
         """
         self.op[1] = reduce_conv_channels(self.op[1], k, device)
         self.op[2] = reduce_bn_features(self.op[2], k, device)
+
+    def activate_lora(self, r: int) -> None:
+        self.op[1].activate_lora_component(r)
 
 
 class Pooling(nn.Module):
@@ -206,7 +210,7 @@ class DilConv(nn.Module):
         super().__init__()
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
-            nn.Conv2d(
+            Conv2DLoRA(
                 C_in,
                 C_in,
                 kernel_size=kernel_size,
@@ -216,7 +220,7 @@ class DilConv(nn.Module):
                 groups=C_in,
                 bias=False,
             ),
-            nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
+            Conv2DLoRA(C_in, C_out, kernel_size=1, padding=0, bias=False),
             nn.BatchNorm2d(C_out, affine=affine),
         )
 
@@ -243,6 +247,10 @@ class DilConv(nn.Module):
         self.op[1] = reduce_conv_channels(self.op[1], k, device)
         self.op[2] = reduce_conv_channels(self.op[2], k, device)
         self.op[3] = reduce_bn_features(self.op[3], k, device)
+
+    def activate_lora(self, r: int) -> None:
+        self.op[1].activate_lora_component(r)
+        self.op[2].activate_lora_component(r)
 
 
 class SepConv(nn.Module):
@@ -278,7 +286,7 @@ class SepConv(nn.Module):
         super().__init__()
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
-            nn.Conv2d(
+            Conv2DLoRA(
                 C_in,
                 C_in,
                 kernel_size=kernel_size,
@@ -287,10 +295,10 @@ class SepConv(nn.Module):
                 groups=C_in,
                 bias=False,
             ),
-            nn.Conv2d(C_in, C_in, kernel_size=1, padding=0, bias=False),
+            Conv2DLoRA(C_in, C_in, kernel_size=1, padding=0, bias=False),
             nn.BatchNorm2d(C_in, affine=affine),
             nn.ReLU(inplace=False),
-            nn.Conv2d(
+            Conv2DLoRA(
                 C_in,
                 C_in,
                 kernel_size=kernel_size,
@@ -299,7 +307,7 @@ class SepConv(nn.Module):
                 groups=C_in,
                 bias=False,
             ),
-            nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
+            Conv2DLoRA(C_in, C_out, kernel_size=1, padding=0, bias=False),
             nn.BatchNorm2d(C_out, affine=affine),
         )
 
@@ -329,6 +337,12 @@ class SepConv(nn.Module):
         self.op[5] = reduce_conv_channels(self.op[5], k, device)
         self.op[6] = reduce_conv_channels(self.op[6], k, device)
         self.op[7] = reduce_bn_features(self.op[7], k, device)
+
+    def activate_lora(self, r: int) -> None:
+        self.op[1].activate_lora_component(r)
+        self.op[2].activate_lora_component(r)
+        self.op[5].activate_lora_component(r)
+        self.op[6].activate_lora_component(r)
 
 
 class Identity(nn.Module):
@@ -445,8 +459,12 @@ class FactorizedReduce(nn.Module):
         super().__init__()
         assert C_out % 2 == 0
         self.relu = nn.ReLU(inplace=False)
-        self.conv_1 = nn.Conv2d(C_in, C_out // 2, 1, stride=2, padding=0, bias=False)
-        self.conv_2 = nn.Conv2d(C_in, C_out // 2, 1, stride=2, padding=0, bias=False)
+        self.conv_1 = Conv2DLoRA(
+            C_in, C_out // 2, kernel_size=1, stride=2, padding=0, bias=False
+        )
+        self.conv_2 = Conv2DLoRA(
+            C_in, C_out // 2, kernel_size=1, stride=2, padding=0, bias=False
+        )
         self.bn = nn.BatchNorm2d(C_out, affine=affine)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -480,6 +498,10 @@ class FactorizedReduce(nn.Module):
         self.conv_1 = reduce_conv_channels(self.conv_1, k, device)
         self.conv_2 = reduce_conv_channels(self.conv_2, k, device)
         self.bn = reduce_bn_features(self.bn, k, device)
+
+    def activate_lora(self, r: int) -> None:
+        self.conv_1.activate_lora_component(r)
+        self.conv_2.activate_lora_component(r)
 
 
 class Conv7x1Conv1x7BN(nn.Module):

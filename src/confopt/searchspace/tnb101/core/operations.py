@@ -5,6 +5,7 @@ from math import log2
 import torch
 from torch import nn
 
+from confopt.searchspace.common import Conv2DLoRA
 from confopt.utils.reduce_channels import (
     reduce_bn_features,
     reduce_conv_channels,
@@ -28,9 +29,11 @@ OPS = {
         affine,
         track_running_stats,
     ),
-    "skip_connect": lambda C_in, C_out, stride, affine, track_running_stats: Identity()
-    if (stride == 1 and C_in == C_out)
-    else FactorizedReduce(C_in, C_out, stride, affine, track_running_stats),
+    "skip_connect": lambda C_in, C_out, stride, affine, track_running_stats: (
+        Identity()
+        if (stride == 1 and C_in == C_out)
+        else FactorizedReduce(C_in, C_out, stride, affine, track_running_stats)
+    ),
     "nor_conv_3x3": lambda C_in, C_out, stride, affine, track_running_stats: ReLUConvBN(
         C_in,
         C_out,
@@ -65,7 +68,7 @@ class ReLUConvBN(nn.Module):
         else:
             raise ValueError(f"invalid activation {activation}")
         ops += [
-            nn.Conv2d(
+            Conv2DLoRA(
                 C_in,
                 C_out,
                 kernel_size,
@@ -90,6 +93,9 @@ class ReLUConvBN(nn.Module):
         # TODO: make this change dynamic
         self.ops[1] = reduce_conv_channels(self.ops[1], k, device)
         self.ops[2] = reduce_bn_features(self.ops[2], k, device)
+
+    def activate_lora(self, r: int) -> None:
+        self.ops[1].activate_lora_component(r)
 
     def extra_repr(self) -> str:
         return "C_in={C_in}, C_out={C_out}, stride={stride}".format(**self.__dict__)
@@ -155,7 +161,7 @@ class FactorizedReduce(nn.Module):
             self.convs = nn.ModuleList()
             for i in range(2):
                 self.convs.append(
-                    nn.Conv2d(
+                    Conv2DLoRA(
                         C_in,
                         C_outs[i],
                         1,
@@ -166,7 +172,7 @@ class FactorizedReduce(nn.Module):
                 )
             self.pad = nn.ConstantPad2d((0, 1, 0, 1), 0)
         elif stride == 1:
-            self.conv = nn.Conv2d(
+            self.conv = Conv2DLoRA(
                 C_in, C_out, 1, stride=stride, padding=0, bias=not affine
             )
         else:
@@ -196,6 +202,15 @@ class FactorizedReduce(nn.Module):
             raise ValueError(f"Invalid stride : {self.stride}")
 
         self.bn = reduce_bn_features(self.bn, k)
+
+    def activate_lora(self, r: int) -> None:
+        if self.stride == 2:
+            for i in range(2):
+                self.convs[i].activate_lora_component(r)
+        elif self.stride == 1:
+            self.conv.activate_lora_component(r)
+        else:
+            raise ValueError(f"Invalid stride : {self.stride}")
 
     def extra_repr(self) -> str:
         return "C_in={C_in}, C_out={C_out}, stride={stride}".format(**self.__dict__)
