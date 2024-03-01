@@ -37,9 +37,22 @@ class LoRALayer:
         pass
 
     @abstractmethod
-    def activate_lora_component(self, r: int) -> None:
+    def activate_lora_component(
+        self,
+        r: int,
+        lora_alpha: int = 1,
+        lora_dropout_rate: float = 0,
+        merge_weights: bool = True,
+    ) -> None:
         assert self.r == 0, "rank can only be changed once"
         self.r = r
+        self.lora_alpha = lora_alpha
+        self.lora_dropout = lora_dropout_rate
+        self.merge_weights = merge_weights
+        if lora_dropout_rate > 0.0:
+            self.lora_dropout = nn.Dropout(p=lora_dropout_rate)
+        else:
+            self.lora_dropout = lambda x: x
         self._initialize_AB()
 
 
@@ -56,6 +69,7 @@ class ConvLoRA(nn.Module, LoRALayer):
         merge_weights: bool = True,
         **kwargs,
     ) -> None:
+        # FIXME does not support dropout
         super().__init__()  # type: ignore
         self.conv = conv_module(in_channels, out_channels, kernel_size, **kwargs)
         self.in_channels = in_channels
@@ -104,6 +118,8 @@ class ConvLoRA(nn.Module, LoRALayer):
                 )
             )
         )
+        nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
+        nn.init.zeros_(self.lora_B)
         self.scaling = self.lora_alpha / self.r
         # Freezing the pre-trained weight matrix
         self.conv.weight.requires_grad = False
