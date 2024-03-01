@@ -23,14 +23,32 @@ class ProfileConfig:
         dropout: float | None = None,
         perturbation: str | None = None,
         perturbator_sample_frequency: str = "epoch",
+        lora_rank: int = 0,
+        lora_warm_epochs: int = 0,
     ) -> None:
         self.config_type = config_type
         self.epochs = epochs
+        self.lora_warm_epochs = lora_warm_epochs
         self._initialize_trainer_config()
         self._initialize_sampler_config()
         self.set_partial_connector(is_partial_connection)
+        self.set_lora_configs(lora_rank)
         self.set_dropout(dropout)
         self.set_perturb(perturbation, perturbator_sample_frequency)
+
+    def set_lora_configs(
+        self,
+        lora_rank: int = 0,
+        lora_dropout: float = 0,
+        lora_alpha: int = 1,
+        merge_weights: bool = True,
+    ) -> None:
+        self.lora_config = {
+            "r": lora_rank,
+            "lora_dropout": lora_dropout,
+            "lora_alpha": lora_alpha,
+            "merge_weights": merge_weights,
+        }
 
     def set_perturb(
         self,
@@ -64,6 +82,7 @@ class ProfileConfig:
             "partial_connector": self.partial_connector_config,
             "dropout": self.dropout_config,
             "trainer": self.trainer_config,
+            "lora": self.lora_config,
         }
         if hasattr(self, "searchspace_config") and self.searchspace_config is not None:
             config.update({"search_space": self.searchspace_config})
@@ -108,6 +127,7 @@ class ProfileConfig:
             "lr": 0.025,
             "arch_lr": 3e-4,
             "epochs": self.epochs,
+            "lora_warm_epochs": self.lora_warm_epochs,
             "optim": "sgd",
             "arch_optim": "adam",
             "optim_config": {
@@ -185,6 +205,13 @@ class ProfileConfig:
             assert (
                 config_key in self.dropout_config
             ), f"{config_key} not a valid configuration for the dropout module"
+            self.dropout_config[config_key] = kwargs[config_key]
+
+    def configure_lora_config(self, **kwargs) -> None:  # type: ignore
+        for config_key in kwargs:
+            assert (
+                config_key in self.lora_config
+            ), f"{config_key} not a valid configuration for the lora layers"
             self.dropout_config[config_key] = kwargs[config_key]
 
     @abstractmethod

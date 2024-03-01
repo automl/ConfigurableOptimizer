@@ -16,6 +16,8 @@ class DartsProfile(ProfileConfig, ABC):
         perturbator_sample_frequency: str = "epoch",
         partial_connector_config: dict | None = None,
         perturbator_config: dict | None = None,
+        lora_rank: int = 0,
+        lora_warm_epochs: int = 0,
     ) -> None:
         PROFILE_TYPE = "DARTS"
         self.sampler_type = str.lower(PROFILE_TYPE)
@@ -27,6 +29,8 @@ class DartsProfile(ProfileConfig, ABC):
             dropout,
             perturbation,
             perturbator_sample_frequency,
+            lora_rank,
+            lora_warm_epochs,
         )
 
         if partial_connector_config is not None:
@@ -53,6 +57,8 @@ class GDASProfile(ProfileConfig, ABC):
         tau_max: float = 10,
         partial_connector_config: dict | None = None,
         perturbator_config: dict | None = None,
+        lora_rank: int = 0,
+        lora_warm_epochs: int = 0,
     ) -> None:
         PROFILE_TYPE = "GDAS"
         self.sampler_type = str.lower(PROFILE_TYPE)
@@ -66,6 +72,8 @@ class GDASProfile(ProfileConfig, ABC):
             dropout,
             perturbation,
             perturbator_sample_frequency,
+            lora_rank,
+            lora_warm_epochs,
         )
 
         if partial_connector_config is not None:
@@ -98,6 +106,8 @@ class SNASProfile(ProfileConfig, ABC):
         total_epochs: int = 250,
         partial_connector_config: dict | None = None,
         perturbator_config: dict | None = None,
+        lora_rank: int = 0,
+        lora_warm_epochs: int = 0,
     ) -> None:
         PROFILE_TYPE = "SNAS"
         self.sampler_type = str.lower(PROFILE_TYPE)
@@ -113,6 +123,8 @@ class SNASProfile(ProfileConfig, ABC):
             dropout,
             perturbation,
             perturbator_sample_frequency,
+            lora_rank,
+            lora_warm_epochs,
         )
 
         if partial_connector_config is not None:
@@ -143,6 +155,8 @@ class DRNASProfile(ProfileConfig, ABC):
         perturbator_sample_frequency: str = "epoch",
         partial_connector_config: dict | None = None,
         perturbator_config: dict | None = None,
+        lora_rank: int = 0,
+        lora_warm_epochs: int = 0,
     ) -> None:
         PROFILE_TYPE = "DRNAS"
         self.sampler_type = str.lower(PROFILE_TYPE)
@@ -154,6 +168,8 @@ class DRNASProfile(ProfileConfig, ABC):
             dropout,
             perturbation,
             perturbator_sample_frequency,
+            lora_rank,
+            lora_warm_epochs,
         )
 
         if partial_connector_config is not None:
