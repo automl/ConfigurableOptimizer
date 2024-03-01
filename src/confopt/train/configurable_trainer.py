@@ -66,7 +66,7 @@ class ConfigurableTrainer:
         self.epochs = epochs
         self.debug_mode = debug_mode
 
-    def train(  # noqa: PLR0915
+    def train(  # noqa: PLR0915, C901
         self,
         profile: Profile,
         epochs: int,
@@ -178,9 +178,10 @@ class ConfigurableTrainer:
                     name="best_model", checkpointables=checkpointables
                 )
 
-            with torch.no_grad():
-                for i, alpha in enumerate(self.model.arch_parameters):
-                    self.logger.log(f"alpha {i} is {alpha}")
+            if not is_warm_epoch:
+                with torch.no_grad():
+                    for i, alpha in enumerate(self.model.arch_parameters):
+                        self.logger.log(f"alpha {i} is {alpha}")
 
             # measure elapsed time
             epoch_time.update(time.time() - start_time)
