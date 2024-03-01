@@ -181,9 +181,11 @@ class Experiment:
         )
         if self.is_wandb_log:
             wandb.init(  # type: ignore
-                project=config.get("project_name", "Configurable_Optimizer")
-                if config is not None
-                else "Configurable_Optimizer",
+                project=(
+                    config.get("project_name", "Configurable_Optimizer")
+                    if config is not None
+                    else "Configurable_Optimizer"
+                ),
                 config=config,
             )
 
@@ -251,6 +253,9 @@ class Experiment:
             profile=self.profile,  # type: ignore
             epochs=arg_config.epochs,  # type: ignore
             is_wandb_log=self.is_wandb_log,
+            lora_warm_epochs=config["trainer"].get(  # type: ignore
+                "lora_warm_epochs", 0
+            ),
         )
 
         return trainer
@@ -271,7 +276,7 @@ class Experiment:
 
         self.set_partial_connector(config.get("partial_connector", {}))
         self.set_dropout(config.get("dropout", {}))
-        self.set_profile()
+        self.set_profile(config)
 
     def set_search_space(
         self,
@@ -329,7 +334,7 @@ class Experiment:
         else:
             self.dropout = None
 
-    def set_profile(self) -> None:
+    def set_profile(self, config: dict) -> None:
         assert self.sampler is not None
 
         self.profile = Profile(
@@ -338,6 +343,7 @@ class Experiment:
             partial_connector=self.partial_connector,
             perturbation=self.perturbator,
             dropout=self.dropout,
+            lora_configs=config.get("lora", None),
         )
 
     def _get_dataset(self, dataset: DatasetType) -> Callable | None:
@@ -355,7 +361,8 @@ class Experiment:
         criterion = CriterionType(criterion_str)
         if criterion == CriterionType.CROSS_ENTROPY:
             return torch.nn.CrossEntropyLoss()
-        return None
+
+        raise NotImplementedError
 
     def _get_optimizer(self, optim_str: str) -> Callable | None:
         optim = OptimizerType(optim_str)
@@ -510,9 +517,7 @@ class Experiment:
         last_info = last_run_logger.path("last_checkpoint")
         info = checkpointer._load_file(f=last_info)
         self.search_space.load_state_dict(info["model"])
-        last_run_logger.log(
-            "=> loading SEARCH checkpoint of the last-info", str(last_info)
-        )
+        print("=> loading SEARCH checkpoint of the last-info", str(last_info))
         last_run_logger.close()
 
 
