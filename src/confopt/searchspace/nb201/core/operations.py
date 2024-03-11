@@ -847,3 +847,6 @@ class FactorizedReduce(nn.Module):
             This method constructs a human-readable string representation of the block.
         """
         return "C_in={C_in}, C_out={C_out}, stride={stride}".format(**self.__dict__)
+
+
+OLES_OPS = [Zero, Pooling, ReLUConvBN, DualSepConv, SepConv, Identity]

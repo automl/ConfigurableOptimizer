@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from functools import partial
+
 import torch
 from torch import nn
 
 from confopt.searchspace.common.base_search import SearchSpace
 
 from .core import NB201SearchModel
-from .core.genotypes import Structure
+from .core.genotypes import Structure as NB201Gynotype
+from .core.model_search import NB201SearchModel, check_grads_cosine, preserve_grads
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -79,5 +82,11 @@ class NASBench201SearchSpace(SearchSpace):
     def discretize(self) -> nn.Module:
         return self.model._discretize()  # type: ignore
 
-    def get_genotype(self) -> Structure:
+    def get_genotype(self) -> NB201Gynotype:
         return self.model.genotype()  # type: ignore
+
+    def preserve_grads(self) -> None:
+        self.model.apply(partial(preserve_grads))
+
+    def check_grads_cosine(self) -> None:
+        self.model.apply(check_grads_cosine)
