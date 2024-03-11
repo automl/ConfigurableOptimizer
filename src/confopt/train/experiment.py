@@ -780,6 +780,7 @@ if __name__ == "__main__":
 
     searchspace = SearchSpaceType(args.searchspace)
     dataset = DatasetType(args.dataset)
+    args.epochs = 3
 
     profile = GDASProfile(
         epochs=args.epochs,
