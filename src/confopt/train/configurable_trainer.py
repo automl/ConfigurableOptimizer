@@ -263,9 +263,15 @@ class ConfigurableTrainer:
                     top5_meter=arch_top5,
                 )
 
-                # update the model weights
-                w_optimizer.zero_grad()
-                arch_optimizer.zero_grad()
+            # calculate gm_score
+            if isinstance(network, nn.DataParallel):
+                network.module.check_grads_cosine()  # type: ignore
+            else:
+                network.check_grads_cosine()  # type: ignore
+
+            # update the model weights
+            w_optimizer.zero_grad()
+            arch_optimizer.zero_grad()
 
             _, logits = network(base_inputs)
             base_loss = criterion(logits, base_targets)
@@ -279,6 +285,12 @@ class ConfigurableTrainer:
                 torch.nn.utils.clip_grad_norm_(network.model_weight_parameters(), 5)
 
             w_optimizer.step()
+
+            # save grads of operations
+            if isinstance(network, nn.DataParallel):
+                network.module.preserve_grads()  # type: ignore
+            else:
+                network.preserve_grads()  # type: ignore
 
             w_optimizer.zero_grad()
             if not is_warm_epoch:
