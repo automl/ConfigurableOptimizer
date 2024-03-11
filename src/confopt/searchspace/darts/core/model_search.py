@@ -5,12 +5,17 @@ from torch import nn
 import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
-from confopt.utils import drop_path
+from confopt.utils import drop_path, freeze
 from confopt.utils.normalize_params import normalize_params
 
+<<<<<<< HEAD
 from .model import NetworkCIFAR, NetworkImageNet
 from .genotypes import BABY_PRIMITIVES, PRIMITIVES, DARTSGenotype
 from .operations import OPS, FactorizedReduce, Identity, ReLUConvBN
+=======
+from .genotypes import PRIMITIVES, Genotype
+from .operations import OLES_OPS, OPS, FactorizedReduce, Identity, ReLUConvBN
+>>>>>>> 337b282 (feat(darts): add gm_score and oles to darts search space)
 
 NUM_CIFAR_CLASSES = 10
 NUM_CIFAR100_CLASSES = 100
@@ -613,3 +618,91 @@ class Network(nn.Module):
             params -= set(self.alphas_reduce)
             params -= set(self.alphas_normal)
         return list(params)
+
+
+def preserve_grads(m: nn.Module) -> None:
+    if isinstance(
+        m,
+        (
+            OperationBlock,
+            OperationChoices,
+            Cell,
+            MixedOp,
+            Network,
+        ),
+    ):
+        return
+
+    flag = 0
+    # for op in OLES_OPS:
+    #     if isinstance(m, op):
+    #         flag = 1
+    #         break
+
+    if isinstance(m, tuple(OLES_OPS)):
+        flag = 1
+
+    if flag == 0:
+        return
+
+    if not hasattr(m, "pre_grads"):
+        m.pre_grads = []
+
+    for param in m.parameters():
+        if param.requires_grad and param.grad is not None:
+            g = param.grad.detach().cpu()
+            m.pre_grads.append(g)
+
+
+# TODO: break function from OLES paper to have less branching.
+def check_grads_cosine(m: nn.Module) -> None:
+    if (
+        isinstance(m, (OperationBlock, OperationChoices, Cell, MixedOp, Network))
+        or not isinstance(m, tuple(OLES_OPS))
+        or not hasattr(m, "pre_grads")
+        or not m.pre_grads
+    ):
+        return
+
+    # TODO: original code from OLES repo
+    # flag = 0
+    # for op in OLES_OPS:
+    #     if isinstance(m, op):
+    #         flag = 1
+    #         break
+
+    # if flag == 0:
+    #     return
+
+    i = 0
+    true_i = 0
+    temp = 0
+
+    for param in m.parameters():
+        if param.requires_grad and param.grad is not None:
+            g = param.grad.detach().cpu()
+            if len(g) != 0:
+                temp += torch.cosine_similarity(g, m.pre_grads[i], dim=0).mean()
+                # import pdb
+                # pdb.set_trace()
+                true_i += 1
+            i += 1
+
+    if true_i != 0:
+        sim_avg = temp / true_i
+    m.pre_grads.clear()
+
+    if not hasattr(m, "avg"):
+        m.avg = 0
+    m.avg += sim_avg
+
+    if not hasattr(m, "count"):
+        m.count = 0
+
+    if m.count == 20:
+        if m.avg / m.count < 0.4:
+            freeze(m)
+        m.count = 0
+        m.avg = 0
+    else:
+        m.count += 1

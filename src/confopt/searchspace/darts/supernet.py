@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from functools import partial
+
 import torch
 from torch import nn
 
 from confopt.searchspace.common.base_search import SearchSpace
 
 from .core import DARTSSearchModel
-from .core.genotypes import Genotype
+from .core.genotypes import DARTSGenotype
+from .core.model_search import check_grads_cosine, preserve_grads
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -102,5 +105,11 @@ class DARTSSearchSpace(SearchSpace):
     def discretize(self) -> nn.Module:
         return self.model._discretize()  # type: ignore
 
-    def get_genotype(self) -> Genotype:
-        return self.model.genotype()
+    def get_genotype(self) -> DARTSGenotype:
+        return self.model.genotype() # type: ignore
+
+    def preserve_grads(self) -> None:
+        self.model.apply(partial(preserve_grads))
+
+    def check_grads_cosine(self) -> None:
+        self.model.apply(check_grads_cosine)
