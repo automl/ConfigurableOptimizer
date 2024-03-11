@@ -75,7 +75,6 @@ def drop_path(x: torch.Tensor, drop_prob: float) -> torch.Tensor:
         x.mul_(mask)
     return x
 
-
 def get_num_classes(dataset: str) -> int:
     if dataset == "cifar10":
         num_classes = 10
@@ -86,6 +85,10 @@ def get_num_classes(dataset: str) -> int:
     else:
         raise ValueError("dataset is not defined.")
     return num_classes
+
+def freeze(m: torch.nn.Module) -> None:
+    for param in m.parameters():
+        param.requires_grad_(False)
 
 
 __all__ = [
