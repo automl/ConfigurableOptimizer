@@ -6,6 +6,7 @@ from torch import nn
 from confopt.searchspace.common.base_search import SearchSpace
 
 from .core import NB201SearchModel
+from .core.genotypes import Structure
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -77,3 +78,6 @@ class NASBench201SearchSpace(SearchSpace):
 
     def discretize(self) -> nn.Module:
         return self.model._discretize()  # type: ignore
+
+    def get_genotype(self) -> Structure:
+        return self.model.genotype()
