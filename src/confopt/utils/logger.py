@@ -51,7 +51,7 @@ class Logger:
         search_space: str = "",
         dataset: str = "cifar10",
         seed: str | int = 2,
-        run_time: str | None = None,
+        runtime: str | None = None,
         use_supernet_checkpoint: bool = False,
         last_run: bool = False,
     ) -> None:
@@ -63,35 +63,39 @@ class Logger:
         self.use_supernet_checkpoint = use_supernet_checkpoint
         self.last_run = last_run
 
-        assert sum([last_run, run_time is not None]) <= 1
+        assert sum([last_run, runtime is not None]) <= 1
         """Create a summary writer logging to log_dir."""
         if last_run:
             assert os.path.exists(self.expr_log_path() / "last_run")
-            last_run_time = self.load_last_run()
-            self.set_up_run(last_run_time)
-        elif run_time is not None:
-            assert os.path.exists(self.expr_log_path() / run_time)
-            self.set_up_run(run_time)
+            last_runtime = self.load_last_run()
+            self.set_up_run(last_runtime)
+        elif runtime and runtime != "":
+            assert os.path.exists(self.expr_log_path() / runtime)
+            self.set_up_run(runtime)
         else:
             self.set_up_new_run()
 
     def set_up_new_run(self) -> None:
-        run_time = time.strftime("%Y-%d-%h-%H:%M:%S", time.gmtime(time.time()))
+        runtime = time.strftime("%Y-%d-%h-%H:%M:%S", time.gmtime(time.time()))
         if hasattr(self, "logger_file"):
             self.close()
-        self.set_up_run(run_time=run_time)
+        self.set_up_run(runtime=runtime)
 
-    def set_up_run(self, run_time: str) -> None:
-        self.run_time = run_time
-        (self.expr_log_path() / self.run_time).mkdir(parents=True, exist_ok=True)
-        (self.expr_log_path() / self.run_time / "checkpoints").mkdir(
+    def set_up_run(self, runtime: str) -> None:
+        self.runtime = runtime
+        (self.expr_log_path() / self.runtime).mkdir(parents=True, exist_ok=True)
+        (self.expr_log_path() / self.runtime / "checkpoints").mkdir(
             parents=True, exist_ok=True
         )
-        self.tensorboard_dir = (self.expr_log_path() / self.run_time) / (
+        if self.use_supernet_checkpoint:
+            (self.expr_log_path() / self.runtime / "genotypes").mkdir(
+                parents=True, exist_ok=True
+            )
+        self.tensorboard_dir = (self.expr_log_path() / self.runtime) / (
             "tensorboard-{:}".format(time.strftime("%d-%h", time.gmtime(time.time())))
         )
         self.save_last_run()
-        self.logger_path = self.expr_log_path() / self.run_time / "log"
+        self.logger_path = self.expr_log_path() / self.runtime / "log"
         self.logger_file = open(self.logger_path, "w")  # noqa: SIM115
         self.writer = None
 
@@ -111,14 +115,14 @@ class Logger:
         file_path = self.expr_log_path() / "last_run"
 
         with open(file_path) as f:
-            run_time = f.read().strip()
-        return run_time
+            runtime = f.read().strip()
+        return runtime
 
     def save_last_run(self) -> None:
         file_path = self.expr_log_path() / "last_run"
 
         with open(file_path, "w") as f:
-            f.write(self.run_time)
+            f.write(self.runtime)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(dir={self.log_dir}, writer={self.writer})"
@@ -129,28 +133,38 @@ class Logger:
             "checkpoints",  # checkpoint of all the checkpoints (periodic)
             "log",  # path to the logger file
             "last_checkpoint",  # return the last checkpoint in the checkpoints folder
+            "genotypes",  # path to the folder containing the genotype of the model
+            "best_genotype",  # path to the file containing the best genotype
             None,
         )
-
+        path = None
         if mode not in valids:
             raise TypeError(f"Unknow mode = {mode}, valid modes = {valids}")
         if mode == "best_model":
-            return str((self.expr_log_path() / self.run_time) / (mode + ".pth"))
+            path = str((self.expr_log_path() / self.runtime) / (mode + ".pth"))
         if mode == "last_checkpoint":
             last_checkpoint_path = (
-                (self.expr_log_path() / self.run_time)
+                (self.expr_log_path() / self.runtime)
                 / "checkpoints"
                 / "last_checkpoint"
             )
             with open(last_checkpoint_path) as f:
-                return str(
-                    (self.expr_log_path() / self.run_time)
+                path = str(
+                    (self.expr_log_path() / self.runtime)
                     / "checkpoints"
                     / f.read().strip()
                 )
+        if mode == "genotypes":
+            if self.use_supernet_checkpoint is True:
+                path = str((self.expr_log_path() / self.runtime) / "genotypes")
+            path = str((self.expr_log_path() / self.runtime) / "genotype.txt")
+        if mode == "best_genotype":
+            path = str((self.expr_log_path() / self.runtime) / "best_genotype.txt")
         if mode is None:
-            return str(self.expr_log_path() / self.run_time)
-        return str((self.expr_log_path() / self.run_time) / mode)
+            path = str(self.expr_log_path() / self.runtime)
+        if path is None:
+            return str((self.expr_log_path() / self.runtime) / mode)  # type: ignore
+        return path
 
     def extract_log(self) -> IO[Any]:
         return self.logger_file
@@ -169,6 +183,53 @@ class Logger:
         if save:
             self.logger_file.write(f"{string}\n")
             self.logger_file.flush()
+
+    def load_genotype(
+        self,
+        start_epoch: int = 0,
+        load_saved_model: bool = False,
+        load_best_model: bool = False,
+        use_supernet_checkpoint: bool = False,
+    ) -> str:
+        if not use_supernet_checkpoint:
+            file_path = self.path(mode="genotypes")
+        elif load_best_model:
+            file_path = self.path(mode="best_genotype")
+        elif start_epoch:
+            file_path = self.path("genotypes")
+            file_path = "{}/{}_{:07d}.txt".format(file_path, "genotye", start_epoch)
+        elif load_saved_model:
+            file_path = self.path("genotypes")
+            with open(file_path) as f:
+                file_path = f.read().strip()
+        with open(file_path) as f:
+            genotype = f.read().strip()
+        return genotype
+
+    def save_genotype(
+        self,
+        genotype: str,
+        epoch: int,
+        checkpointing_freq: int = 1,
+        save_best_model: bool = False,
+    ) -> None:
+        if epoch % checkpointing_freq != 0:
+            return
+        if save_best_model:
+            file_path = Path(self.path(mode="best_genotype"))
+            last_file_path = Path(self.path(mode=None)) / "last_genotype"
+            last_file_info = "best_genotype.txt"
+        else:
+            file_path = Path(self.path(mode="genotypes"))
+            last_file_path = file_path / "last_genotype"
+            file_path = Path("{}/{}_{:07d}.txt".format(file_path, "genotype", epoch))
+            last_file_info = "{}_{:07d}.txt".format("genotype", epoch)
+
+        with open(file_path, "w") as f:
+            f.write(genotype)
+
+        with open(last_file_path, "w") as f:
+            f.write(last_file_info)
 
     def log_metrics(
         self,
