@@ -45,7 +45,7 @@ class TestUtils(unittest.TestCase):
 
 
 class TestLogger(unittest.TestCase):
-    def test_logger_init_with_run_time(self) -> None:
+    def test_logger_init_with_runtime(self) -> None:
         log_dir = str(Path(".") / "tests" / "logs")
         logger_source = Logger(
             log_dir=log_dir,
@@ -71,11 +71,11 @@ class TestLogger(unittest.TestCase):
             search_space="darts",
             dataset="cifar100",
             seed="12",
-            run_time=logger_source.run_time,
+            runtime=logger_source.runtime,
             use_supernet_checkpoint=False,
         )
-        assert logger_source.run_time == logger.run_time
-        assert os.path.exists("/".join([expr_path, logger.run_time, "log"]))
+        assert logger_source.runtime == logger.runtime
+        assert os.path.exists("/".join([expr_path, logger.runtime, "log"]))
 
     def test_logger_init_with_last_run(self) -> None:
         log_dir = str(Path(".") / "tests" / "logs")
@@ -106,8 +106,8 @@ class TestLogger(unittest.TestCase):
             use_supernet_checkpoint=False,
             last_run=True,
         )
-        assert logger_source.run_time == logger.run_time
-        assert os.path.exists("/".join([expr_path, logger.run_time, "log"]))
+        assert logger_source.runtime == logger.runtime
+        assert os.path.exists("/".join([expr_path, logger.runtime, "log"]))
 
     def test_logger_init(self) -> None:
         log_dir = str(Path(".") / "tests" / "logs")
@@ -131,8 +131,8 @@ class TestLogger(unittest.TestCase):
         )
         assert os.path.exists(expr_path)
         assert os.path.exists("/".join([expr_path, "last_run"]))
-        assert os.path.exists("/".join([expr_path, logger.run_time, "log"]))
-        assert os.path.exists("/".join([expr_path, logger.run_time, "checkpoints"]))
+        assert os.path.exists("/".join([expr_path, logger.runtime, "log"]))
+        assert os.path.exists("/".join([expr_path, logger.runtime, "checkpoints"]))
 
     # def test_set_up_new_run(self) -> None:
     #     ...
@@ -182,7 +182,7 @@ class TestLogger(unittest.TestCase):
             seed="12",
             use_supernet_checkpoint=False,
         )
-        assert logger.load_last_run() == logger.run_time
+        assert logger.load_last_run() == logger.runtime
 
     # def test_save_last_run(self) -> None:
     #     ...
@@ -206,7 +206,7 @@ class TestLogger(unittest.TestCase):
                 "cifar100",
                 "12",
                 "discrete",
-                logger.run_time,
+                logger.runtime,
             ]
         )
         assert logger.path("best_model") == "/".join([expr_path, "best_model.pth"])
