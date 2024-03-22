@@ -562,7 +562,7 @@ class Network(nn.Module):
                 cell._discretize(genotype)  # type: ignore
             else:
                 cell._discretize(genotype)  # type: ignore
-        discrete_model._arch_parameters = None  # type: ignore
+        discrete_model._arch_parameters = [None]  # type: ignore
         discrete_model.to(next(self.parameters()).device)
 
         return discrete_model
@@ -570,7 +570,7 @@ class Network(nn.Module):
     def model_weight_parameters(self) -> list[nn.Parameter]:
         params = set(self.parameters())
         params -= set(self._betas)
-        if self._arch_parameters is not None:
+        if self._arch_parameters != [None]:
             params -= set(self.alphas_reduce)
             params -= set(self.alphas_normal)
         return list(params)
