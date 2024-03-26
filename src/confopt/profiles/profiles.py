@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import ABC
 from collections import namedtuple
 
+from confopt.utils import get_num_classes
+
 from .profile_config import ProfileConfig
 
 Genotype = namedtuple("Genotype", "normal normal_concat reduce reduce_concat")
@@ -245,3 +247,21 @@ class DiscreteProfile:
 
     def set_search_space_config(self, config: dict) -> None:
         self.searchspace_config = config
+
+    def get_searchspace_config(self, searchspace_str: str, dataset_str: str) -> dict:
+        if self.searchspace_config:
+            return self.searchspace_config
+        if searchspace_str == "nb201":
+            searchspace_config = {
+                "num_cells": 5,
+                "channels": 16,
+            }
+        elif searchspace_str == "darts":
+            searchspace_config = {
+                "C": 36,  # init channels
+                "layers": 20,  # number of layers
+            }
+        else:
+            raise ValueError("search space is not correct")
+        searchspace_config["num_classes"] = get_num_classes(dataset_str)
+        return searchspace_config
