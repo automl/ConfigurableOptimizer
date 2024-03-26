@@ -57,7 +57,7 @@ def read_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--last_search_run_time",
+        "--last_search_runtime",
         default="NOT_VALID",
         help="The search run time to take in for the discretization step",
         type=str,
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     IS_WANDB_LOG = False
 
     if IS_WANDB_LOG:
-        wandb.init(
+        wandb.init( # type: ignore
             project="BASELINES",
             group="DRNAS",
             config=discrete_config,
@@ -107,7 +107,7 @@ if __name__ == "__main__":
     drnas_profile = get_drnas_profile(profile_args)
     # Control from last_run
     experiment.initialize_from_last_run(
-        profile_config=drnas_profile, last_search_run_time=args.last_search_run_time
+        profile_config=drnas_profile, last_search_runtime=args.last_search_runtime
     )
 
     discret_trainer = experiment.run_discrete_model_with_profile(
