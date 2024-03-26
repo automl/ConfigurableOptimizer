@@ -6,6 +6,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
+from confopt.oneshot.weightentangler import ConvolutionalWEModule
 from confopt.utils.reduce_channels import (
     reduce_bn_features,
     reduce_conv_channels,
@@ -123,7 +124,7 @@ SearchSpaceNames = {
 }
 
 
-class ReLUConvBN(nn.Module):
+class ReLUConvBN(ConvolutionalWEModule):
     """ReLU-Convolution-BatchNorm Block Class.
 
     Args:
@@ -158,6 +159,10 @@ class ReLUConvBN(nn.Module):
         track_running_stats: bool = True,
     ):
         super().__init__()
+        self.kernel_size = (
+            kernel_size if isinstance(kernel_size, int) else kernel_size[0]
+        )
+        self.stride = stride
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
             nn.Conv2d(
@@ -173,6 +178,11 @@ class ReLUConvBN(nn.Module):
                 C_out, affine=affine, track_running_stats=track_running_stats
             ),
         )
+
+        self.__post__init__()
+
+    def mark_entanglement_weights(self) -> None:
+        self.op[1].can_entangle_weight = True
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through the ReLUConvBN block.
@@ -206,7 +216,7 @@ class ReLUConvBN(nn.Module):
         self.op[2] = reduce_bn_features(self.op[2], k, device)
 
 
-class SepConv(nn.Module):
+class SepConv(ConvolutionalWEModule):
     """Separable Convolution-BatchNorm Block Class.
 
     Args:
@@ -241,6 +251,10 @@ class SepConv(nn.Module):
         track_running_stats: bool = True,
     ):
         super().__init__()
+        self.kernel_size = (
+            kernel_size if isinstance(kernel_size, int) else kernel_size[0]
+        )
+        self.stride = stride
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
             nn.Conv2d(
@@ -258,6 +272,11 @@ class SepConv(nn.Module):
                 C_out, affine=affine, track_running_stats=track_running_stats
             ),
         )
+
+        self.__post__init__()
+
+    def mark_entanglement_weights(self) -> None:
+        self.op[1].can_entangle_weight = True
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through the SepConv block.

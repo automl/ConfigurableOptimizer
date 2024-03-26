@@ -27,6 +27,7 @@ from confopt.oneshot.archsampler import (
 from confopt.oneshot.dropout import Dropout
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import SDARTSPerturbator
+from confopt.oneshot.weightentangler import WeightEntangler
 from confopt.profiles import (
     DiscreteProfile,
     GDASProfile,
@@ -140,6 +141,7 @@ class Experiment:
         self.is_partial_connection = profile.is_partial_connection
         self.dropout = profile.dropout
         self.edge_normalization = profile.is_partial_connection
+        self.entangle_op_weights = profile.entangle_op_weights
         assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
         return self.runner(
             config,
@@ -268,11 +270,10 @@ class Experiment:
             config = {}  # type : ignore
         self.set_search_space(search_space_enum, config.get("search_space", {}))
         self.set_sampler(sampler_enum, config.get("sampler", {}))
-
         self.set_perturbator(perturbator_enum, config.get("perturbator", {}))
-
         self.set_partial_connector(config.get("partial_connector", {}))
         self.set_dropout(config.get("dropout", {}))
+        self.set_weight_entangler()
         self.set_profile()
 
     def set_search_space(
@@ -333,6 +334,9 @@ class Experiment:
         else:
             self.dropout = None
 
+    def set_weight_entangler(self) -> None:
+        self.weight_entangler = WeightEntangler() if self.entangle_op_weights else None
+
     def set_profile(self) -> None:
         assert self.sampler is not None
 
@@ -342,6 +346,7 @@ class Experiment:
             partial_connector=self.partial_connector,
             perturbation=self.perturbator,
             dropout=self.dropout,
+            weight_entangler=self.weight_entangler,
         )
 
     def _get_dataset(self, dataset: DatasetType) -> Callable | None:

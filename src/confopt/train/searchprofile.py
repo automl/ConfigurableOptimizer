@@ -6,6 +6,7 @@ from confopt.oneshot.archsampler import BaseSampler, DARTSSampler
 from confopt.oneshot.dropout import Dropout
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import BasePerturbator
+from confopt.oneshot.weightentangler import WeightEntangler
 from confopt.searchspace import DARTSSearchSpace
 from confopt.searchspace.common import (
     OperationBlock,
@@ -22,12 +23,14 @@ class Profile:
         partial_connector: PartialConnector | None = None,
         perturbation: BasePerturbator | None = None,
         dropout: Dropout | None = None,
+        weight_entangler: WeightEntangler | None = None,
     ) -> None:
         self.sampler = sampler
         self.edge_normalization = edge_normalization
         self.partial_connector = partial_connector
         self.perturbation = perturbation
         self.dropout = dropout
+        self.weight_entangler = weight_entangler
 
     def adapt_search_space(self, search_space: SearchSpace) -> None:
         if hasattr(search_space.model, "edge_normalization"):
@@ -69,7 +72,11 @@ class Profile:
         self, ops: torch.nn.Module, is_reduction_cell: bool = False
     ) -> OperationBlock:
         op_block = OperationBlock(
-            ops, is_reduction_cell, self.partial_connector, self.dropout
+            ops,
+            is_reduction_cell=is_reduction_cell,
+            partial_connector=self.partial_connector,
+            dropout=self.dropout,
+            weight_entangler=self.weight_entangler,
         )
         return op_block
 

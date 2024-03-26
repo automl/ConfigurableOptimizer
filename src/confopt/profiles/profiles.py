@@ -16,6 +16,7 @@ class DartsProfile(ProfileConfig, ABC):
         perturbator_sample_frequency: str = "epoch",
         partial_connector_config: dict | None = None,
         perturbator_config: dict | None = None,
+        entangle_op_weights: bool = False,
     ) -> None:
         PROFILE_TYPE = "DARTS"
         self.sampler_type = str.lower(PROFILE_TYPE)
@@ -27,6 +28,7 @@ class DartsProfile(ProfileConfig, ABC):
             dropout,
             perturbation,
             perturbator_sample_frequency,
+            entangle_op_weights,
         )
 
         if partial_connector_config is not None:
@@ -53,6 +55,7 @@ class GDASProfile(ProfileConfig, ABC):
         tau_max: float = 10,
         partial_connector_config: dict | None = None,
         perturbator_config: dict | None = None,
+        entangle_op_weights: bool = False,
     ) -> None:
         PROFILE_TYPE = "GDAS"
         self.sampler_type = str.lower(PROFILE_TYPE)
@@ -66,6 +69,7 @@ class GDASProfile(ProfileConfig, ABC):
             dropout,
             perturbation,
             perturbator_sample_frequency,
+            entangle_op_weights,
         )
 
         if partial_connector_config is not None:
@@ -98,6 +102,7 @@ class SNASProfile(ProfileConfig, ABC):
         total_epochs: int = 250,
         partial_connector_config: dict | None = None,
         perturbator_config: dict | None = None,
+        entangle_op_weights: bool = False,
     ) -> None:
         PROFILE_TYPE = "SNAS"
         self.sampler_type = str.lower(PROFILE_TYPE)
@@ -106,13 +111,14 @@ class SNASProfile(ProfileConfig, ABC):
         self.temp_min = temp_min
         self.temp_annealing = temp_annealing
         self.total_epochs = total_epochs
-        super().__init__(
+        super().__init__(  # type: ignore
             PROFILE_TYPE,
             epochs,
             is_partial_connection,
             dropout,
             perturbation,
             perturbator_sample_frequency,
+            entangle_op_weights,
         )
 
         if partial_connector_config is not None:
@@ -143,17 +149,19 @@ class DRNASProfile(ProfileConfig, ABC):
         perturbator_sample_frequency: str = "epoch",
         partial_connector_config: dict | None = None,
         perturbator_config: dict | None = None,
+        entangle_op_weights: bool = False,
     ) -> None:
         PROFILE_TYPE = "DRNAS"
         self.sampler_type = str.lower(PROFILE_TYPE)
         self.sampler_sample_frequency = sampler_sample_frequency
-        super().__init__(
+        super().__init__(  # type: ignore
             PROFILE_TYPE,
             epochs,
             is_partial_connection,
             dropout,
             perturbation,
             perturbator_sample_frequency,
+            entangle_op_weights,
         )
 
         if partial_connector_config is not None:

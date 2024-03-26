@@ -3,6 +3,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
+from confopt.oneshot.weightentangler import ConvolutionalWEModule
 from confopt.utils.reduce_channels import (
     reduce_bn_features,
     reduce_conv_channels,
@@ -173,12 +174,12 @@ class Pooling(nn.Module):
         self.op[1] = reduce_bn_features(self.op[1], k, device)
 
 
-class DilConv(nn.Module):
+class DilConv(ConvolutionalWEModule):
     def __init__(
         self,
         C_in: int,
         C_out: int,
-        kernel_size: int,
+        kernel_size: int | tuple[int, int],
         stride: int,
         padding: int,
         dilation: int,
@@ -204,6 +205,10 @@ class DilConv(nn.Module):
             BatchNorm2d.
         """
         super().__init__()
+        self.kernel_size = (
+            kernel_size if isinstance(kernel_size, int) else kernel_size[0]
+        )
+        self.stride = stride
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
             nn.Conv2d(
@@ -219,6 +224,11 @@ class DilConv(nn.Module):
             nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
             nn.BatchNorm2d(C_out, affine=affine),
         )
+
+        self.__post__init__()
+
+    def mark_entanglement_weights(self) -> None:
+        self.op[1].can_entangle_weight = True
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Perform a forward pass through the Dilated Convolution operation.
@@ -245,12 +255,12 @@ class DilConv(nn.Module):
         self.op[3] = reduce_bn_features(self.op[3], k, device)
 
 
-class SepConv(nn.Module):
+class SepConv(ConvolutionalWEModule):
     def __init__(
         self,
         C_in: int,
         C_out: int,
-        kernel_size: int,
+        kernel_size: int | tuple[int, int],
         stride: int,
         padding: int,
         affine: bool = True,
@@ -276,6 +286,10 @@ class SepConv(nn.Module):
             neural network architectures.
         """
         super().__init__()
+        self.kernel_size = (
+            kernel_size if isinstance(kernel_size, int) else kernel_size[0]
+        )
+        self.stride = stride
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
             nn.Conv2d(
@@ -302,6 +316,12 @@ class SepConv(nn.Module):
             nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
             nn.BatchNorm2d(C_out, affine=affine),
         )
+
+        self.__post__init__()
+
+    def mark_entanglement_weights(self) -> None:
+        self.op[1].can_entangle_weight = True
+        self.op[5].can_entangle_weight = True
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Perform a forward pass through the Seperated Convolution operation.

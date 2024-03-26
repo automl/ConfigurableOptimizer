@@ -5,6 +5,7 @@ from torch import nn
 
 from confopt.oneshot.dropout import Dropout
 from confopt.oneshot.partial_connector import PartialConnector
+from confopt.oneshot.weightentangler import WeightEntangler
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 __all__ = ["OperationChoices"]
@@ -39,6 +40,7 @@ class OperationBlock(nn.Module):
         is_reduction_cell: bool,
         partial_connector: PartialConnector | None = None,
         dropout: Dropout | None = None,
+        weight_entangler: WeightEntangler | None = None,
         device: torch.device = DEVICE,
     ) -> None:
         super().__init__()
@@ -53,6 +55,7 @@ class OperationBlock(nn.Module):
         self.partial_connector = partial_connector
         self.is_reduction_cell = is_reduction_cell
         self.dropout = dropout
+        self.weight_entangler = weight_entangler
 
     def forward(self, x: torch.Tensor, alphas: list[torch.Tensor]) -> torch.Tensor:
         if self.dropout:
@@ -62,9 +65,13 @@ class OperationBlock(nn.Module):
         if self.partial_connector:
             return self.partial_connector(x, alphas, self.ops)
 
-        states = [op(x) * alpha for op, alpha in zip(self.ops, alphas)]
+        if self.weight_entangler is not None:
+            output = self.weight_entangler.forward(x, self.ops, alphas)
+        else:
+            states = [op(x) * alpha for op, alpha in zip(self.ops, alphas)]
+            output = sum(states)
 
-        return sum(states)  # type: ignore
+        return output
 
     def change_op_channel_size(self, wider: int | None = None) -> None:
         if wider is None:

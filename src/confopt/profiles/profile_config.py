@@ -23,6 +23,7 @@ class ProfileConfig:
         dropout: float | None = None,
         perturbation: str | None = None,
         perturbator_sample_frequency: str = "epoch",
+        entangle_op_weights: bool = False,
     ) -> None:
         self.config_type = config_type
         self.epochs = epochs
@@ -31,6 +32,7 @@ class ProfileConfig:
         self.set_partial_connector(is_partial_connection)
         self.set_dropout(dropout)
         self.set_perturb(perturbation, perturbator_sample_frequency)
+        self.entangle_op_weights = entangle_op_weights
 
     def set_perturb(
         self,
