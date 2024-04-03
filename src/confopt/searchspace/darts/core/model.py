@@ -165,7 +165,7 @@ class NetworkCIFAR(nn.Module):
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.classifier = nn.Linear(C_prev, num_classes)
 
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor | None]:
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor | None, torch.Tensor]:
         logits_aux = None
         s0 = s1 = self.stem(x)
         for i, cell in enumerate(self.cells):
@@ -174,7 +174,7 @@ class NetworkCIFAR(nn.Module):
                 logits_aux = self.auxiliary_head(s1)
         out = self.global_pooling(s1)
         logits = self.classifier(out.view(out.size(0), -1))
-        return logits, logits_aux
+        return logits_aux, logits
 
 
 class NetworkImageNet(nn.Module):
@@ -225,7 +225,7 @@ class NetworkImageNet(nn.Module):
         self.global_pooling = nn.AvgPool2d(7)
         self.classifier = nn.Linear(C_prev, num_classes)
 
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor | None]:
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor | None, torch.Tensor]:
         logits_aux = None
         s0 = self.stem0(x)
         s1 = self.stem1(s0)
@@ -235,4 +235,4 @@ class NetworkImageNet(nn.Module):
                 logits_aux = self.auxiliary_head(s1)
         out = self.global_pooling(s1)
         logits = self.classifier(out.view(out.size(0), -1))
-        return logits, logits_aux
+        return logits_aux, logits
