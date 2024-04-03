@@ -83,7 +83,7 @@ if __name__ == "__main__":
     IS_WANDB_LOG = False
 
     if IS_WANDB_LOG:
-        wandb.init( # type: ignore
+        wandb.init(  # type: ignore
             project="BASELINES",
             group="DRNAS",
             config=discrete_config,
