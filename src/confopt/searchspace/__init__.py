@@ -1,6 +1,6 @@
 from .common.base_search import SearchSpace
 from .darts.core import DARTSImageNetModel, DARTSModel  # type: ignore
-from .darts.core.genotypes import Genotype as DARTSGenotype
+from .darts.core.genotypes import DARTSGenotype
 from .darts.supernet import DARTSSearchSpace  # type: ignore
 from .nb1shot1.supernet import NASBench1Shot1SearchSpace  # type: ignore
 from .nb201.core import NASBench201Model  # type: ignore

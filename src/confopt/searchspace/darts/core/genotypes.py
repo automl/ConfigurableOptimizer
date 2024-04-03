@@ -4,6 +4,20 @@ from collections import namedtuple
 
 Genotype = namedtuple("Genotype", "normal normal_concat reduce reduce_concat")
 
+
+class DARTSGenotype(Genotype):
+    def __str__(self) -> str:
+        return (
+            f"DARTSGenotype(normal={self.normal}, "
+            f"normal_concat={self.normal_concat}, "
+            f"reduce={self.reduce}, "
+            f"reduce_concat={self.reduce_concat})"
+        )
+
+    def tostr(self) -> str:
+        return str(self)
+
+
 PRIMITIVES = [
     "none",
     "max_pool_3x3",
