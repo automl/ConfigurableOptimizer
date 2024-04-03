@@ -80,4 +80,4 @@ class NASBench201SearchSpace(SearchSpace):
         return self.model._discretize()  # type: ignore
 
     def get_genotype(self) -> Structure:
-        return self.model.genotype()
+        return self.model.genotype()  # type: ignore
