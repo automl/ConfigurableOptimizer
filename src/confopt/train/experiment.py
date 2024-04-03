@@ -6,7 +6,6 @@ from enum import Enum
 import random
 from typing import Callable
 
-from fvcore.common.checkpoint import Checkpointer
 import numpy as np
 import torch
 from torch.backends import cudnn
@@ -33,13 +32,19 @@ from confopt.profiles import (
     ProfileConfig,
 )
 from confopt.searchspace import (
+    DARTSImageNetModel,
+    DARTSModel,
     DARTSSearchSpace,
+    NAS201Genotype,
     NASBench1Shot1SearchSpace,
+    NASBench201Model,
     NASBench201SearchSpace,
+    SearchSpace,
     TransNASBench101SearchSpace,
 )
 from confopt.train import ConfigurableTrainer, DiscreteTrainer, Profile
 from confopt.utils import Logger
+from confopt.utils.time import check_date_format
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -55,6 +60,11 @@ class SearchSpaceType(Enum):
     NB201 = "nb201"
     NB1SHOT1 = "nb1shot1"
     TNB101 = "tnb101"
+
+
+class ModelType(Enum):
+    DARTS = "darts"
+    NB201 = "nb201"
 
 
 class SamplerType(Enum):
@@ -107,6 +117,7 @@ class Experiment:
         is_wandb_log: bool = False,
         debug_mode: bool = False,
         exp_name: str = "test",
+        runtime: str = "",
     ) -> None:
         self.search_space_str = search_space
         self.dataset_str = dataset
@@ -114,6 +125,7 @@ class Experiment:
         self.is_wandb_log = is_wandb_log
         self.debug_mode = debug_mode
         self.exp_name = exp_name
+        self.runtime = runtime
 
     def set_seed(self, rand_seed: int) -> None:
         random.seed(rand_seed)
@@ -158,19 +170,29 @@ class Experiment:
         self.set_seed(self.seed)
 
         if load_saved_model or load_best_model or start_epoch > 0:
+            last_run = False
+            if not self.runtime:
+                last_run = True
+
             self.logger = Logger(
                 log_dir="logs",
-                seed=self.seed,
                 exp_name=self.exp_name,
                 search_space=self.search_space_str.value,
-                last_run=True,
+                dataset=str(self.dataset_str.value),
+                seed=self.seed,
+                runtime=self.runtime,
+                use_supernet_checkpoint=True,
+                last_run=last_run,
             )
         else:
             self.logger = Logger(
                 log_dir="logs",
-                seed=self.seed,
                 exp_name=self.exp_name,
+                dataset=str(self.dataset_str.value),
                 search_space=self.search_space_str.value,
+                seed=self.seed,
+                runtime=self.runtime,
+                use_supernet_checkpoint=True,
             )
 
         self._enum_to_objects(
@@ -181,9 +203,11 @@ class Experiment:
         )
         if self.is_wandb_log:
             wandb.init(  # type: ignore
-                project=config.get("project_name", "Configurable_Optimizer")
-                if config is not None
-                else "Configurable_Optimizer",
+                project=(
+                    config.get("project_name", "Configurable_Optimizer")
+                    if config is not None
+                    else "Configurable_Optimizer"
+                ),
                 config=config,
             )
 
@@ -203,6 +227,7 @@ class Experiment:
         )
 
         model = self.search_space
+        # model =
 
         w_optimizer = self._get_optimizer(arg_config.optim)(  # type: ignore
             model.model_weight_parameters(),
@@ -373,56 +398,209 @@ class Experiment:
         start_epoch: int = 0,
         load_saved_model: bool = False,
         load_best_model: bool = False,
+        use_supernet_checkpoint: bool = False,
     ) -> DiscreteTrainer:
         config = profile.get_trainer_config()
+        searchspace_config = profile.get_searchspace_config(
+            self.search_space_str.value, self.dataset_str.value
+        )
+        genotype_str = profile.get_genotype()
 
         return self.run_discrete_model(
-            config,
-            start_epoch,
-            load_saved_model,
-            load_best_model,
+            searchspace_config=searchspace_config,
+            arg_config=config,
+            start_epoch=start_epoch,
+            load_saved_model=load_saved_model,
+            load_best_model=load_best_model,
+            use_supernet_checkpoint=use_supernet_checkpoint,
+            genotype_str=genotype_str,
         )
 
-    def run_discrete_model(
+    def get_discrete_model_from_genotype_str(
         self,
+        search_space_str: str,
+        genotype_str: str,
+        searchspace_config: dict,
+    ) -> torch.nn.Module:
+        if search_space_str == ModelType.NB201.value:
+            searchspace_config["genotype"] = NAS201Genotype.str2structure(genotype_str)
+            discrete_model = NASBench201Model(**searchspace_config)
+        elif search_space_str == ModelType.DARTS.value:
+            searchspace_config["genotype"] = eval(genotype_str)
+            if (
+                self.dataset_str.value == "cifar10"
+                or self.dataset_str.value == "cifar100"
+            ):
+                discrete_model = DARTSModel(**searchspace_config)
+            elif (
+                self.dataset_str.value == "imgnet16"
+                or self.dataset_str.value == "imgnet16_120"
+            ):
+                discrete_model = DARTSImageNetModel(**searchspace_config)
+            else:
+                raise ValueError("undefined discrete model for this dataset.")
+        else:
+            raise ValueError("undefined discrete model for this search space.")
+
+        return discrete_model
+
+    def get_discrete_model_from_supernet(
+        self,
+    ) -> SearchSpace:
+        # A) Use the experiment's self.search_space of the experiment.
+        if hasattr(self, "search_space"):
+            if self.search_space.arch_parameters:
+                model = self.search_space.discretize()
+                return model  # type: ignore
+            raise ValueError("need to be a supernet to be able to get the discrete net")
+        raise ValueError("cannot have the ")
+
+    # logger load_genotype function handles for both supernet and discrete model
+    def get_genotype_str_from_checkpoint(
+        self,
+        start_epoch: int = 0,
+        load_saved_model: bool = False,
+        load_best_model: bool = False,
+        use_supernet_checkpoint: bool = False,
+    ) -> str:
+        if load_best_model or load_saved_model or (start_epoch > 0):
+            genotype_str = self.logger.load_genotype(
+                start_epoch,
+                load_saved_model,
+                load_best_model,
+                use_supernet_checkpoint=use_supernet_checkpoint,
+            )
+            return genotype_str
+
+        raise ValueError("is not a valid checkpoint.")
+
+    def get_genotype_str_from_profile(
+        self,
+        arg_config: dict,
+    ) -> str:
+        genotype_str = arg_config.get("genotype")
+        if genotype_str is None:
+            raise LookupError("genotype does not exist in profile")
+        return genotype_str
+
+    def get_discrete_model(
+        self,
+        searchspace_config: dict,
         arg_config: dict | None = None,
         start_epoch: int = 0,
         load_saved_model: bool = False,
         load_best_model: bool = False,
+        use_supernet_checkpoint: bool = False,
+        use_expr_search_space: bool = False,
+        genotype_str: str | None = None,
+    ) -> tuple[torch.nn.Module, str]:
+        # A) Use the experiment's self.search_space of the experiment.
+        if use_expr_search_space:
+            model = self.get_discrete_model_from_supernet()
+            return model, model.get_genotype()  # type: ignore
+        if sum([load_best_model, load_saved_model, (start_epoch > 0)]) == 1:
+            genotype_str = self.get_genotype_str_from_checkpoint(
+                start_epoch,
+                load_saved_model,
+                load_best_model,
+                use_supernet_checkpoint,
+            )
+        elif sum(
+            [
+                load_best_model,
+                load_saved_model,
+                (start_epoch > 0),
+                use_supernet_checkpoint,
+            ],
+        ) == 0 and hasattr(self, "search_space"):
+            genotype_str = self.search_space.get_genotype().tostr()  # type: ignore
+
+        elif arg_config:
+            genotype_str = self.get_genotype_str_from_profile(arg_config)
+
+        if genotype_str is None:
+            raise ValueError("genotype cannot be empty")
+        model = self.get_discrete_model_from_genotype_str(
+            self.search_space_str.value,
+            genotype_str,
+            searchspace_config,
+        )
+        return model, genotype_str
+
+    # refactor the name to train
+    def run_discrete_model(
+        self,
+        searchspace_config: dict,
+        arg_config: dict | None = None,
+        start_epoch: int = 0,
+        load_saved_model: bool = False,
+        load_best_model: bool = False,
+        use_supernet_checkpoint: bool = False,
+        use_expr_search_space: bool = False,
+        genotype_str: str | None = None,
     ) -> DiscreteTrainer:
+        # should not care where the model comes from => genotype should be a
+        # different function
         assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
 
         self.set_seed(self.seed)
 
-        if not hasattr(self, "search_space"):
-            self.set_search_space(
-                self.search_space_str,
-                arg_config.get("search_space", {}),  # type: ignore
-            )
-
         if load_saved_model or load_best_model or start_epoch > 0:
+            last_run = False
+            if not self.runtime:
+                last_run = True
+
             self.logger = Logger(
                 log_dir="logs",
-                seed=self.seed,
                 exp_name=self.exp_name,
                 search_space=self.search_space_str.value,
-                last_run=True,
+                dataset=str(self.dataset_str.value),
+                seed=self.seed,
+                runtime=self.runtime,
+                use_supernet_checkpoint=use_supernet_checkpoint,
+                last_run=last_run,
             )
         else:
             self.logger = Logger(
                 log_dir="logs",
-                seed=self.seed,
                 exp_name=self.exp_name,
                 search_space=self.search_space_str.value,
+                dataset=str(self.dataset_str.value),
+                seed=self.seed,
+                runtime=None,
+                use_supernet_checkpoint=use_supernet_checkpoint,
                 last_run=False,
             )
 
-        if "search_space" in arg_config:  # type: ignore
-            searched_arch_params = self.search_space.arch_parameters
-            self.set_search_space(
-                self.search_space_str, arg_config.get("search_space")  # type: ignore
-            )
-            self.search_space.set_arch_parameters(searched_arch_params)
+        # different options to train a discrete model:
+        # A) Use the experiment's self.search_space of the experiment.
+        # B) From a supernet checkpoint, load, and discretize to get the model.
+        # C) From a discerete checkpoint, load the model.
+        # D) pass a genotype from the prompt to build a discrete model.
+        # E) just use the default genotype which is set in the discrete_profile.
+        # TODO: have a function that would get a genotype and create a model out of it.
+        # searchspace_config =
+        model, genotype_str = self.get_discrete_model(
+            searchspace_config=searchspace_config,
+            arg_config=arg_config,
+            start_epoch=start_epoch,
+            load_saved_model=load_saved_model,
+            load_best_model=load_best_model,
+            use_supernet_checkpoint=use_supernet_checkpoint,
+            use_expr_search_space=use_expr_search_space,
+            genotype_str=genotype_str,
+        )
+        model.to(device=DEVICE)
+        # TODO: do i need this line?
+        if use_supernet_checkpoint:
+            start_epoch = 0
+            load_saved_model = False
+            load_best_model = False
+            use_supernet_checkpoint = False
+            self.logger.use_supernet_checkpoint = False
+            self.logger.set_up_new_run()
+
+        self.logger.save_genotype(genotype_str)
 
         Arguments = namedtuple(  # type: ignore
             "Configure", " ".join(arg_config.keys())  # type: ignore
@@ -435,9 +613,8 @@ class Experiment:
             train_portion=arg_config.train_portion,  # type: ignore
         )
 
-        model = self.search_space
         w_optimizer = self._get_optimizer(arg_config.optim)(  # type: ignore
-            model.model_weight_parameters(),
+            model.parameters(),
             arg_config.lr,  # type: ignore
             **arg_config.optim_config,  # type: ignore
         )
@@ -461,6 +638,8 @@ class Experiment:
             logger=self.logger,
             batch_size=arg_config.batch_size,  # type: ignore
             use_data_parallel=arg_config.use_data_parallel,  # type: ignore
+            print_freq=arg_config.print_freq,  # type: ignore
+            drop_path_prob=arg_config.drop_path_prob,  # type: ignore
             load_saved_model=load_saved_model,
             load_best_model=load_best_model,
             start_epoch=start_epoch,
@@ -476,44 +655,6 @@ class Experiment:
         trainer.test(is_wandb_log=self.is_wandb_log)
 
         return trainer
-
-    def initialize_from_last_run(
-        self,
-        profile_config: ProfileConfig,
-        last_search_run_time: str = "NOT_VALID",
-    ) -> None:
-        if last_search_run_time != "NOT_VALID":
-            run_time = last_search_run_time
-            last_run_logger = Logger(
-                log_dir="logs",
-                seed=self.seed,
-                exp_name=self.exp_name,
-                search_space=self.search_space_str.value,
-                run_time=run_time,
-            )
-        else:
-            last_run_logger = Logger(
-                log_dir="logs",
-                seed=self.seed,
-                exp_name=self.exp_name,
-                search_space=self.search_space_str.value,
-                last_run=True,
-            )
-        config = profile_config.get_config()
-        self.set_search_space(self.search_space_str, config.get("search_space"))
-        checkpoint_dir = last_run_logger.path(mode="checkpoints")
-        checkpointer = Checkpointer(
-            model=self.search_space,
-            save_dir=checkpoint_dir,
-            save_to_disk=True,
-        )
-        last_info = last_run_logger.path("last_checkpoint")
-        info = checkpointer._load_file(f=last_info)
-        self.search_space.load_state_dict(info["model"])
-        last_run_logger.log(
-            "=> loading SEARCH checkpoint of the last-info", str(last_info)
-        )
-        last_run_logger.close()
 
 
 if __name__ == "__main__":
@@ -553,6 +694,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", default="cifar10", type=str)
     parser.add_argument("--logdir", default="./logs", type=str)
     parser.add_argument("--seed", default=444, type=int)
+    parser.add_argument("--epochs", default=3, type=int)
     parser.add_argument("--exp_name", default="test", type=str)
     parser.add_argument(
         "--load_best_model",
@@ -569,10 +711,24 @@ if __name__ == "__main__":
     parser.add_argument(
         "--start_epoch",
         default=0,
-        help="Specify the start epoch to continue the training of the model from the \
-        previous run",
+        help="Specify the start epoch to continue the training of the model from the"
+        + "previous run",
         type=int,
     )
+    parser.add_argument(
+        "--use_supernet_checkpoint",
+        action="store_true",
+        default=False,
+        help="If you would like to load_best_model, load_saved_model, or start_epoch"
+        + "from the supernets checkpoint pass True",
+    )
+    parser.add_argument(
+        "--runtime",
+        # default="",
+        help="if you want to start from in a certain runtime",
+        type=str,
+    )
+
     args = parser.parse_args()
     IS_DEBUG_MODE = True
     is_wandb_log = IS_DEBUG_MODE is False
@@ -589,6 +745,9 @@ if __name__ == "__main__":
 
     config = profile.get_config()
 
+    if args.runtime:
+        assert check_date_format(args.runtime)
+
     experiment = Experiment(
         search_space=searchspace,
         dataset=dataset,
@@ -596,14 +755,15 @@ if __name__ == "__main__":
         is_wandb_log=is_wandb_log,
         debug_mode=IS_DEBUG_MODE,
         exp_name=args.exp_name,
+        runtime=args.runtime,
     )
 
-    trainer = experiment.run_with_profile(
-        profile,
-        start_epoch=args.start_epoch,
-        load_saved_model=args.load_saved_model,
-        load_best_model=args.load_best_model,
-    )
+    # trainer = experiment.run_with_profile(
+    #     profile,
+    #     start_epoch=args.start_epoch,
+    #     load_saved_model=args.load_saved_model,
+    #     load_best_model=args.load_best_model,
+    # )
 
     profile = DiscreteProfile()
     discret_trainer = experiment.run_discrete_model_with_profile(
@@ -611,6 +771,7 @@ if __name__ == "__main__":
         start_epoch=args.start_epoch,
         load_saved_model=args.load_saved_model,
         load_best_model=args.load_best_model,
+        use_supernet_checkpoint=args.use_supernet_checkpoint,
     )
 
     if is_wandb_log:
