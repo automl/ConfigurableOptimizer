@@ -200,6 +200,7 @@ class DiscreteProfile:
             "batch_size": 96,
             "learning_rate_min": 0.0,
             "channel": 36,
+            "print_freq": 2,
             "drop_path_prob": 0.2,
             "cutout": -1,
             "cutout_length": 16,
@@ -249,17 +250,18 @@ class DiscreteProfile:
         self.searchspace_config = config
 
     def get_searchspace_config(self, searchspace_str: str, dataset_str: str) -> dict:
-        if self.searchspace_config:
+        if hasattr(self, "searchspace_config"):
             return self.searchspace_config
         if searchspace_str == "nb201":
             searchspace_config = {
-                "num_cells": 5,
-                "channels": 16,
+                "N": 5,  # num_cells
+                "C": 16,  # channels
             }
         elif searchspace_str == "darts":
             searchspace_config = {
                 "C": 36,  # init channels
                 "layers": 20,  # number of layers
+                "auxiliary": False,
             }
         else:
             raise ValueError("search space is not correct")
