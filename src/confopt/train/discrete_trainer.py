@@ -24,7 +24,7 @@ CriterionType: TypeAlias = torch.nn.modules.loss._Loss
 class DiscreteTrainer(ConfigurableTrainer):
     def __init__(
         self,
-        model: SearchSpace,
+        model: nn.Module,
         data: AbstractData,
         model_optimizer: OptimizerType,
         scheduler: LRSchedulerType,
@@ -103,6 +103,12 @@ class DiscreteTrainer(ConfigurableTrainer):
 
         for epoch in range(self.start_epoch, epochs):
             epoch_str = f"{epoch:03d}-{epochs:03d}"
+
+            if self.logger.search_space == "darts":
+                if isinstance(network, torch.nn.DataParallel):
+                    network.module.drop_path_prob = self.drop_path_prob * epoch / epochs
+                else:
+                    network.drop_path_prob = self.drop_path_prob * epoch / epochs
 
             base_metrics = self.train_func(
                 train_loader,
