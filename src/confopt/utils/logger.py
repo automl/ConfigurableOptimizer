@@ -13,6 +13,8 @@ from typing import IO, Any, NamedTuple
 import torch
 import wandb
 
+from .time import get_runtime
+
 
 def prepare_logger(
     save_dir: str,
@@ -76,7 +78,8 @@ class Logger:
             self.set_up_new_run()
 
     def set_up_new_run(self) -> None:
-        runtime = time.strftime("%Y-%d-%h-%H:%M:%S", time.gmtime(time.time()))
+        runtime = get_runtime()
+        # runtime = time.strftime("%Y-%d-%h-%H:%M:%S", time.gmtime(time.time()))
         if hasattr(self, "logger_file"):
             self.close()
         self.set_up_run(runtime=runtime)
@@ -135,6 +138,7 @@ class Logger:
             "last_checkpoint",  # return the last checkpoint in the checkpoints folder
             "genotypes",  # path to the folder containing the genotype of the model
             "best_genotype",  # path to the file containing the best genotype
+            "last_genotype",
             None,
         )
         path = None
@@ -155,9 +159,10 @@ class Logger:
                     / f.read().strip()
                 )
         if mode == "genotypes":
-            if self.use_supernet_checkpoint is True:
+            if self.use_supernet_checkpoint:
                 path = str((self.expr_log_path() / self.runtime) / "genotypes")
-            path = str((self.expr_log_path() / self.runtime) / "genotype.txt")
+            else:
+                path = str((self.expr_log_path() / self.runtime) / "genotype.txt")
         if mode == "best_genotype":
             path = str((self.expr_log_path() / self.runtime) / "best_genotype.txt")
         if mode is None:
@@ -197,11 +202,13 @@ class Logger:
             file_path = self.path(mode="best_genotype")
         elif start_epoch:
             file_path = self.path("genotypes")
-            file_path = "{}/{}_{:07d}.txt".format(file_path, "genotye", start_epoch)
+            file_path = "{}/{}_{:07d}.txt".format(file_path, "genotype", start_epoch)
         elif load_saved_model:
             file_path = self.path("genotypes")
-            with open(file_path) as f:
-                file_path = f.read().strip()
+            last_file_path = "{}/{}".format(file_path, "last_genotype.txt")
+            with open(last_file_path) as f:
+                file_path = f"{file_path}/{f.read().strip()}"
+
         with open(file_path) as f:
             genotype = f.read().strip()
         return genotype
@@ -209,7 +216,7 @@ class Logger:
     def save_genotype(
         self,
         genotype: str,
-        epoch: int,
+        epoch: int = 0,
         checkpointing_freq: int = 1,
         save_best_model: bool = False,
     ) -> None:
@@ -217,19 +224,23 @@ class Logger:
             return
         if save_best_model:
             file_path = Path(self.path(mode="best_genotype"))
-            last_file_path = Path(self.path(mode=None)) / "last_genotype"
+            last_file_path = Path(self.path(mode=None)) / "last_genotype.txt"
             last_file_info = "best_genotype.txt"
+        elif not self.use_supernet_checkpoint:
+            file_path = Path(self.path(mode="genotypes"))
+            last_file_info = None
         else:
             file_path = Path(self.path(mode="genotypes"))
-            last_file_path = file_path / "last_genotype"
+            last_file_path = file_path / "last_genotype.txt"
             file_path = Path("{}/{}_{:07d}.txt".format(file_path, "genotype", epoch))
             last_file_info = "{}_{:07d}.txt".format("genotype", epoch)
 
         with open(file_path, "w") as f:
             f.write(genotype)
 
-        with open(last_file_path, "w") as f:
-            f.write(last_file_info)
+        if last_file_info:
+            with open(last_file_path, "w") as f:
+                f.write(last_file_info)
 
     def log_metrics(
         self,
