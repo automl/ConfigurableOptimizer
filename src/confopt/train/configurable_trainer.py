@@ -233,7 +233,10 @@ class ConfigurableTrainer:
             arch_loss.backward()
             arch_optimizer.step()
 
-            profile.perturb_parameter(network)
+            if self.use_data_parallel:
+                profile.perturb_parameter(network.module)
+            else:
+                profile.perturb_parameter(network)
 
             self._update_meters(
                 inputs=arch_inputs,
