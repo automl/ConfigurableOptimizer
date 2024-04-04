@@ -7,7 +7,9 @@ from fvcore.common.checkpoint import Checkpointer, PeriodicCheckpointer
 import torch
 from torch import nn
 from typing_extensions import TypeAlias
+import wandb
 
+from confopt.benchmarks import BenchmarkBase
 from confopt.dataset import AbstractData
 from confopt.searchspace import SearchSpace
 from confopt.utils import AverageMeter, Logger, calc_accuracy
@@ -44,6 +46,8 @@ class ConfigurableTrainer:
         checkpointing_freq: int = 1,
         epochs: int = 100,
         debug_mode: bool = False,
+        query_dataset: str = "cifar10",
+        benchmark_api: BenchmarkBase | None = None,
     ) -> None:
         self.model = model
         self.model_optimizer = model_optimizer
@@ -65,6 +69,9 @@ class ConfigurableTrainer:
         self.checkpointing_freq = checkpointing_freq
         self.epochs = epochs
         self.debug_mode = debug_mode
+
+        self.query_dataset = query_dataset
+        self.benchmark_api = benchmark_api
 
     def train(self, profile: Profile, epochs: int, is_wandb_log: bool = True) -> None:
         self.epochs = epochs
@@ -160,6 +167,8 @@ class ConfigurableTrainer:
                 self.best_model_checkpointer.save(
                     name="best_model", checkpointables=checkpointables
                 )
+
+            self.log_benchmark_result(network, is_wandb_log)
 
             with torch.no_grad():
                 for i, alpha in enumerate(self.model.arch_parameters):
@@ -471,6 +480,32 @@ class ConfigurableTrainer:
             model.new_epoch()
         elif calling_frequency == "step":
             model.new_step()
+
+    def log_benchmark_result(
+        self, network: torch.nn.Module, is_wandb_log: bool = False
+    ) -> None:
+        if self.benchmark_api is None:
+            return
+        genotype = (
+            network.module.model.genotype()
+            if self.use_data_parallel
+            else network.model.genotype()
+        )
+        result_train, rusult_valid, result_test = self.benchmark_api.query(
+            genotype, dataset=self.query_dataset
+        )
+        self.logger.log(
+            f"Benchmark Results for {self.query_dataset} -> train: {result_train}, "
+            + f"valid: {rusult_valid}, test: {result_test}"
+        )
+
+        if is_wandb_log:
+            log_dict = {
+                "benchmark/train": result_train,
+                "benchmark/valid": rusult_valid,
+                "benchmark/test": result_test,
+            }
+            wandb.log(log_dict)  # type: ignore
 
     def update_sample_function(
         self,

@@ -12,6 +12,7 @@ import torch
 from torch.backends import cudnn
 import wandb
 
+from confopt.benchmarks import NB201Benchmark, NB301Benchmark
 from confopt.dataset import (
     CIFAR10Data,
     CIFAR100Data,
@@ -131,6 +132,7 @@ class Experiment:
         start_epoch: int = 0,
         load_saved_model: bool = False,
         load_best_model: bool = False,
+        use_benchmark: bool = True,
     ) -> ConfigurableTrainer:
         config = profile.get_config()
 
@@ -146,6 +148,7 @@ class Experiment:
             start_epoch,
             load_saved_model,
             load_best_model,
+            use_benchmark,
         )
 
     def runner(
@@ -154,6 +157,7 @@ class Experiment:
         start_epoch: int = 0,
         load_saved_model: bool = False,
         load_best_model: bool = False,
+        use_benchmark: bool = True,
     ) -> ConfigurableTrainer:
         assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
 
@@ -180,12 +184,15 @@ class Experiment:
             self.sampler_str,
             self.perturbator_str,
             config=config,
+            use_benchmark=use_benchmark,
         )
         if self.is_wandb_log:
             wandb.init(  # type: ignore
-                project=config.get("project_name", "Configurable_Optimizer")
-                if config is not None
-                else "Configurable_Optimizer",
+                project=(
+                    config.get("project_name", "Configurable_Optimizer")
+                    if config is not None
+                    else "Configurable_Optimizer"
+                ),
                 config=config,
             )
 
@@ -247,6 +254,8 @@ class Experiment:
             checkpointing_freq=arg_config.checkpointing_freq,  # type: ignore
             epochs=arg_config.epochs,  # type: ignore
             debug_mode=self.debug_mode,
+            query_dataset=self.dataset_str.value,
+            benchmark_api=self.benchmark_api,
         )
 
         trainer.train(
@@ -263,6 +272,7 @@ class Experiment:
         sampler_enum: SamplerType,
         perturbator_enum: PerturbatorType,
         config: dict | None = None,
+        use_benchmark: bool = True,
     ) -> None:
         if config is None:
             config = {}  # type : ignore
@@ -273,6 +283,12 @@ class Experiment:
 
         self.set_partial_connector(config.get("partial_connector", {}))
         self.set_dropout(config.get("dropout", {}))
+
+        if use_benchmark:
+            self.set_benchmark_api(search_space_enum, config.get("benchmark", {}))
+        else:
+            self.benchmark_api = None
+
         self.set_profile()
 
     def set_search_space(
@@ -290,6 +306,18 @@ class Experiment:
             self.search_space = TransNASBench101SearchSpace(**config)
         elif search_space == SearchSpaceType.BABYDARTS:
             self.search_space = BabyDARTSSearchSpace(**config)
+
+    def set_benchmark_api(
+        self,
+        search_space: SearchSpaceType,
+        config: dict,
+    ) -> None:
+        if search_space == SearchSpaceType.NB201:
+            self.benchmark_api = NB201Benchmark()
+        elif search_space == SearchSpaceType.DARTS:
+            self.benchmark_api = NB301Benchmark(**config)
+        else:
+            print(f"Benchmark does not exist for the {search_space.value} searchspace")
 
     def set_sampler(
         self,
