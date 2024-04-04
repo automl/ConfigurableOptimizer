@@ -100,7 +100,7 @@ class TestNASBench201SearchSpace(unittest.TestCase):
 
         # search_cells[0].edges["1<-0"]
         # assert type(first_cell_edge_ops) in OPS.values()
-        new_model = search_space._discretize()
+        new_model = search_space.discretize()
 
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
         out, logits = new_model(x)
@@ -467,7 +467,7 @@ class TestTransNASBench101SearchSpace(unittest.TestCase):
     def test_discretize_supernet(self) -> None:
         search_space = TransNASBench101SearchSpace()
 
-        new_model = search_space._discretize()
+        new_model = search_space.discretize()
 
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
         out = new_model(x)
