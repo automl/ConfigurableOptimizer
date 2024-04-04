@@ -77,6 +77,7 @@ class TestDartsProfile(unittest.TestCase):
             "k": 2,
         }
         profile = DartsProfile(
+            epochs=100,
             is_partial_connection=True,
             perturbation="random",
             sampler_sample_frequency="step",
@@ -96,6 +97,7 @@ class TestDartsProfile(unittest.TestCase):
 
         with self.assertRaises(AssertionError):
             profile = DartsProfile(  # noqa: F841
+                epochs=100,
                 is_partial_connection=True,
                 perturbation="random",
                 sampler_sample_frequency="step",
@@ -105,6 +107,7 @@ class TestDartsProfile(unittest.TestCase):
 
     def test_sampler_change(self) -> None:
         profile = DartsProfile(
+            epochs=100,
             sampler_sample_frequency="step",
         )
         sampler_config = {"sample_frequency": "epoch"}
@@ -125,6 +128,7 @@ class TestDRNASProfile(unittest.TestCase):
             "k": 2,
         }
         profile = DRNASProfile(
+            epochs=100,
             is_partial_connection=True,
             perturbation="random",
             sampler_sample_frequency="step",
@@ -144,6 +148,7 @@ class TestDRNASProfile(unittest.TestCase):
 
         with self.assertRaises(AssertionError):
             profile = DRNASProfile(  # noqa: F841
+                epochs=100,
                 is_partial_connection=True,
                 perturbation="random",
                 sampler_sample_frequency="step",
@@ -153,6 +158,7 @@ class TestDRNASProfile(unittest.TestCase):
 
     def test_sampler_change(self) -> None:
         profile = DRNASProfile(
+            epochs=100,
             sampler_sample_frequency="step",
         )
         sampler_config = {"sample_frequency": "epoch"}
@@ -173,6 +179,7 @@ class TestGDASProfile(unittest.TestCase):
             "k": 2,
         }
         profile = GDASProfile(
+            epochs=100,
             is_partial_connection=True,
             perturbation="random",
             sampler_sample_frequency="step",
@@ -192,6 +199,7 @@ class TestGDASProfile(unittest.TestCase):
 
         with self.assertRaises(AssertionError):
             profile = GDASProfile(  # noqa: F841
+                epochs=100,
                 is_partial_connection=True,
                 perturbation="random",
                 sampler_sample_frequency="step",
@@ -201,6 +209,7 @@ class TestGDASProfile(unittest.TestCase):
 
     def test_sampler_change(self) -> None:
         profile = GDASProfile(
+            epochs=100,
             sampler_sample_frequency="step",
         )
         sampler_config = {"tau_max": 12, "tau_min": 0.3}
@@ -220,6 +229,7 @@ class TestSNASProfile(unittest.TestCase):
             "k": 2,
         }
         profile = SNASProfile(
+            epochs=100,
             is_partial_connection=True,
             perturbation="random",
             sampler_sample_frequency="step",
@@ -239,6 +249,7 @@ class TestSNASProfile(unittest.TestCase):
 
         with self.assertRaises(AssertionError):
             profile = SNASProfile(  # noqa: F841
+                epochs=100,
                 is_partial_connection=True,
                 perturbation="random",
                 sampler_sample_frequency="step",
@@ -248,6 +259,7 @@ class TestSNASProfile(unittest.TestCase):
 
     def test_sampler_change(self) -> None:
         profile = SNASProfile(
+            epochs=100,
             sampler_sample_frequency="step",
         )
         sampler_config = {"temp_min": 0.5, "temp_init": 1.3}
