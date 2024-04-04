@@ -205,6 +205,6 @@ class Logger:
             f"{title}/acc_top5": metrics.acc_top5,  # type: ignore
         }
         if totaltime is not None:
-            log_metrics.update({f"{title}/time": f"{totaltime:.1f}"})
+            log_metrics.update({f"{title}/time": totaltime})
 
         wandb.log(log_metrics)  # type: ignore
