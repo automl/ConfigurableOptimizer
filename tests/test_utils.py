@@ -118,7 +118,7 @@ class TestLogger(unittest.TestCase):
                 "darts",
                 "cifar100",
                 "12",
-                "discrete",
+                "supernet",
             ]
         )
         logger = Logger(
