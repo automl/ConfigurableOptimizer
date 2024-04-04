@@ -10,7 +10,7 @@ from .checkpoints import (
 )
 from .logger import Logger, prepare_logger
 from .normalize_params import normalize_params
-from .time import get_time_as_string
+from .time import get_runtime, get_time_as_string
 
 
 class AverageMeter:
@@ -95,6 +95,7 @@ __all__ = [
     "copy_checkpoint",
     "get_machine_info",
     "get_time_as_string",
+    "get_runtime",
     "prepare_logger",
     "Logger",
     "BaseProfile",
