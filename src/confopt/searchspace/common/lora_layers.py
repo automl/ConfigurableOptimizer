@@ -37,7 +37,7 @@ class LoRALayer:
         pass
 
     @abstractmethod
-    def activate_lora_component(
+    def activate_lora(
         self,
         r: int,
         lora_alpha: int = 1,

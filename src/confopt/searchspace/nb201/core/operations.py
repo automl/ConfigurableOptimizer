@@ -209,7 +209,7 @@ class ReLUConvBN(nn.Module):
         self.op[2] = reduce_bn_features(self.op[2], k, device)
 
     def activate_lora(self, r: int) -> None:
-        self.op[1].activate_lora_component(r)
+        self.op[1].activate_lora(r)
 
 
 class SepConv(nn.Module):
@@ -299,8 +299,8 @@ class SepConv(nn.Module):
         self.op[3] = reduce_bn_features(self.op[3], k, device)
 
     def activate_lora(self, r: int) -> None:
-        self.op[1].activate_lora_component(r)
-        self.op[2].activate_lora_component(r)
+        self.op[1].activate_lora(r)
+        self.op[2].activate_lora(r)
 
 
 class DualSepConv(nn.Module):
@@ -833,9 +833,9 @@ class FactorizedReduce(nn.Module):
     def activate_lora(self, r: int) -> None:
         if self.stride == 2:
             for i in range(2):
-                self.convs[i].activate_lora_component(r)
+                self.convs[i].activate_lora(r)
         elif self.stride == 1:
-            self.conv.activate_lora_component(r)
+            self.conv.activate_lora(r)
         else:
             raise ValueError(f"Invalid stride: {self.stride}")
 

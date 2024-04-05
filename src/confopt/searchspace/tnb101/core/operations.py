@@ -95,7 +95,7 @@ class ReLUConvBN(nn.Module):
         self.ops[2] = reduce_bn_features(self.ops[2], k, device)
 
     def activate_lora(self, r: int) -> None:
-        self.ops[1].activate_lora_component(r)
+        self.ops[1].activate_lora(r)
 
     def extra_repr(self) -> str:
         return "C_in={C_in}, C_out={C_out}, stride={stride}".format(**self.__dict__)
@@ -206,9 +206,9 @@ class FactorizedReduce(nn.Module):
     def activate_lora(self, r: int) -> None:
         if self.stride == 2:
             for i in range(2):
-                self.convs[i].activate_lora_component(r)
+                self.convs[i].activate_lora(r)
         elif self.stride == 1:
-            self.conv.activate_lora_component(r)
+            self.conv.activate_lora(r)
         else:
             raise ValueError(f"Invalid stride : {self.stride}")
 

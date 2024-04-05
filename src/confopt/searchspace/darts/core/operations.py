@@ -113,7 +113,7 @@ class ReLUConvBN(nn.Module):
         self.op[2] = reduce_bn_features(self.op[2], k, device)
 
     def activate_lora(self, r: int) -> None:
-        self.op[1].activate_lora_component(r)
+        self.op[1].activate_lora(r)
 
 
 class Pooling(nn.Module):
@@ -249,8 +249,8 @@ class DilConv(nn.Module):
         self.op[3] = reduce_bn_features(self.op[3], k, device)
 
     def activate_lora(self, r: int) -> None:
-        self.op[1].activate_lora_component(r)
-        self.op[2].activate_lora_component(r)
+        self.op[1].activate_lora(r)
+        self.op[2].activate_lora(r)
 
 
 class SepConv(nn.Module):
@@ -339,10 +339,10 @@ class SepConv(nn.Module):
         self.op[7] = reduce_bn_features(self.op[7], k, device)
 
     def activate_lora(self, r: int) -> None:
-        self.op[1].activate_lora_component(r)
-        self.op[2].activate_lora_component(r)
-        self.op[5].activate_lora_component(r)
-        self.op[6].activate_lora_component(r)
+        self.op[1].activate_lora(r)
+        self.op[2].activate_lora(r)
+        self.op[5].activate_lora(r)
+        self.op[6].activate_lora(r)
 
 
 class Identity(nn.Module):
@@ -500,8 +500,8 @@ class FactorizedReduce(nn.Module):
         self.bn = reduce_bn_features(self.bn, k, device)
 
     def activate_lora(self, r: int) -> None:
-        self.conv_1.activate_lora_component(r)
-        self.conv_2.activate_lora_component(r)
+        self.conv_1.activate_lora(r)
+        self.conv_2.activate_lora(r)
 
 
 class Conv7x1Conv1x7BN(nn.Module):

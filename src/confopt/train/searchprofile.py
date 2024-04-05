@@ -87,7 +87,7 @@ class Profile:
         if r > 0:
             for _, module in searchspace.named_modules(remove_duplicate=False):
                 if isinstance(module, LoRALayer):
-                    module.activate_lora_component(
+                    module.activate_lora(
                         r=r,
                         lora_alpha=lora_alpha,
                         lora_dropout_rate=lora_dropout,
