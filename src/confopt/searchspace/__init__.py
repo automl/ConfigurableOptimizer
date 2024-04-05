@@ -1,3 +1,4 @@
+from .baby_darts.supernet import BabyDARTSSearchSpace
 from .common.base_search import SearchSpace
 from .darts.core import DARTSImageNetModel, DARTSModel  # type: ignore
 from .darts.core.genotypes import DARTSGenotype
@@ -19,4 +20,5 @@ __all__ = [
     "DARTSGenotype",
     "NASBench201Model",
     "NAS201Genotype",
+    "BabyDARTSSearchSpace",
 ]
