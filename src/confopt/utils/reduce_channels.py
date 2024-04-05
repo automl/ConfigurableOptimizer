@@ -61,6 +61,15 @@ def increase_conv_channels(
             conv2d_layer.bias is not None,
         ).to(device)
 
+    # Copy the weights and biases from the original conv2d to the new one
+    increased_conv2d.weight.data[
+        :out_channels, :in_channels, :, :
+    ] = conv2d_layer.weight.data[:out_channels, :in_channels, :, :].clone()
+    if conv2d_layer.bias is not None:
+        increased_conv2d.bias.data[:out_channels] = conv2d_layer.bias.data[
+            :out_channels
+        ].clone()
+
     return increased_conv2d
 
 
@@ -160,14 +169,24 @@ def increase_bn_features(
     # Calculate the new number of features
     new_num_features = int(max(1, num_features // k))
 
-    # Create a new BatchNorm2d layer with the reduced number of features
-    nn.BatchNorm2d(
+    # Create a new BatchNorm2d layer with the increased number of features
+    increased_batchnorm = nn.BatchNorm2d(
         new_num_features,
         eps=batchnorm_layer.eps,
         momentum=batchnorm_layer.momentum,
         affine=batchnorm_layer.affine,
         track_running_stats=batchnorm_layer.track_running_stats,
     ).to(device)
+
+    if batchnorm_layer.affine:
+        increased_batchnorm.weight.data[:num_features] = batchnorm_layer.weight.data[
+            :num_features
+        ].clone()
+        increased_batchnorm.bias.data[:num_features] = batchnorm_layer.bias.data[
+            :num_features
+        ].clone()
+
+    return increased_batchnorm
 
 
 def reduce_bn_features(
