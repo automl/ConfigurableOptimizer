@@ -10,6 +10,7 @@ from confopt.searchspace import (
     NASBench201SearchSpace,
     TransNASBench101SearchSpace,
 )
+from confopt.searchspace.common.lora_layers import LoRALayer
 from confopt.searchspace.darts.core.model_search import Cell as DARTSSearchCell
 from confopt.searchspace.nb1shot1.core.model_search import (
     Cell as NasBench1Shot1SearchCell,
@@ -148,34 +149,19 @@ class TestNASBench201SearchSpace(unittest.TestCase):
         for beta_param_before, beta_param_after in zip(betas_before, betas_after):
             assert not torch.allclose(beta_param_before, beta_param_after)
 
-
-"""
-    def test_optim_forward_pass(self) -> None:
+    def test_lora_parameters(self) -> None:
         search_space = NASBench201SearchSpace(edge_normalization=True)
-        loss_fn = torch.nn.CrossEntropyLoss().to(DEVICE)
-        x = torch.randn(2, 3, 32, 32).to(DEVICE)
-        y = torch.randint(low=0, high=9, size=(2,)).to(DEVICE)
-        arch_optim = torch.optim.Adam(
-            [*search_space.arch_parameters, *search_space.beta_parameters]
+        model_optimizer = torch.optim.Adam(search_space.model_weight_parameters())
+        for _, module in search_space.named_modules(remove_duplicate=False):
+            if isinstance(module, LoRALayer):
+                module.activate_lora(r=4)
+        opt_hyperparams = model_optimizer.defaults
+        model_optimizer = type(model_optimizer)(
+            search_space.model_weight_parameters(), **opt_hyperparams
         )
-        arch_optim.zero_grad()
-        out = search_space(x)
-        loss = loss_fn(out[1], y)
-        loss.backward()
-        alphas_before = []
-        # betas_before = []
-        for alpha in search_space.arch_parameters:
-            alphas_before.append(alpha.clone().detach())
-        # for beta in search_space.beta_parameters:
-        #     betas_before.append(beta.clone().detach())
-        arch_optim.step()
-        alphas_after = search_space.arch_parameters
-        # betas_after = search_space.beta_parameters
-        for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
-            assert not torch.allclose(arch_param_before, arch_param_after)
-        # for beta_param_before, beta_param_after in zip(betas_before, betas_after):
-        #     assert not torch.allclose(beta_param_before, beta_param_after)
-"""
+        model_params = search_space.model_weight_parameters()
+
+        assert model_params == model_optimizer.param_groups[0]["params"]
 
 
 class TestDARTSSearchSpace(unittest.TestCase):
@@ -293,6 +279,20 @@ class TestDARTSSearchSpace(unittest.TestCase):
             assert not torch.allclose(arch_param_before, arch_param_after)
         for beta_param_before, beta_param_after in zip(betas_before, betas_after):
             assert not torch.allclose(beta_param_before, beta_param_after)
+
+    def test_lora_parameters(self) -> None:
+        search_space = DARTSSearchSpace(edge_normalization=True)
+        model_optimizer = torch.optim.Adam(search_space.model_weight_parameters())
+        for _, module in search_space.named_modules(remove_duplicate=False):
+            if isinstance(module, LoRALayer):
+                module.activate_lora(r=4)
+        opt_hyperparams = model_optimizer.defaults
+        model_optimizer = type(model_optimizer)(
+            search_space.model_weight_parameters(), **opt_hyperparams
+        )
+        model_params = search_space.model_weight_parameters()
+
+        assert model_params == model_optimizer.param_groups[0]["params"]
 
 
 class TestNASBench1Shot1SearchSpace(unittest.TestCase):
@@ -500,6 +500,21 @@ class TestTransNASBench101SearchSpace(unittest.TestCase):
             assert not torch.allclose(arch_param_before, arch_param_after)
         for beta_param_before, beta_param_after in zip(betas_before, betas_after):
             assert not torch.allclose(beta_param_before, beta_param_after)
+
+    def test_lora_parameters(self) -> None:
+        search_space = TransNASBench101SearchSpace(edge_normalization=True)
+        model_optimizer = torch.optim.Adam(search_space.model_weight_parameters())
+        for _, module in search_space.named_modules(remove_duplicate=False):
+            if isinstance(module, LoRALayer):
+                module.activate_lora(r=4)
+
+        opt_hyperparams = model_optimizer.defaults
+        model_optimizer = type(model_optimizer)(
+            search_space.model_weight_parameters(), **opt_hyperparams
+        )
+        model_params = search_space.model_weight_parameters()
+
+        assert model_params == model_optimizer.param_groups[0]["params"]
 
 
 if __name__ == "__main__":

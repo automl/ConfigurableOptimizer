@@ -40,7 +40,7 @@ class TestLoRA(unittest.TestCase):
         assert not hasattr(lora_conv2d, "lora_A")
         assert not hasattr(lora_conv2d, "lora_B")
 
-        lora_conv2d.activate_lora_component(r=8)
+        lora_conv2d.activate_lora(r=8)
 
         assert lora_conv2d.lora_A.shape == torch.Size(
             [r * kernel_size[0], in_channels * kernel_size[0]]
