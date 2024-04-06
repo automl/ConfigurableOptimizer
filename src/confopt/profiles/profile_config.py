@@ -13,8 +13,6 @@ ADVERSERIAL_DATA = (
 
 
 class ProfileConfig:
-    epochs = 100
-
     def __init__(
         self,
         config_type: str,
@@ -138,8 +136,9 @@ class ProfileConfig:
             "arch_optim_config": {
                 "weight_decay": 1e-3,
             },
+            "scheduler": "cosine_annealing_warm_restart",
             "criterion": "cross_entropy",
-            "batch_size": 96,
+            "batch_size": 64,
             "learning_rate_min": 0.0,
             "cutout": -1,
             "cutout_length": 16,
@@ -212,7 +211,7 @@ class ProfileConfig:
             assert (
                 config_key in self.lora_config
             ), f"{config_key} not a valid configuration for the lora layers"
-            self.dropout_config[config_key] = kwargs[config_key]
+            self.lora_config[config_key] = kwargs[config_key]
 
     @abstractmethod
     def set_searchspace_config(self, config: dict) -> None:

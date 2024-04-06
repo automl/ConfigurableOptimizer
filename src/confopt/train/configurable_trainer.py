@@ -66,12 +66,13 @@ class ConfigurableTrainer:
         self.epochs = epochs
         self.debug_mode = debug_mode
 
-    def train(  # noqa: PLR0915, C901
+    def train(  # noqa: C901, PLR0915, PLR0912
         self,
         profile: Profile,
         epochs: int,
         is_wandb_log: bool = True,
         lora_warm_epochs: int = 0,
+        retain_warm: bool = False,
     ) -> None:
         self.epochs = epochs
         profile.adapt_search_space(self.model)
@@ -110,7 +111,8 @@ class ConfigurableTrainer:
             epoch_str = f"{epoch:03d}-{self.epochs:03d}"
             if lora_warm_epochs > 0 and epoch == lora_warm_epochs:
                 self._initialize_lora_modules(lora_warm_epochs, profile, network)
-                is_warm_epoch = False
+                if not retain_warm:
+                    is_warm_epoch = False
 
             self._component_new_step_or_epoch(network, calling_frequency="epoch")
             self.update_sample_function(profile, network, calling_frequency="epoch")
@@ -274,7 +276,8 @@ class ConfigurableTrainer:
             w_optimizer.step()
 
             w_optimizer.zero_grad()
-            arch_optimizer.zero_grad()
+            if not is_warm_epoch:
+                arch_optimizer.zero_grad()
 
             self._update_meters(
                 inputs=base_inputs,
@@ -389,7 +392,8 @@ class ConfigurableTrainer:
         )
         checkpointer.add_checkpointable("w_scheduler", self.scheduler)
         checkpointer.add_checkpointable("w_optimizer", self.model_optimizer)
-        checkpointer.add_checkpointable("arch_optimizer", self.arch_optimizer)
+        if self.arch_optimizer is not None:
+            checkpointer.add_checkpointable("arch_optimizer", self.arch_optimizer)
         return checkpointer
 
     def _init_periodic_checkpointer(self) -> None:
@@ -415,7 +419,8 @@ class ConfigurableTrainer:
         self.model.load_state_dict(last_checkpoint["model"])
         self.scheduler.load_state_dict(last_checkpoint["w_scheduler"])
         self.model_optimizer.load_state_dict(last_checkpoint["w_optimizer"])
-        self.arch_optimizer.load_state_dict(last_checkpoint["arch_optimizer"])
+        if self.arch_optimizer is not None:
+            self.arch_optimizer.load_state_dict(last_checkpoint["arch_optimizer"])
 
         last_checkpoint = last_checkpoint["checkpointables"]
         self.start_epoch = last_checkpoint["epoch"]
@@ -529,10 +534,25 @@ class ConfigurableTrainer:
             param_group["initial_lr"] = old_initial_lrs[param_id]
 
         # reinitialize scheduler
+        scheduler_config = {}
+        if isinstance(self.scheduler, torch.optim.lr_scheduler.CosineAnnealingLR):
+            scheduler_config = {
+                "T_max": self.scheduler.T_max,
+                "eta_min": self.scheduler.eta_min,
+            }
+
+        if isinstance(
+            self.scheduler, torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
+        ):
+            scheduler_config = {
+                "T_0": self.scheduler.T_0,
+                "T_mult": self.scheduler.T_mult,
+                "eta_min": self.scheduler.eta_min,
+            }
+
         self.scheduler = type(self.scheduler)(
             self.model_optimizer,
-            self.scheduler.T_max,  # type: ignore
-            self.scheduler.eta_min,  # type: ignore
+            **scheduler_config,
         )
 
     def update_sample_function(
