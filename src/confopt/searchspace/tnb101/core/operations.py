@@ -6,10 +6,7 @@ import torch
 from torch import nn
 
 from confopt.searchspace.common import Conv2DLoRA
-from confopt.utils.reduce_channels import (
-    reduce_bn_features,
-    reduce_conv_channels,
-)
+import confopt.utils.reduce_channels as rc
 
 TRANS_NAS_BENCH_101 = ["none", "nor_conv_1x1", "skip_connect", "nor_conv_3x3"]
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -91,8 +88,8 @@ class ReLUConvBN(nn.Module):
 
     def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
         # TODO: make this change dynamic
-        self.ops[1] = reduce_conv_channels(self.ops[1], k, device)
-        self.ops[2] = reduce_bn_features(self.ops[2], k, device)
+        self.ops[1] = rc.reduce_conv_channels(self.ops[1], k, device)
+        self.ops[2] = rc.reduce_bn_features(self.ops[2], k, device)
 
     def activate_lora(self, r: int) -> None:
         self.ops[1].activate_lora(r)
@@ -195,13 +192,13 @@ class FactorizedReduce(nn.Module):
     def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
         if self.stride == 2:
             for i in range(2):
-                self.convs[i] = reduce_conv_channels(self.convs[i], k, device)
+                self.convs[i] = rc.reduce_conv_channels(self.convs[i], k, device)
         elif self.stride == 1:
-            self.conv = reduce_conv_channels(self.conv, k, device)
+            self.conv = rc.reduce_conv_channels(self.conv, k, device)
         else:
             raise ValueError(f"Invalid stride : {self.stride}")
 
-        self.bn = reduce_bn_features(self.bn, k)
+        self.bn = rc.reduce_bn_features(self.bn, k)
 
     def activate_lora(self, r: int) -> None:
         if self.stride == 2:

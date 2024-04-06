@@ -4,10 +4,7 @@ import torch
 from torch import nn
 
 from confopt.searchspace.common import Conv2DLoRA
-from confopt.utils.reduce_channels import (
-    reduce_bn_features,
-    reduce_conv_channels,
-)
+import confopt.utils.reduce_channels as rc
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 OPS = {
@@ -109,8 +106,8 @@ class ReLUConvBN(nn.Module):
             This method dynamically changes the number of output channels in the
             ReLUConvBN block.
         """
-        self.op[1] = reduce_conv_channels(self.op[1], k, device)
-        self.op[2] = reduce_bn_features(self.op[2], k, device)
+        self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
+        self.op[2] = rc.reduce_bn_features(self.op[2], k, device)
 
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
@@ -174,7 +171,7 @@ class Pooling(nn.Module):
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
         """
-        self.op[1] = reduce_bn_features(self.op[1], k, device)
+        self.op[1] = rc.reduce_bn_features(self.op[1], k, device)
 
 
 class DilConv(nn.Module):
@@ -244,9 +241,9 @@ class DilConv(nn.Module):
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
         """
-        self.op[1] = reduce_conv_channels(self.op[1], k, device)
-        self.op[2] = reduce_conv_channels(self.op[2], k, device)
-        self.op[3] = reduce_bn_features(self.op[3], k, device)
+        self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
+        self.op[2] = rc.reduce_conv_channels(self.op[2], k, device)
+        self.op[3] = rc.reduce_bn_features(self.op[3], k, device)
 
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
@@ -331,12 +328,12 @@ class SepConv(nn.Module):
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
         """
-        self.op[1] = reduce_conv_channels(self.op[1], k, device)
-        self.op[2] = reduce_conv_channels(self.op[2], k, device)
-        self.op[3] = reduce_bn_features(self.op[3], k, device)
-        self.op[5] = reduce_conv_channels(self.op[5], k, device)
-        self.op[6] = reduce_conv_channels(self.op[6], k, device)
-        self.op[7] = reduce_bn_features(self.op[7], k, device)
+        self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
+        self.op[2] = rc.reduce_conv_channels(self.op[2], k, device)
+        self.op[3] = rc.reduce_bn_features(self.op[3], k, device)
+        self.op[5] = rc.reduce_conv_channels(self.op[5], k, device)
+        self.op[6] = rc.reduce_conv_channels(self.op[6], k, device)
+        self.op[7] = rc.reduce_bn_features(self.op[7], k, device)
 
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
@@ -495,9 +492,9 @@ class FactorizedReduce(nn.Module):
             This method dynamically changes the number of output channels in the block's
             convolutional layers and BatchNorm.
         """
-        self.conv_1 = reduce_conv_channels(self.conv_1, k, device)
-        self.conv_2 = reduce_conv_channels(self.conv_2, k, device)
-        self.bn = reduce_bn_features(self.bn, k, device)
+        self.conv_1 = rc.reduce_conv_channels(self.conv_1, k, device)
+        self.conv_2 = rc.reduce_conv_channels(self.conv_2, k, device)
+        self.bn = rc.reduce_bn_features(self.bn, k, device)
 
     def activate_lora(self, r: int) -> None:
         self.conv_1.activate_lora(r)
@@ -552,6 +549,6 @@ class Conv7x1Conv1x7BN(nn.Module):
         Note: This method is used for architectural search and adjusts the number of
         channels in the Convolution operation.
         """
-        self.op[1] = reduce_conv_channels(self.op[1], k, device)
-        self.op[2] = reduce_conv_channels(self.op[2], k, device)
-        self.op[3] = reduce_bn_features(self.op[3], k, device)
+        self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
+        self.op[2] = rc.reduce_conv_channels(self.op[2], k, device)
+        self.op[3] = rc.reduce_bn_features(self.op[3], k, device)

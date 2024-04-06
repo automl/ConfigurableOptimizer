@@ -7,10 +7,7 @@ import torch
 from torch import nn
 
 from confopt.searchspace.common import Conv2DLoRA
-from confopt.utils.reduce_channels import (
-    reduce_bn_features,
-    reduce_conv_channels,
-)
+import confopt.utils.reduce_channels as rc
 
 __all__ = ["OPS", "ResNetBasicblock", "SearchSpaceNames", "ReLUConvBN"]
 
@@ -205,8 +202,8 @@ class ReLUConvBN(nn.Module):
             This method dynamically changes the number of output channels in the
             ReLUConvBN block.
         """
-        self.op[1] = reduce_conv_channels(self.op[1], k, device)
-        self.op[2] = reduce_bn_features(self.op[2], k, device)
+        self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
+        self.op[2] = rc.reduce_bn_features(self.op[2], k, device)
 
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
@@ -294,9 +291,9 @@ class SepConv(nn.Module):
             This method dynamically changes the number of output channels in the SepConv
             block.
         """
-        self.op[1] = reduce_conv_channels(self.op[1], k, device)
-        self.op[2] = reduce_conv_channels(self.op[2], k, device)
-        self.op[3] = reduce_bn_features(self.op[3], k, device)
+        self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
+        self.op[2] = rc.reduce_conv_channels(self.op[2], k, device)
+        self.op[3] = rc.reduce_bn_features(self.op[3], k, device)
 
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
@@ -822,13 +819,13 @@ class FactorizedReduce(nn.Module):
         """
         if self.stride == 2:
             for i in range(2):
-                self.convs[i] = reduce_conv_channels(self.convs[i], k, device)
+                self.convs[i] = rc.reduce_conv_channels(self.convs[i], k, device)
         elif self.stride == 1:
-            self.conv = reduce_conv_channels(self.conv, k, device)
+            self.conv = rc.reduce_conv_channels(self.conv, k, device)
         else:
             raise ValueError(f"Invalid stride: {self.stride}")
 
-        self.bn = reduce_bn_features(self.bn, k)
+        self.bn = rc.reduce_bn_features(self.bn, k)
 
     def activate_lora(self, r: int) -> None:
         if self.stride == 2:
