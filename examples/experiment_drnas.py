@@ -64,6 +64,7 @@ if __name__ == "__main__":
 
     # Sampler and Perturbator have different sample_frequency
     profile = DRNASProfile(
+        is_partial_connection=args.searchspace == "darts",
         epochs=args.search_epochs,
         sampler_sample_frequency="step",
     )
@@ -72,7 +73,6 @@ if __name__ == "__main__":
         "num_classes": dataset_size[args.dataset],  # type: ignore
     }
     if args.searchspace == "darts":
-        profile.set_partial_connector(is_partial_connection=True)
         profile.configure_partial_connector(k=4)
         searchspace_config.update({"C": 36, "layers": 20})
     profile.set_searchspace_config(searchspace_config)

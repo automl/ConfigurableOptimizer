@@ -33,6 +33,7 @@ from confopt.profiles import (
     ProfileConfig,
 )
 from confopt.searchspace import (
+    BabyDARTSSearchSpace,
     DARTSSearchSpace,
     NASBench1Shot1SearchSpace,
     NASBench201SearchSpace,
@@ -55,6 +56,7 @@ class SearchSpaceType(Enum):
     NB201 = "nb201"
     NB1SHOT1 = "nb1shot1"
     TNB101 = "tnb101"
+    BABYDARTS = "baby_darts"
 
 
 class SamplerType(Enum):
@@ -439,6 +441,8 @@ class Experiment:
             self.search_space = NASBench1Shot1SearchSpace(**config)
         elif search_space == SearchSpaceType.TNB101:
             self.search_space = TransNASBench101SearchSpace(**config)
+        elif search_space == SearchSpaceType.BABYDARTS:
+            self.search_space = BabyDARTSSearchSpace(**config)
 
     def set_sampler(
         self,

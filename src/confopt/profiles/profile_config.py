@@ -29,12 +29,12 @@ class ProfileConfig:
         self.lora_warm_epochs = lora_warm_epochs
         self._initialize_trainer_config()
         self._initialize_sampler_config()
-        self.set_partial_connector(is_partial_connection)
-        self.set_lora_configs(lora_rank)
-        self.set_dropout(dropout)
-        self.set_perturb(perturbation, perturbator_sample_frequency)
+        self._set_partial_connector(is_partial_connection)
+        self._set_lora_configs(lora_rank)
+        self._set_dropout(dropout)
+        self._set_perturb(perturbation, perturbator_sample_frequency)
 
-    def set_lora_configs(
+    def _set_lora_configs(
         self,
         lora_rank: int = 0,
         lora_dropout: float = 0,
@@ -48,7 +48,7 @@ class ProfileConfig:
             "merge_weights": merge_weights,
         }
 
-    def set_perturb(
+    def _set_perturb(
         self,
         perturb_type: str | None = None,
         perturbator_sample_frequency: str = "epoch",
@@ -62,11 +62,11 @@ class ProfileConfig:
         self.perturbator_sample_frequency = perturbator_sample_frequency
         self._initialize_perturbation_config()
 
-    def set_partial_connector(self, is_partial_connection: bool = False) -> None:
+    def _set_partial_connector(self, is_partial_connection: bool = False) -> None:
         self.is_partial_connection = is_partial_connection
         self._initialize_partial_connector_config()
 
-    def set_dropout(self, dropout: float | None = None) -> None:
+    def _set_dropout(self, dropout: float | None = None) -> None:
         self.dropout = dropout
         self._initialize_dropout_config()
 

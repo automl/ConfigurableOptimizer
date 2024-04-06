@@ -1,3 +1,4 @@
+from .baby_darts.supernet import BabyDARTSSearchSpace
 from .common.base_search import SearchSpace
 from .darts.supernet import DARTSSearchSpace  # type: ignore
 from .nb1shot1.supernet import NASBench1Shot1SearchSpace  # type: ignore
@@ -10,4 +11,5 @@ __all__ = [
     "NASBench1Shot1SearchSpace",
     "TransNASBench101SearchSpace",
     "SearchSpace",
+    "BabyDARTSSearchSpace",
 ]

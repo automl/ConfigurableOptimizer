@@ -15,6 +15,12 @@ PRIMITIVES = [
     "dil_conv_5x5",
 ]
 
+BABY_PRIMITIVES = [
+    "none",
+    "sep_conv_3x3",
+    "dil_conv_3x3",
+]
+
 NASNet = Genotype(
     normal=[
         ("sep_conv_5x5", 1),
