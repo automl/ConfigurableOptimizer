@@ -36,7 +36,6 @@ class LoRALayer:
     def _initialize_AB(self) -> None:  # noqa: N802
         pass
 
-    @abstractmethod
     def activate_lora(
         self,
         r: int,
