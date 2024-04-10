@@ -56,8 +56,8 @@ class TestWeightEntangler(unittest.TestCase):
         assert set([1, 5]) == set(entangled_modules.keys())
 
         modules = list(entangled_modules.values())
-        assert modules[0] == sep_conv7x7.op[1]
-        assert modules[1] == sep_conv7x7.op[5]
+        assert modules[0] == sep_conv7x7.op[1].conv
+        assert modules[1] == sep_conv7x7.op[5].conv
 
         dil_conv5x5 = DilConv(32, 32, 5, 1, 2, 1)
 
@@ -66,7 +66,7 @@ class TestWeightEntangler(unittest.TestCase):
         assert 1 == list(entangled_modules.keys())[0]
 
         modules = list(entangled_modules.values())
-        assert modules[0] == dil_conv5x5.op[1]
+        assert modules[0] == dil_conv5x5.op[1].conv
 
         pooling = Pooling(32, 1, "avg")
         entangled_modules = entangler._get_weight_entangle_ops(pooling)
@@ -88,14 +88,14 @@ class TestWeightEntangler(unittest.TestCase):
         assert len(entangle_modules[5]) == 3
 
         assert entangle_modules[1] == [
-            sep_convs[0].op[1],
-            sep_convs[1].op[1],
-            sep_convs[2].op[1],
+            sep_convs[0].op[1].conv,
+            sep_convs[1].op[1].conv,
+            sep_convs[2].op[1].conv,
         ]
         assert entangle_modules[5] == [
-            sep_convs[0].op[5],
-            sep_convs[1].op[5],
-            sep_convs[2].op[5],
+            sep_convs[0].op[5].conv,
+            sep_convs[1].op[5].conv,
+            sep_convs[2].op[5].conv,
         ]
 
         dil_convs = [DilConv(32, 32, k, 1, d, 1) for k, d in zip([3, 5], [1, 2])]
@@ -105,7 +105,7 @@ class TestWeightEntangler(unittest.TestCase):
         assert set([1]) == set(entangle_modules.keys())
         assert len(entangle_modules[1]) == 2
 
-        assert entangle_modules[1] == [dil_convs[0].op[1], dil_convs[1].op[1]]
+        assert entangle_modules[1] == [dil_convs[0].op[1].conv, dil_convs[1].op[1].conv]
 
         with pytest.raises(AssertionError):
             entangler._get_entanglement_op_sets(dil_convs + [Pooling(32, 1, "max")])

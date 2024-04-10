@@ -71,13 +71,21 @@ class WeightEntangler(OneShotComponent):
         self, candidate_op: WeightEntanglementModule
     ) -> dict[int, nn.Module]:
         entangle_modules = {}
+        # TODO: importing here to avoid circular import
+        from confopt.searchspace.common.lora_layers import (
+            Conv2DLoRA,
+        )
+
         for idx, op in enumerate(candidate_op.op.children()):
-            if (
-                hasattr(op, "can_entangle_weight")
-                and op.can_entangle_weight is True
-                and isinstance(op, nn.Conv2d)
-            ):
-                entangle_modules[idx] = op
+            if hasattr(op, "can_entangle_weight") and op.can_entangle_weight is True:
+                if isinstance(op, nn.Conv2d):
+                    module = op
+                elif isinstance(op, Conv2DLoRA):
+                    module = op.conv
+                else:
+                    continue
+
+                entangle_modules[idx] = module
 
         return entangle_modules
 
