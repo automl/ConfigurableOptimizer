@@ -18,7 +18,11 @@ class PartialConnector(nn.Module):
         self.mp = nn.MaxPool2d(2, 2)
 
     def forward(
-        self, x: torch.Tensor, alphas: list[torch.Tensor], ops: list[nn.Module]
+        self,
+        x: torch.Tensor,
+        alphas: list[torch.Tensor],
+        ops: list[nn.Module],
+        is_argmax_sampler: bool = False,
     ) -> torch.Tensor:
         assert len(alphas) == len(
             ops
@@ -27,17 +31,28 @@ class PartialConnector(nn.Module):
         dim_2 = x.shape[1]  # channel number of the input to the layer
         xtemp = x[:, : dim_2 // self.k, :, :]
         xtemp2 = x[:, dim_2 // self.k :, :, :]
-        temp1 = sum(op(xtemp) * alpha for op, alpha in zip(ops, alphas))
+
+        if is_argmax_sampler:
+            argmax = torch.argmax(alphas)
+            temp1 = [
+                alphas[i] * op(xtemp) if i == argmax else alphas[i]
+                for i, op in enumerate(ops)
+            ]
+            temp1 = sum(temp1)
+        else:
+            temp1 = sum(op(xtemp) * alpha for op, alpha in zip(ops, alphas))
 
         if (
             hasattr(ops[-1], "C_in")
             and hasattr(ops[-1], "C_out")
             and (ops[-1].C_in != ops[-1].C_out)
         ):
-            xtemp2 = expand_tensor(xtemp2, ops[-1].C_out - temp1.size(1))
+            xtemp2 = expand_tensor(
+                xtemp2, ops[-1].C_out - temp1.size(1)  # type: ignore
+            )
         # reduction cell needs pooling before concat
         # Not all reduction cell have stride = 2
-        if temp1.shape[2] != xtemp2.shape[2]:
+        if temp1.shape[2] != xtemp2.shape[2]:  # type: ignore
             states = torch.cat([temp1, self.mp(xtemp2)], dim=1)
         else:
             states = torch.cat([temp1, xtemp2], dim=1)

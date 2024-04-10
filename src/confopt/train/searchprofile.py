@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import torch
 
-from confopt.oneshot.archsampler import BaseSampler, DARTSSampler
+from confopt.oneshot.archsampler import BaseSampler, DARTSSampler, GDASSampler
 from confopt.oneshot.dropout import Dropout
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import BasePerturbator
 from confopt.oneshot.weightentangler import WeightEntangler
 from confopt.searchspace import DARTSSearchSpace
 from confopt.searchspace.common import (
+    LoRALayer,
     OperationBlock,
     OperationChoices,
     SearchSpace,
@@ -24,6 +25,7 @@ class Profile:
         perturbation: BasePerturbator | None = None,
         dropout: Dropout | None = None,
         weight_entangler: WeightEntangler | None = None,
+        lora_configs: dict | None = None,
     ) -> None:
         self.sampler = sampler
         self.edge_normalization = edge_normalization
@@ -31,6 +33,11 @@ class Profile:
         self.perturbation = perturbation
         self.dropout = dropout
         self.weight_entangler = weight_entangler
+        self.lora_configs = lora_configs
+
+        self.is_argmax_sampler = False
+        if isinstance(self.sampler, GDASSampler):
+            self.is_argmax_sampler = True
 
     def adapt_search_space(self, search_space: SearchSpace) -> None:
         if hasattr(search_space.model, "edge_normalization"):
@@ -77,8 +84,27 @@ class Profile:
             partial_connector=self.partial_connector,
             dropout=self.dropout,
             weight_entangler=self.weight_entangler,
+            is_argmax_sampler=self.is_argmax_sampler,
         )
         return op_block
+
+    def activate_lora(
+        self,
+        searchspace: SearchSpace,
+        r: int,
+        lora_alpha: int = 1,
+        lora_dropout: float = 0,
+        merge_weights: bool = True,
+    ) -> None:
+        if r > 0:
+            for _, module in searchspace.named_modules(remove_duplicate=False):
+                if isinstance(module, LoRALayer):
+                    module.activate_lora(
+                        r=r,
+                        lora_alpha=lora_alpha,
+                        lora_dropout_rate=lora_dropout,
+                        merge_weights=merge_weights,
+                    )
 
     def get_parent_and_attribute(self, module_name: str) -> tuple[str, str]:
         split_index = module_name.rfind(".")

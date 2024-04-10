@@ -8,9 +8,13 @@ from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
 from confopt.utils import drop_path
 from confopt.utils.normalize_params import normalize_params
 
-from .genotypes import BABY_PRIMITIVES, PRIMITIVES, Genotype
+from .model import NetworkCIFAR, NetworkImageNet
+from .genotypes import BABY_PRIMITIVES, PRIMITIVES, DARTSGenotype
 from .operations import OPS, FactorizedReduce, Identity, ReLUConvBN
 
+NUM_CIFAR_CLASSES = 10
+NUM_CIFAR100_CLASSES = 100
+NUM_IMAGENET_CLASSES = 120
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
@@ -99,8 +103,7 @@ class Cell(nn.Module):
             s1 (torch.Tensor): Second input tensor to the model.
             weights (list[torch.Tensor]): Alpha weights to the edges.
             beta_weights (torch.Tensor): Beta weights for the edge.
-            drop_prob: (float|None): the droping probability of a path.
-
+            drop_prob: (float|None): the droping probability of a path (for discrete).
 
         Returns:
             torch.Tensor: state ouptut from the cell
@@ -178,7 +181,7 @@ class Cell(nn.Module):
 
         return torch.cat(states[-self._multiplier :], dim=1)
 
-    def _discretize(self, genotype: Genotype) -> None:
+    def _discretize(self, genotype: DARTSGenotype) -> None:
         # TODO: create indices and concat
         if self.reduction:
             op_names, indices = zip(*genotype.reduce)
@@ -471,7 +474,7 @@ class Network(nn.Module):
         """
         return self._betas
 
-    def genotype(self) -> Genotype:
+    def genotype(self) -> DARTSGenotype:
         """Get the genotype of the model, representing the architecture.
 
         Returns:
@@ -511,7 +514,7 @@ class Network(nn.Module):
         gene_reduce = _parse(F.softmax(self.alphas_reduce, dim=-1).data.cpu().numpy())
 
         concat = range(2 + self._steps - self._multiplier, self._steps + 2)
-        genotype = Genotype(
+        genotype = DARTSGenotype(
             normal=gene_normal,
             normal_concat=concat,
             reduce=gene_reduce,
@@ -555,26 +558,50 @@ class Network(nn.Module):
 
             self.mask.append(mask)
 
-    def _discretize(self) -> Network:
+    def _discretize(self) -> NetworkCIFAR | NetworkImageNet:
         genotype = self.genotype()
-        discrete_model = Network(
-            C=self._C,
-            num_classes=self._num_classes,
-            layers=self._layers,
-            criterion=self._criterion,  # TODO: what is this
-            steps=self._steps,
-            multiplier=self._multiplier,
-            stem_multiplier=self.stem[-1].num_features,  # type: ignore
-            edge_normalization=False,
-            discretized=True,
-            is_baby_darts=self.is_baby_darts,
-        )
-        for cell in discrete_model.cells:
-            if cell.reduction:
-                cell._discretize(genotype)  # type: ignore
-            else:
-                cell._discretize(genotype)  # type: ignore
-        discrete_model._arch_parameters = None  # type: ignore
+        if (
+            self._num_classes == NUM_CIFAR_CLASSES
+            or self._num_classes == NUM_CIFAR100_CLASSES
+        ):
+            discrete_model = NetworkCIFAR(
+                C=self._C,
+                num_classes=self._num_classes,
+                layers=self._layers,
+                auxiliary=False,
+                genotype=genotype,
+            )
+        elif self._num_classes == NUM_IMAGENET_CLASSES:
+            discrete_model = NetworkImageNet(
+                C=self._C,
+                num_classes=self._num_classes,
+                layers=self._layers,
+                auxiliary=False,
+                genotype=genotype,
+            )
+        else:
+            raise ValueError(
+                "number of classes is not a valid number of any of the datasets"
+            )
+#         discrete_model = Network(
+#             C=self._C,
+#             num_classes=self._num_classes,
+#             layers=self._layers,
+#             criterion=self._criterion,  # TODO: what is this
+#             steps=self._steps,
+#             multiplier=self._multiplier,
+#             stem_multiplier=self.stem[-1].num_features,  # type: ignore
+#             edge_normalization=False,
+#             discretized=True,
+#             is_baby_darts=self.is_baby_darts,
+#         )
+#         for cell in discrete_model.cells:
+#             if cell.reduction:
+#                 cell._discretize(genotype)  # type: ignore
+#             else:
+#                 cell._discretize(genotype)  # type: ignore
+#         discrete_model._arch_parameters = None  # type: ignore
+
         discrete_model.to(next(self.parameters()).device)
 
         return discrete_model
@@ -582,7 +609,7 @@ class Network(nn.Module):
     def model_weight_parameters(self) -> list[nn.Parameter]:
         params = set(self.parameters())
         params -= set(self._betas)
-        if self._arch_parameters is not None:
+        if self._arch_parameters != [None]:
             params -= set(self.alphas_reduce)
             params -= set(self.alphas_normal)
         return list(params)

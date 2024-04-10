@@ -30,7 +30,7 @@ class ConfigurableTrainer:
         model: SearchSpace,
         data: AbstractData,
         model_optimizer: OptimizerType,
-        arch_optimizer: OptimizerType,
+        arch_optimizer: OptimizerType | None,
         scheduler: LRSchedulerType,
         criterion: CriterionType,
         logger: Logger,
@@ -41,7 +41,7 @@ class ConfigurableTrainer:
         load_saved_model: bool = False,
         load_best_model: bool = False,
         start_epoch: int = 0,
-        checkpointing_freq: int = 1,
+        checkpointing_freq: int = 2,
         epochs: int = 100,
         debug_mode: bool = False,
     ) -> None:
@@ -66,7 +66,13 @@ class ConfigurableTrainer:
         self.epochs = epochs
         self.debug_mode = debug_mode
 
-    def train(self, profile: Profile, epochs: int, is_wandb_log: bool = True) -> None:
+    def train(  # noqa: C901, PLR0915
+        self,
+        profile: Profile,
+        epochs: int,
+        is_wandb_log: bool = True,
+        lora_warm_epochs: int = 0,
+    ) -> None:
         self.epochs = epochs
         profile.adapt_search_space(self.model)
 
@@ -90,9 +96,21 @@ class ConfigurableTrainer:
             batch_size=self.batch_size,
             n_workers=0,
         )
+        is_warm_epoch = False
+        if lora_warm_epochs > 0:
+            assert (
+                profile.lora_configs is not None
+            ), "Expected profile's lora configs to be populated"
+            assert (
+                profile.lora_configs.get("r", 0) > 0
+            ), "Value of r should be greater than 0"
+            is_warm_epoch = True
 
-        for epoch in range(self.start_epoch, epochs):
-            epoch_str = f"{epoch:03d}-{epochs:03d}"
+        for epoch in range(self.start_epoch + 1, self.epochs + 1):
+            epoch_str = f"{epoch:03d}-{self.epochs:03d}"
+            if lora_warm_epochs > 0 and epoch == lora_warm_epochs:
+                self._initialize_lora_modules(lora_warm_epochs, profile, network)
+                is_warm_epoch = False
 
             self._component_new_step_or_epoch(network, calling_frequency="epoch")
             self.update_sample_function(profile, network, calling_frequency="epoch")
@@ -103,12 +121,10 @@ class ConfigurableTrainer:
                 val_loader,
                 network,
                 criterion,
-                self.scheduler,
                 self.model_optimizer,
                 self.arch_optimizer,
-                epoch_str,
                 self.print_freq,
-                self.logger,
+                is_warm_epoch=is_warm_epoch,
             )
 
             # Logging
@@ -120,9 +136,10 @@ class ConfigurableTrainer:
                 search_time.sum,
             )
 
-            self.logger.log_metrics(
-                "Search: Architecture metrics ", arch_metrics, epoch_str
-            )
+            if not is_warm_epoch:
+                self.logger.log_metrics(
+                    "Search: Architecture metrics ", arch_metrics, epoch_str
+                )
 
             valid_metrics = self.valid_func(val_loader, self.model, self.criterion)
             self.logger.log_metrics("Evaluation: ", valid_metrics, epoch_str)
@@ -146,10 +163,17 @@ class ConfigurableTrainer:
                 self.search_accs_top5[epoch],
             ) = base_metrics
 
+            if self.scheduler is not None:
+                self.scheduler.step()
+
             checkpointables = self._get_checkpointables(epoch=epoch)
             self.periodic_checkpointer.step(
                 iteration=epoch, checkpointables=checkpointables
             )
+
+            # genotype = str(self.model.get_genotype())
+            genotype = self.model.get_genotype().tostr()  # type: ignore
+            self.logger.save_genotype(genotype, epoch, self.checkpointing_freq)
             if valid_metrics.acc_top1 > self.valid_accs_top1["best"]:
                 self.valid_accs_top1["best"] = valid_metrics.acc_top1
                 self.logger.log(
@@ -160,17 +184,18 @@ class ConfigurableTrainer:
                 self.best_model_checkpointer.save(
                     name="best_model", checkpointables=checkpointables
                 )
+                self.logger.save_genotype(
+                    genotype, epoch, self.checkpointing_freq, save_best_model=True
+                )
 
-            with torch.no_grad():
-                for i, alpha in enumerate(self.model.arch_parameters):
-                    self.logger.log(f"alpha {i} is {alpha}")
+            if not is_warm_epoch:
+                with torch.no_grad():
+                    for i, alpha in enumerate(self.model.arch_parameters):
+                        self.logger.log(f"alpha {i} is {alpha}")
 
             # measure elapsed time
             epoch_time.update(time.time() - start_time)
             start_time = time.time()
-
-            if self.scheduler is not None:
-                self.scheduler.step()
 
     def train_func(
         self,
@@ -179,12 +204,10 @@ class ConfigurableTrainer:
         valid_loader: DataLoaderType,
         network: SearchSpace | torch.nn.DataParallel,
         criterion: CriterionType,
-        w_scheduler: LRSchedulerType,  # noqa: ARG002  TODO:Fix
         w_optimizer: OptimizerType,
         arch_optimizer: OptimizerType,
-        epoch_str: str,  # noqa: ARG002  TODO:Fix
         print_freq: int,
-        logger: Logger,  # noqa: ARG002  TODO:Fix
+        is_warm_epoch: bool = False,
     ) -> tuple[TrainingMetrics, TrainingMetrics]:
         data_time, batch_time = AverageMeter(), AverageMeter()
         base_losses, base_top1, base_top5 = (
@@ -202,7 +225,7 @@ class ConfigurableTrainer:
 
         for step, (base_inputs, base_targets) in enumerate(train_loader):
             # FIXME: What was the point of this? and is it safe to remove?
-            # scheduler.update(None, 1.0 * step / len(xloader))
+            # self.scheduler.update(None, 1.0 * step / len(xloader))
             self._component_new_step_or_epoch(network, calling_frequency="step")
             if step == 1:
                 self.update_sample_function(profile, network, calling_frequency="step")
@@ -219,32 +242,36 @@ class ConfigurableTrainer:
             # measure data loading time
             data_time.update(time.time() - end)
 
-            _, logits = network(arch_inputs)
-            arch_loss = criterion(logits, arch_targets)
-            arch_loss.backward()
-            arch_optimizer.step()
+            if not is_warm_epoch:
+                _, logits = network(arch_inputs)
+                arch_loss = criterion(logits, arch_targets)
+                arch_loss.backward()
+                arch_optimizer.step()
 
-            profile.perturb_parameter(network)
+                if self.use_data_parallel:
+                    profile.perturb_parameter(network.module)
+                else:
+                    profile.perturb_parameter(network)
 
-            self._update_meters(
-                inputs=arch_inputs,
-                logits=logits,
-                targets=arch_targets,
-                loss=arch_loss,
-                loss_meter=arch_losses,
-                top1_meter=arch_top1,
-                top5_meter=arch_top5,
-            )
+                self._update_meters(
+                    inputs=arch_inputs,
+                    logits=logits,
+                    targets=arch_targets,
+                    loss=arch_loss,
+                    loss_meter=arch_losses,
+                    top1_meter=arch_top1,
+                    top5_meter=arch_top5,
+                )
 
-            # update the model weights
-            w_optimizer.zero_grad()
-            arch_optimizer.zero_grad()
+                # update the model weights
+                w_optimizer.zero_grad()
+                arch_optimizer.zero_grad()
 
             _, logits = network(base_inputs)
             base_loss = criterion(logits, base_targets)
             base_loss.backward()
-            # TODO: Does this vary with the one-shot optimizers?
-            if isinstance(network, torch.nn.DataParallel):
+
+            if self.use_data_parallel:
                 torch.nn.utils.clip_grad_norm_(
                     network.module.model_weight_parameters(), 5
                 )
@@ -254,7 +281,8 @@ class ConfigurableTrainer:
             w_optimizer.step()
 
             w_optimizer.zero_grad()
-            arch_optimizer.zero_grad()
+            if not is_warm_epoch:
+                arch_optimizer.zero_grad()
 
             self._update_meters(
                 inputs=base_inputs,
@@ -355,21 +383,28 @@ class ConfigurableTrainer:
 
         self._init_periodic_checkpointer()
         self.best_model_checkpointer = self._set_up_checkpointer(mode=None)
-        self.logger.set_up_run()
+        # TODO: this is needed?
+        # self.logger.set_up_run()
 
     def _set_up_checkpointer(self, mode: str | None) -> Checkpointer:
         checkpoint_dir = self.logger.path(mode=mode)  # todo: check this
         # checkpointables = self._get_checkpointables(self.start_epoch)
         # todo: return scheduler and optimizers that do have state_dict()
+        # checkpointables = {
+        #     "w_scheduler": self.scheduler,
+        #     "w_optimizer": self.model_optimizer,
+        #     "arch_optimizer": self.arch_optimizer,
+        # }
         checkpointer = Checkpointer(
             model=self.model,
             save_dir=checkpoint_dir,
             save_to_disk=True,
-            # checkpointables=checkpointables,
+            # **checkpointables,
         )
         checkpointer.add_checkpointable("w_scheduler", self.scheduler)
         checkpointer.add_checkpointable("w_optimizer", self.model_optimizer)
-        checkpointer.add_checkpointable("arch_optimizer", self.arch_optimizer)
+        if self.arch_optimizer is not None:
+            checkpointer.add_checkpointable("arch_optimizer", self.arch_optimizer)
         return checkpointer
 
     def _init_periodic_checkpointer(self) -> None:
@@ -393,10 +428,10 @@ class ConfigurableTrainer:
 
     def _set_checkpointer_info(self, last_checkpoint: dict) -> None:
         self.model.load_state_dict(last_checkpoint["model"])
-        self.scheduler.load_state_dict(last_checkpoint["w_scheduler"])
+        if self.arch_optimizer:
+            self.arch_optimizer.load_state_dict(last_checkpoint["arch_optimizer"])
         self.model_optimizer.load_state_dict(last_checkpoint["w_optimizer"])
-        self.arch_optimizer.load_state_dict(last_checkpoint["arch_optimizer"])
-
+        self.scheduler.load_state_dict(last_checkpoint["w_scheduler"])
         last_checkpoint = last_checkpoint["checkpointables"]
         self.start_epoch = last_checkpoint["epoch"]
         self.search_losses = last_checkpoint["search_losses"]
@@ -462,7 +497,7 @@ class ConfigurableTrainer:
             "epoch",
             "step",
         ], "Called Frequency should be either epoch or step"
-        if isinstance(model, torch.nn.DataParallel):
+        if self.use_data_parallel:
             model = model.module
         assert (
             len(model.components) > 0
@@ -471,6 +506,64 @@ class ConfigurableTrainer:
             model.new_epoch()
         elif calling_frequency == "step":
             model.new_step()
+
+    def _initialize_lora_modules(
+        self,
+        lora_warm_epochs: int,
+        profile: Profile,
+        network: torch.nn.Module,
+    ) -> None:
+        self.logger.log(
+            f"The searchspace has been warm started with {lora_warm_epochs} epochs"
+        )
+        profile.activate_lora(network, **profile.lora_configs)  # type: ignore
+        self.logger.log(
+            "LoRA layers have been initialized for all operations with"
+            + " Conv2DLoRA module"
+        )
+        # reinitialize optimizer
+        optimizer_hyperparameters = self.model_optimizer.defaults
+        old_param_lrs = []
+        old_initial_lrs = []
+        for param_group in self.model_optimizer.param_groups:
+            old_param_lrs.append(param_group["lr"])
+            old_initial_lrs.append(param_group["initial_lr"])
+
+        self.model_optimizer = type(self.model_optimizer)(
+            (
+                network.module.model_weight_parameters()  # type: ignore
+                if self.use_data_parallel
+                else network.model_weight_parameters()  # type: ignore
+            ),
+            **optimizer_hyperparameters,
+        )
+        # change the lr for optimizer
+        # Update optimizer learning rate manually
+        for param_id, param_group in enumerate(self.model_optimizer.param_groups):
+            param_group["lr"] = old_param_lrs[param_id]
+            param_group["initial_lr"] = old_initial_lrs[param_id]
+
+        # reinitialize scheduler
+        scheduler_config = {}
+        if isinstance(self.scheduler, torch.optim.lr_scheduler.CosineAnnealingLR):
+            scheduler_config = {
+                "T_max": self.scheduler.T_max,
+                "eta_min": self.scheduler.eta_min,
+            }
+
+        if isinstance(
+            self.scheduler, torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
+        ):
+            scheduler_config = {
+                "T_0": self.scheduler.T_0,
+                "T_mult": self.scheduler.T_mult,
+                "eta_min": self.scheduler.eta_min,
+            }
+
+        self.scheduler = type(self.scheduler)(
+            self.model_optimizer,
+            **scheduler_config,
+        )
 
     def update_sample_function(
         self,
@@ -482,7 +575,7 @@ class ConfigurableTrainer:
             "epoch",
             "step",
         ], "Called Frequency should be either epoch or step"
-        if isinstance(model, torch.nn.DataParallel):
+        if self.use_data_parallel:
             model = model.module
         assert (
             len(model.components) > 0

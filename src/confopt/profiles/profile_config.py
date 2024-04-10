@@ -13,28 +13,44 @@ ADVERSERIAL_DATA = (
 
 
 class ProfileConfig:
-    epochs = 100
-
     def __init__(
         self,
         config_type: str,
-        epochs: int,
+        epochs: int = 100,
         is_partial_connection: bool = False,
         dropout: float | None = None,
         perturbation: str | None = None,
         perturbator_sample_frequency: str = "epoch",
         entangle_op_weights: bool = False,
+        lora_rank: int = 0,
+        lora_warm_epochs: int = 0,
     ) -> None:
         self.config_type = config_type
         self.epochs = epochs
+        self.lora_warm_epochs = lora_warm_epochs
         self._initialize_trainer_config()
         self._initialize_sampler_config()
-        self.set_partial_connector(is_partial_connection)
-        self.set_dropout(dropout)
-        self.set_perturb(perturbation, perturbator_sample_frequency)
+        self._set_partial_connector(is_partial_connection)
+        self._set_lora_configs(lora_rank)
+        self._set_dropout(dropout)
+        self._set_perturb(perturbation, perturbator_sample_frequency)
         self.entangle_op_weights = entangle_op_weights
 
-    def set_perturb(
+    def _set_lora_configs(
+        self,
+        lora_rank: int = 0,
+        lora_dropout: float = 0,
+        lora_alpha: int = 1,
+        merge_weights: bool = True,
+    ) -> None:
+        self.lora_config = {
+            "r": lora_rank,
+            "lora_dropout": lora_dropout,
+            "lora_alpha": lora_alpha,
+            "merge_weights": merge_weights,
+        }
+
+    def _set_perturb(
         self,
         perturb_type: str | None = None,
         perturbator_sample_frequency: str = "epoch",
@@ -48,11 +64,11 @@ class ProfileConfig:
         self.perturbator_sample_frequency = perturbator_sample_frequency
         self._initialize_perturbation_config()
 
-    def set_partial_connector(self, is_partial_connection: bool = False) -> None:
+    def _set_partial_connector(self, is_partial_connection: bool = False) -> None:
         self.is_partial_connection = is_partial_connection
         self._initialize_partial_connector_config()
 
-    def set_dropout(self, dropout: float | None = None) -> None:
+    def _set_dropout(self, dropout: float | None = None) -> None:
         self.dropout = dropout
         self._initialize_dropout_config()
 
@@ -66,6 +82,7 @@ class ProfileConfig:
             "partial_connector": self.partial_connector_config,
             "dropout": self.dropout_config,
             "trainer": self.trainer_config,
+            "lora": self.lora_config,
         }
         if hasattr(self, "searchspace_config") and self.searchspace_config is not None:
             config.update({"search_space": self.searchspace_config})
@@ -110,6 +127,7 @@ class ProfileConfig:
             "lr": 0.025,
             "arch_lr": 3e-4,
             "epochs": self.epochs,
+            "lora_warm_epochs": self.lora_warm_epochs,
             "optim": "sgd",
             "arch_optim": "adam",
             "optim_config": {
@@ -120,8 +138,9 @@ class ProfileConfig:
             "arch_optim_config": {
                 "weight_decay": 1e-3,
             },
+            "scheduler": "cosine_annealing_warm_restart",
             "criterion": "cross_entropy",
-            "batch_size": 96,
+            "batch_size": 64,
             "learning_rate_min": 0.0,
             "cutout": -1,
             "cutout_length": 16,
@@ -188,6 +207,13 @@ class ProfileConfig:
                 config_key in self.dropout_config
             ), f"{config_key} not a valid configuration for the dropout module"
             self.dropout_config[config_key] = kwargs[config_key]
+
+    def configure_lora_config(self, **kwargs) -> None:  # type: ignore
+        for config_key in kwargs:
+            assert (
+                config_key in self.lora_config
+            ), f"{config_key} not a valid configuration for the lora layers"
+            self.lora_config[config_key] = kwargs[config_key]
 
     @abstractmethod
     def set_searchspace_config(self, config: dict) -> None:

@@ -42,6 +42,7 @@ class OperationBlock(nn.Module):
         dropout: Dropout | None = None,
         weight_entangler: WeightEntangler | None = None,
         device: torch.device = DEVICE,
+        is_argmax_sampler: bool = False,
     ) -> None:
         super().__init__()
         self.device = device
@@ -56,21 +57,36 @@ class OperationBlock(nn.Module):
         self.is_reduction_cell = is_reduction_cell
         self.dropout = dropout
         self.weight_entangler = weight_entangler
+        self.is_argmax_sampler = is_argmax_sampler
 
-    def forward(self, x: torch.Tensor, alphas: list[torch.Tensor]) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        alphas: list[torch.Tensor],
+    ) -> torch.Tensor:
         if self.dropout:
             alphas = self.dropout.apply_mask(alphas)
-        if self.partial_connector is not None:
-            self.partial_connector.is_reduction_cell = self.is_reduction_cell
-        if self.partial_connector:
-            return self.partial_connector(x, alphas, self.ops)
 
+        # TODO[DESIGN]: How can weight entanglement work with partial connections?
         if self.weight_entangler is not None:
-            output = self.weight_entangler.forward(x, self.ops, alphas)
+            return self.weight_entangler.forward(x, self.ops, alphas)
+
+        # TODO[DESIGN]: PartialConnector shouldn't have to implement everything that
+        # follows this if block, but it does. Not very clean.
+        if self.partial_connector:
+            self.partial_connector.is_reduction_cell = self.is_reduction_cell
+            return self.partial_connector(x, alphas, self.ops, self.is_argmax_sampler)
+
+        if self.is_argmax_sampler:
+            argmax = torch.argmax(alphas)
+            states = [
+                alphas[i] * op(x) if i == argmax else alphas[i]
+                for i, op in enumerate(self.ops)
+            ]
         else:
             states = [op(x) * alpha for op, alpha in zip(self.ops, alphas)]
-            output = sum(states)
 
+        output = sum(states)
         return output
 
     def change_op_channel_size(self, wider: int | None = None) -> None:
