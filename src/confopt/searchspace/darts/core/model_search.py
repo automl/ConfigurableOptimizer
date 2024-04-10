@@ -8,14 +8,9 @@ from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
 from confopt.utils import drop_path, freeze
 from confopt.utils.normalize_params import normalize_params
 
-<<<<<<< HEAD
-from .model import NetworkCIFAR, NetworkImageNet
 from .genotypes import BABY_PRIMITIVES, PRIMITIVES, DARTSGenotype
-from .operations import OPS, FactorizedReduce, Identity, ReLUConvBN
-=======
-from .genotypes import PRIMITIVES, Genotype
+from .model import NetworkCIFAR, NetworkImageNet
 from .operations import OLES_OPS, OPS, FactorizedReduce, Identity, ReLUConvBN
->>>>>>> 337b282 (feat(darts): add gm_score and oles to darts search space)
 
 NUM_CIFAR_CLASSES = 10
 NUM_CIFAR100_CLASSES = 100
@@ -588,24 +583,24 @@ class Network(nn.Module):
             raise ValueError(
                 "number of classes is not a valid number of any of the datasets"
             )
-#         discrete_model = Network(
-#             C=self._C,
-#             num_classes=self._num_classes,
-#             layers=self._layers,
-#             criterion=self._criterion,  # TODO: what is this
-#             steps=self._steps,
-#             multiplier=self._multiplier,
-#             stem_multiplier=self.stem[-1].num_features,  # type: ignore
-#             edge_normalization=False,
-#             discretized=True,
-#             is_baby_darts=self.is_baby_darts,
-#         )
-#         for cell in discrete_model.cells:
-#             if cell.reduction:
-#                 cell._discretize(genotype)  # type: ignore
-#             else:
-#                 cell._discretize(genotype)  # type: ignore
-#         discrete_model._arch_parameters = None  # type: ignore
+        #         discrete_model = Network(
+        #             C=self._C,
+        #             num_classes=self._num_classes,
+        #             layers=self._layers,
+        #             criterion=self._criterion,  # TODO: what is this
+        #             steps=self._steps,
+        #             multiplier=self._multiplier,
+        #             stem_multiplier=self.stem[-1].num_features,  # type: ignore
+        #             edge_normalization=False,
+        #             discretized=True,
+        #             is_baby_darts=self.is_baby_darts,
+        #         )
+        #         for cell in discrete_model.cells:
+        #             if cell.reduction:
+        #                 cell._discretize(genotype)  # type: ignore
+        #             else:
+        #                 cell._discretize(genotype)  # type: ignore
+        #         discrete_model._arch_parameters = None  # type: ignore
 
         discrete_model.to(next(self.parameters()).device)
 
