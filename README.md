@@ -8,7 +8,8 @@ First, install the dependencies required for development and testing in your env
 ```
 conda create -n confopt python=3.9
 conda activate confopt
-pip install -e ".[benchmark, dev, test]"
+pip install -e ".[dev, test]"
+pip install -e ".[benchmark]"
 ```
 
 Install the precommit hooks
