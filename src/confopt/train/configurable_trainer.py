@@ -66,13 +66,12 @@ class ConfigurableTrainer:
         self.epochs = epochs
         self.debug_mode = debug_mode
 
-    def train(  # noqa: C901, PLR0915, PLR0912
+    def train(  # noqa: C901, PLR0915
         self,
         profile: Profile,
         epochs: int,
         is_wandb_log: bool = True,
         lora_warm_epochs: int = 0,
-        retain_warm: bool = False,
     ) -> None:
         self.epochs = epochs
         profile.adapt_search_space(self.model)
@@ -111,8 +110,7 @@ class ConfigurableTrainer:
             epoch_str = f"{epoch:03d}-{self.epochs:03d}"
             if lora_warm_epochs > 0 and epoch == lora_warm_epochs:
                 self._initialize_lora_modules(lora_warm_epochs, profile, network)
-                if not retain_warm:
-                    is_warm_epoch = False
+                is_warm_epoch = False
 
             self._component_new_step_or_epoch(network, calling_frequency="epoch")
             self.update_sample_function(profile, network, calling_frequency="epoch")
