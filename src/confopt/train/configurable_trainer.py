@@ -30,7 +30,7 @@ class ConfigurableTrainer:
         model: SearchSpace,
         data: AbstractData,
         model_optimizer: OptimizerType,
-        arch_optimizer: OptimizerType,
+        arch_optimizer: OptimizerType | None,
         scheduler: LRSchedulerType,
         criterion: CriterionType,
         logger: Logger,
@@ -41,7 +41,7 @@ class ConfigurableTrainer:
         load_saved_model: bool = False,
         load_best_model: bool = False,
         start_epoch: int = 0,
-        checkpointing_freq: int = 1,
+        checkpointing_freq: int = 2,
         epochs: int = 100,
         debug_mode: bool = False,
     ) -> None:
@@ -106,7 +106,7 @@ class ConfigurableTrainer:
             ), "Value of r should be greater than 0"
             is_warm_epoch = True
 
-        for epoch in range(self.start_epoch, self.epochs):
+        for epoch in range(self.start_epoch + 1, self.epochs + 1):
             epoch_str = f"{epoch:03d}-{self.epochs:03d}"
             if lora_warm_epochs > 0 and epoch == lora_warm_epochs:
                 self._initialize_lora_modules(lora_warm_epochs, profile, network)
@@ -163,10 +163,17 @@ class ConfigurableTrainer:
                 self.search_accs_top5[epoch],
             ) = base_metrics
 
+            if self.scheduler is not None:
+                self.scheduler.step()
+
             checkpointables = self._get_checkpointables(epoch=epoch)
             self.periodic_checkpointer.step(
                 iteration=epoch, checkpointables=checkpointables
             )
+
+            # genotype = str(self.model.get_genotype())
+            genotype = self.model.get_genotype().tostr()  # type: ignore
+            self.logger.save_genotype(genotype, epoch, self.checkpointing_freq)
             if valid_metrics.acc_top1 > self.valid_accs_top1["best"]:
                 self.valid_accs_top1["best"] = valid_metrics.acc_top1
                 self.logger.log(
@@ -177,6 +184,9 @@ class ConfigurableTrainer:
                 self.best_model_checkpointer.save(
                     name="best_model", checkpointables=checkpointables
                 )
+                self.logger.save_genotype(
+                    genotype, epoch, self.checkpointing_freq, save_best_model=True
+                )
 
             if not is_warm_epoch:
                 with torch.no_grad():
@@ -186,9 +196,6 @@ class ConfigurableTrainer:
             # measure elapsed time
             epoch_time.update(time.time() - start_time)
             start_time = time.time()
-
-            if self.scheduler is not None:
-                self.scheduler.step()
 
     def train_func(
         self,
@@ -241,7 +248,7 @@ class ConfigurableTrainer:
                 arch_loss.backward()
                 arch_optimizer.step()
 
-                if isinstance(network, torch.nn.DataParallel):
+                if self.use_data_parallel:
                     profile.perturb_parameter(network.module)
                 else:
                     profile.perturb_parameter(network)
@@ -264,7 +271,7 @@ class ConfigurableTrainer:
             base_loss = criterion(logits, base_targets)
             base_loss.backward()
 
-            if isinstance(network, torch.nn.DataParallel):
+            if self.use_data_parallel:
                 torch.nn.utils.clip_grad_norm_(
                     network.module.model_weight_parameters(), 5
                 )
@@ -376,17 +383,23 @@ class ConfigurableTrainer:
 
         self._init_periodic_checkpointer()
         self.best_model_checkpointer = self._set_up_checkpointer(mode=None)
-        self.logger.set_up_run()
+        # TODO: this is needed?
+        # self.logger.set_up_run()
 
     def _set_up_checkpointer(self, mode: str | None) -> Checkpointer:
         checkpoint_dir = self.logger.path(mode=mode)  # todo: check this
         # checkpointables = self._get_checkpointables(self.start_epoch)
         # todo: return scheduler and optimizers that do have state_dict()
+        # checkpointables = {
+        #     "w_scheduler": self.scheduler,
+        #     "w_optimizer": self.model_optimizer,
+        #     "arch_optimizer": self.arch_optimizer,
+        # }
         checkpointer = Checkpointer(
             model=self.model,
             save_dir=checkpoint_dir,
             save_to_disk=True,
-            # checkpointables=checkpointables,
+            # **checkpointables,
         )
         checkpointer.add_checkpointable("w_scheduler", self.scheduler)
         checkpointer.add_checkpointable("w_optimizer", self.model_optimizer)
@@ -415,11 +428,10 @@ class ConfigurableTrainer:
 
     def _set_checkpointer_info(self, last_checkpoint: dict) -> None:
         self.model.load_state_dict(last_checkpoint["model"])
-        self.scheduler.load_state_dict(last_checkpoint["w_scheduler"])
-        self.model_optimizer.load_state_dict(last_checkpoint["w_optimizer"])
-        if self.arch_optimizer is not None:
+        if self.arch_optimizer:
             self.arch_optimizer.load_state_dict(last_checkpoint["arch_optimizer"])
-
+        self.model_optimizer.load_state_dict(last_checkpoint["w_optimizer"])
+        self.scheduler.load_state_dict(last_checkpoint["w_scheduler"])
         last_checkpoint = last_checkpoint["checkpointables"]
         self.start_epoch = last_checkpoint["epoch"]
         self.search_losses = last_checkpoint["search_losses"]
@@ -485,7 +497,7 @@ class ConfigurableTrainer:
             "epoch",
             "step",
         ], "Called Frequency should be either epoch or step"
-        if isinstance(model, torch.nn.DataParallel):
+        if self.use_data_parallel:
             model = model.module
         assert (
             len(model.components) > 0
@@ -520,7 +532,7 @@ class ConfigurableTrainer:
         self.model_optimizer = type(self.model_optimizer)(
             (
                 network.module.model_weight_parameters()  # type: ignore
-                if isinstance(network, torch.nn.DataParallel)
+                if self.use_data_parallel
                 else network.model_weight_parameters()  # type: ignore
             ),
             **optimizer_hyperparameters,
@@ -563,7 +575,7 @@ class ConfigurableTrainer:
             "epoch",
             "step",
         ], "Called Frequency should be either epoch or step"
-        if isinstance(model, torch.nn.DataParallel):
+        if self.use_data_parallel:
             model = model.module
         assert (
             len(model.components) > 0

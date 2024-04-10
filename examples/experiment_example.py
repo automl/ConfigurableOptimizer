@@ -10,6 +10,7 @@ if __name__ == "__main__":
 
     # Sampler and Perturbator have different sample_frequency
     profile = GDASProfile(
+        epochs=100,
         is_partial_connection=True,
         perturbation="random",
         sampler_sample_frequency="step",

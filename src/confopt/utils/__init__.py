@@ -10,7 +10,7 @@ from .checkpoints import (
 )
 from .logger import Logger, prepare_logger
 from .normalize_params import normalize_params
-from .time import get_time_as_string
+from .time import get_runtime, get_time_as_string
 
 
 class AverageMeter:
@@ -62,14 +62,30 @@ def get_device(model: torch.nn.Module) -> torch.device:
 def drop_path(x: torch.Tensor, drop_prob: float) -> torch.Tensor:
     if drop_prob > 0.0:
         keep_prob = 1.0 - drop_prob
+
+        # mask = torch.nn.Parameter(
+        #     torch.cuda.FloatTensor(x.size(0), 1, 1, 1, dtype=torch.float32).bernoulli
+        # _(keep_prob
+        #     )
+        # ).to(device=x.device)
         mask = torch.nn.Parameter(
-            torch.cuda.FloatTensor(x.size(0), 1, 1, 1, dtype=torch.float32).bernoulli_(
-                keep_prob
-            )
+            torch.empty(x.size(0), 1, 1, 1, dtype=torch.float32).bernoulli_(keep_prob)
         ).to(device=x.device)
         x.div_(keep_prob)
         x.mul_(mask)
     return x
+
+
+def get_num_classes(dataset: str) -> int:
+    if dataset == "cifar10":
+        num_classes = 10
+    elif dataset == "cifar100":
+        num_classes = 100
+    elif dataset == "imgnet16_120" or dataset == "imgnet16":
+        num_classes = 120
+    else:
+        raise ValueError("dataset is not defined.")
+    return num_classes
 
 
 __all__ = [
@@ -79,6 +95,7 @@ __all__ = [
     "copy_checkpoint",
     "get_machine_info",
     "get_time_as_string",
+    "get_runtime",
     "prepare_logger",
     "Logger",
     "BaseProfile",

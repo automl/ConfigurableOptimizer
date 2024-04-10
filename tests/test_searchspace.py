@@ -103,7 +103,7 @@ class TestBabyDARTS(unittest.TestCase):
 
     def test_discretize_supernet(self) -> None:
         C = 32
-        num_classes = 11
+        num_classes = 10
         search_space = BabyDARTSSearchSpace(
             C=C, num_classes=num_classes, edge_normalization=True
         )
@@ -361,12 +361,13 @@ class TestDARTSSearchSpace(unittest.TestCase):
         # TODO: check to have one operation on each edge of the search space
         C = 32
         layers = 6
-        num_classes = 11
+        num_classes = 10
         search_space = DARTSSearchSpace(
             C=C, layers=layers, num_classes=num_classes, edge_normalization=True
         )
 
         new_model = search_space.discretize()
+        new_model.drop_path_prob = 0.1 # type: ignore
 
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
         out, logits = new_model(x)

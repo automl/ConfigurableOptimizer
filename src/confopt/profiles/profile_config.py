@@ -16,7 +16,7 @@ class ProfileConfig:
     def __init__(
         self,
         config_type: str,
-        epochs: int,
+        epochs: int = 100,
         is_partial_connection: bool = False,
         dropout: float | None = None,
         perturbation: str | None = None,

@@ -253,6 +253,7 @@ class NB201SearchModel(nn.Module):
         """
         if self.discretized:
             return self.discrete_model_forward(inputs)
+
         if self.edge_normalization:
             return self.edge_normalization_forward(inputs)
 
@@ -294,6 +295,7 @@ class NB201SearchModel(nn.Module):
         inputs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         alphas = self.sample(self.arch_parameters)
+
         if self.mask is not None:
             alphas = normalize_params(alphas, self.mask)
 
@@ -312,7 +314,6 @@ class NB201SearchModel(nn.Module):
                     betas = torch.cat([betas, beta_node_v], dim=0)
 
                 feature = cell(feature, alphas, betas)
-
             else:
                 feature = cell(feature)
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from confopt.oneshot.archsampler import BaseSampler, DARTSSampler
+from confopt.oneshot.archsampler import BaseSampler, DARTSSampler, GDASSampler
 from confopt.oneshot.dropout import Dropout
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import BasePerturbator
@@ -31,6 +31,10 @@ class Profile:
         self.perturbation = perturbation
         self.dropout = dropout
         self.lora_configs = lora_configs
+
+        self.is_argmax_sampler = False
+        if isinstance(self.sampler, GDASSampler):
+            self.is_argmax_sampler = True
 
     def adapt_search_space(self, search_space: SearchSpace) -> None:
         if hasattr(search_space.model, "edge_normalization"):
@@ -72,7 +76,11 @@ class Profile:
         self, ops: torch.nn.Module, is_reduction_cell: bool = False
     ) -> OperationBlock:
         op_block = OperationBlock(
-            ops, is_reduction_cell, self.partial_connector, self.dropout
+            ops,
+            is_reduction_cell,
+            self.partial_connector,
+            self.dropout,
+            is_argmax_sampler=self.is_argmax_sampler,
         )
         return op_block
 
