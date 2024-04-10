@@ -33,18 +33,16 @@ class SearchSpace(nn.Module, ABC):
         self.model.sample = sample_function
 
     def model_weight_parameters(self) -> list[nn.Parameter]:
-        all_parameters = set(self.model.parameters())
-        if hasattr(self, "arch_parameters") and self.arch_parameters:
-            arch_parameters = set(self.arch_parameters)
-            all_parameters -= arch_parameters
-        if (
-            hasattr(self, "beta_parameters")
-            and self.arch_parameters
-            and self.beta_parameters
-        ):
-            beta_parameters = set(self.beta_parameters)  # type: ignore
-            all_parameters -= beta_parameters
-        return list(all_parameters)
+        arch_param_ids = {id(p) for p in getattr(self, "arch_parameters", [])}
+        beta_param_ids = {id(p) for p in getattr(self, "beta_parameters", [])}
+
+        all_parameters = [
+            p
+            for p in self.model.parameters()
+            if id(p) not in arch_param_ids and id(p) not in beta_param_ids
+        ]
+
+        return all_parameters
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         return self.model(x)  # type: ignore

@@ -6,6 +6,7 @@ from torch import nn
 from confopt.searchspace.common.base_search import SearchSpace
 
 from .core import DARTSSearchModel
+from .core.genotypes import Genotype
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -100,3 +101,6 @@ class DARTSSearchSpace(SearchSpace):
 
     def discretize(self) -> nn.Module:
         return self.model._discretize()  # type: ignore
+
+    def get_genotype(self) -> Genotype:
+        return self.model.genotype()

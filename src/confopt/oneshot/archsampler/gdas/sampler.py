@@ -36,12 +36,14 @@ class GDASSampler(BaseSampler):
         self.total_epochs = total_epochs
 
     def sample_alphas(self, arch_parameters: list[torch.Tensor]) -> list[torch.Tensor]:
-        sampled_alphas = []
+        sampled_hardwt = []
         for alpha in arch_parameters:
-            sampled_alphas.append(self.sample(alpha))
-        return sampled_alphas
+            sampled_alpha = self.sample(alpha)
+            hardwt, index = sampled_alpha[0], sampled_alpha[1]  # noqa: F841
+            sampled_hardwt.append(hardwt)
+        return sampled_hardwt
 
-    def sample(self, alpha: torch.Tensor) -> torch.Tensor:
+    def sample(self, alpha: torch.Tensor) -> tuple:
         tau = self.tau_curr.to(alpha.device)  # type: ignore
         while True:
             gumbels = -torch.empty_like(alpha, device=alpha.device).exponential_().log()
@@ -59,7 +61,7 @@ class GDASSampler(BaseSampler):
             ):
                 break
 
-        return hardwts
+        return hardwts, index
 
     def new_epoch(self) -> None:
         self.tau_curr = self.tau_max - (self.tau_max - self.tau_min) * self._epoch / (

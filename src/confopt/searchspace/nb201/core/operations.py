@@ -6,10 +6,8 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from confopt.utils.reduce_channels import (
-    reduce_bn_features,
-    reduce_conv_channels,
-)
+from confopt.searchspace.common import Conv2DLoRA
+import confopt.utils.reduce_channels as rc
 
 __all__ = ["OPS", "ResNetBasicblock", "SearchSpaceNames", "ReLUConvBN"]
 
@@ -94,9 +92,11 @@ OPS = {
         affine,
         track_running_stats,
     ),
-    "skip_connect": lambda C_in, C_out, stride, affine, track_running_stats: Identity()
-    if stride == 1 and C_in == C_out
-    else FactorizedReduce(C_in, C_out, stride, affine, track_running_stats),
+    "skip_connect": lambda C_in, C_out, stride, affine, track_running_stats: (
+        Identity()
+        if stride == 1 and C_in == C_out
+        else FactorizedReduce(C_in, C_out, stride, affine, track_running_stats)
+    ),
 }
 
 NAS_BENCH_201 = [
@@ -160,7 +160,7 @@ class ReLUConvBN(nn.Module):
         super().__init__()
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
-            nn.Conv2d(
+            Conv2DLoRA(
                 C_in,
                 C_out,
                 kernel_size,
@@ -202,8 +202,11 @@ class ReLUConvBN(nn.Module):
             This method dynamically changes the number of output channels in the
             ReLUConvBN block.
         """
-        self.op[1] = reduce_conv_channels(self.op[1], k, device)
-        self.op[2] = reduce_bn_features(self.op[2], k, device)
+        self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
+        self.op[2] = rc.reduce_bn_features(self.op[2], k, device)
+
+    def activate_lora(self, r: int) -> None:
+        self.op[1].activate_lora(r)
 
 
 class SepConv(nn.Module):
@@ -243,17 +246,17 @@ class SepConv(nn.Module):
         super().__init__()
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
-            nn.Conv2d(
+            Conv2DLoRA(
                 C_in,
                 C_in,
-                kernel_size=kernel_size,
+                kernel_size,
                 stride=stride,
                 padding=padding,
                 dilation=dilation,
                 groups=C_in,
                 bias=False,
             ),
-            nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=not affine),
+            Conv2DLoRA(C_in, C_out, kernel_size=1, padding=0, bias=not affine),
             nn.BatchNorm2d(
                 C_out, affine=affine, track_running_stats=track_running_stats
             ),
@@ -288,9 +291,13 @@ class SepConv(nn.Module):
             This method dynamically changes the number of output channels in the SepConv
             block.
         """
-        self.op[1] = reduce_conv_channels(self.op[1], k, device)
-        self.op[2] = reduce_conv_channels(self.op[2], k, device)
-        self.op[3] = reduce_bn_features(self.op[3], k, device)
+        self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
+        self.op[2] = rc.reduce_conv_channels(self.op[2], k, device)
+        self.op[3] = rc.reduce_bn_features(self.op[3], k, device)
+
+    def activate_lora(self, r: int) -> None:
+        self.op[1].activate_lora(r)
+        self.op[2].activate_lora(r)
 
 
 class DualSepConv(nn.Module):
@@ -381,6 +388,10 @@ class DualSepConv(nn.Module):
         """
         self.op_b.change_channel_size(k, device)
         self.op_b.change_channel_size(k, device)
+
+    def activate_lora(self, r: int) -> None:
+        self.op_a.activate_lora(r)
+        self.op_b.activate_lora(r)
 
 
 class ResNetBasicblock(nn.Module):
@@ -750,10 +761,10 @@ class FactorizedReduce(nn.Module):
             self.convs = nn.ModuleList()
             for i in range(2):
                 self.convs.append(
-                    nn.Conv2d(
+                    Conv2DLoRA(
                         C_in,
                         C_outs[i],
-                        1,
+                        kernel_size=1,
                         stride=stride,
                         padding=0,
                         bias=not affine,
@@ -761,8 +772,8 @@ class FactorizedReduce(nn.Module):
                 )
             self.pad = nn.ConstantPad2d((0, 1, 0, 1), 0)
         elif stride == 1:
-            self.conv = nn.Conv2d(
-                C_in, C_out, 1, stride=stride, padding=0, bias=not affine
+            self.conv = Conv2DLoRA(
+                C_in, C_out, kernel_size=1, stride=stride, padding=0, bias=not affine
             )
         else:
             raise ValueError(f"Invalid stride: {stride}")
@@ -808,13 +819,22 @@ class FactorizedReduce(nn.Module):
         """
         if self.stride == 2:
             for i in range(2):
-                self.convs[i] = reduce_conv_channels(self.convs[i], k, device)
+                self.convs[i] = rc.reduce_conv_channels(self.convs[i], k, device)
         elif self.stride == 1:
-            self.conv = reduce_conv_channels(self.conv, k, device)
+            self.conv = rc.reduce_conv_channels(self.conv, k, device)
         else:
             raise ValueError(f"Invalid stride: {self.stride}")
 
-        self.bn = reduce_bn_features(self.bn, k)
+        self.bn = rc.reduce_bn_features(self.bn, k)
+
+    def activate_lora(self, r: int) -> None:
+        if self.stride == 2:
+            for i in range(2):
+                self.convs[i].activate_lora(r)
+        elif self.stride == 1:
+            self.conv.activate_lora(r)
+        else:
+            raise ValueError(f"Invalid stride: {self.stride}")
 
     def extra_repr(self) -> str:
         """Return an informative string representation of the Factorized Reduce block.

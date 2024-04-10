@@ -11,6 +11,7 @@ from confopt.searchspace import (
     NASBench201SearchSpace,
     TransNASBench101SearchSpace,
 )
+from confopt.searchspace.common.lora_layers import LoRALayer
 from confopt.searchspace.darts.core.model_search import Cell as DARTSSearchCell
 from confopt.searchspace.nb1shot1.core.model_search import (
     Cell as NasBench1Shot1SearchCell,
@@ -18,7 +19,7 @@ from confopt.searchspace.nb1shot1.core.model_search import (
 from confopt.searchspace.nb201.core import NAS201SearchCell
 from confopt.searchspace.nb201.core.operations import ReLUConvBN, ResNetBasicblock
 from confopt.searchspace.tnb101.core.model_search import TNB101SearchCell
-from utils import get_modules_of_type
+from utils import get_modules_of_type  # type: ignore
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -102,7 +103,7 @@ class TestBabyDARTS(unittest.TestCase):
 
     def test_discretize_supernet(self) -> None:
         C = 32
-        num_classes = 11
+        num_classes = 10
         search_space = BabyDARTSSearchSpace(
             C=C, num_classes=num_classes, edge_normalization=True
         )
@@ -263,6 +264,20 @@ class TestNASBench201SearchSpace(unittest.TestCase):
         for beta_param_before, beta_param_after in zip(betas_before, betas_after):
             assert not torch.allclose(beta_param_before, beta_param_after)
 
+    def test_lora_parameters(self) -> None:
+        search_space = NASBench201SearchSpace(edge_normalization=True)
+        model_optimizer = torch.optim.Adam(search_space.model_weight_parameters())
+        for _, module in search_space.named_modules(remove_duplicate=False):
+            if isinstance(module, LoRALayer):
+                module.activate_lora(r=4)
+        opt_hyperparams = model_optimizer.defaults
+        model_optimizer = type(model_optimizer)(
+            search_space.model_weight_parameters(), **opt_hyperparams
+        )
+        model_params = search_space.model_weight_parameters()
+
+        assert model_params == model_optimizer.param_groups[0]["params"]
+
 
 class TestDARTSSearchSpace(unittest.TestCase):
     def test_arch_parameters(self) -> None:
@@ -346,12 +361,13 @@ class TestDARTSSearchSpace(unittest.TestCase):
         # TODO: check to have one operation on each edge of the search space
         C = 32
         layers = 6
-        num_classes = 11
+        num_classes = 10
         search_space = DARTSSearchSpace(
             C=C, layers=layers, num_classes=num_classes, edge_normalization=True
         )
 
         new_model = search_space.discretize()
+        new_model.drop_path_prob = 0.1  # type: ignore
 
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
         out, logits = new_model(x)
@@ -379,6 +395,20 @@ class TestDARTSSearchSpace(unittest.TestCase):
             assert not torch.allclose(arch_param_before, arch_param_after)
         for beta_param_before, beta_param_after in zip(betas_before, betas_after):
             assert not torch.allclose(beta_param_before, beta_param_after)
+
+    def test_lora_parameters(self) -> None:
+        search_space = DARTSSearchSpace(edge_normalization=True)
+        model_optimizer = torch.optim.Adam(search_space.model_weight_parameters())
+        for _, module in search_space.named_modules(remove_duplicate=False):
+            if isinstance(module, LoRALayer):
+                module.activate_lora(r=4)
+        opt_hyperparams = model_optimizer.defaults
+        model_optimizer = type(model_optimizer)(
+            search_space.model_weight_parameters(), **opt_hyperparams
+        )
+        model_params = search_space.model_weight_parameters()
+
+        assert model_params == model_optimizer.param_groups[0]["params"]
 
 
 class TestNASBench1Shot1SearchSpace(unittest.TestCase):
@@ -586,6 +616,21 @@ class TestTransNASBench101SearchSpace(unittest.TestCase):
             assert not torch.allclose(arch_param_before, arch_param_after)
         for beta_param_before, beta_param_after in zip(betas_before, betas_after):
             assert not torch.allclose(beta_param_before, beta_param_after)
+
+    def test_lora_parameters(self) -> None:
+        search_space = TransNASBench101SearchSpace(edge_normalization=True)
+        model_optimizer = torch.optim.Adam(search_space.model_weight_parameters())
+        for _, module in search_space.named_modules(remove_duplicate=False):
+            if isinstance(module, LoRALayer):
+                module.activate_lora(r=4)
+
+        opt_hyperparams = model_optimizer.defaults
+        model_optimizer = type(model_optimizer)(
+            search_space.model_weight_parameters(), **opt_hyperparams
+        )
+        model_params = search_space.model_weight_parameters()
+
+        assert model_params == model_optimizer.param_groups[0]["params"]
 
 
 if __name__ == "__main__":

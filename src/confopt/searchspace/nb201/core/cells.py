@@ -134,6 +134,7 @@ class NAS201SearchCell(nn.Module):
         """
         if weightss is None:
             return self.discrete_model_forward(inputs)
+
         if beta_weightss is not None:
             return self.edge_normalization_forward(inputs, weightss, beta_weightss)
 

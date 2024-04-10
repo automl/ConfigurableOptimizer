@@ -3,13 +3,14 @@ from __future__ import annotations
 from collections import namedtuple
 import time
 
-from fvcore.common.checkpoint import Checkpointer, PeriodicCheckpointer
+from fvcore.common.checkpoint import Checkpointer
 import torch
 from torch import nn
 from typing_extensions import TypeAlias
 
 from confopt.dataset import AbstractData
 from confopt.searchspace import SearchSpace
+from confopt.train import ConfigurableTrainer
 from confopt.utils import AverageMeter, Logger, calc_accuracy
 
 TrainingMetrics = namedtuple("TrainingMetrics", ["loss", "acc_top1", "acc_top5"])
@@ -20,7 +21,7 @@ LRSchedulerType: TypeAlias = torch.optim.lr_scheduler.LRScheduler
 CriterionType: TypeAlias = torch.nn.modules.loss._Loss
 
 
-class DiscreteTrainer:
+class DiscreteTrainer(ConfigurableTrainer):
     def __init__(
         self,
         model: nn.Module,
@@ -31,54 +32,60 @@ class DiscreteTrainer:
         logger: Logger,
         batch_size: int,
         use_data_parallel: bool = False,
-        print_freq: int = 20,
+        print_freq: int = 2,
         drop_path_prob: float = 0.1,
         load_saved_model: bool = False,
         load_best_model: bool = False,
         start_epoch: int = 0,
+        # use_supernet_checkpoint: bool = False,
         checkpointing_freq: int = 20,
         epochs: int = 100,
+        debug_mode: bool = False,
     ) -> None:
-        self.model = model
-        self.model_optimizer = model_optimizer
-        self.scheduler = scheduler
-        self.data = data
-        self.device = (
-            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        super().__init__(
+            model=model,
+            data=data,
+            model_optimizer=model_optimizer,
+            arch_optimizer=None,
+            scheduler=scheduler,
+            criterion=criterion,
+            logger=logger,
+            batch_size=batch_size,
+            use_data_parallel=use_data_parallel,
+            print_freq=print_freq,
+            drop_path_prob=drop_path_prob,
+            load_saved_model=load_saved_model,
+            load_best_model=load_best_model,
+            start_epoch=start_epoch,
+            checkpointing_freq=checkpointing_freq,
+            epochs=epochs,
+            debug_mode=debug_mode,
         )
-        self.logger = logger
-        self.criterion = criterion
-        self.use_data_parallel = use_data_parallel
-        self.print_freq = print_freq
-        self.batch_size = batch_size
-        self.drop_path_prob = drop_path_prob
-        self.load_best_model = load_best_model
-        self.load_saved_model = load_saved_model
-        self.load_best_model = load_best_model
-        self.start_epoch = start_epoch
-        self.checkpointing_freq = checkpointing_freq
-        self.epochs = epochs
+        # self.use_supernet_checkpoint = use_supernet_checkpoint
 
     def train(self, epochs: int, is_wandb_log: bool = True) -> None:
         self.epochs = epochs
-        self.model = self.model.discretize()  # type: ignore
+        # self.model = self.model.discretize()  # type: ignore
 
-        self._init_empty_model_state_info()
         if self.load_saved_model or self.load_best_model or self.start_epoch != 0:
+            assert (
+                sum(
+                    [
+                        self.load_best_model,
+                        self.load_saved_model,
+                        (self.start_epoch > 0),
+                    ]
+                )
+                <= 1
+            )
+
             self._load_model_state_if_exists()
+        else:
+            if hasattr(self.model, "arch_parametes"):
+                assert self.model.arch_parametes == [None]
+            self._init_empty_model_state_info()
 
-        optimizer_hyperparameters = self.model_optimizer.defaults
-        self.model_optimizer = type(self.model_optimizer)(
-            self.model.model_weight_parameters(),  # type: ignore
-            **optimizer_hyperparameters,
-        )
-        self.scheduler = type(self.scheduler)(
-            self.model_optimizer,
-            self.scheduler.T_max,  # type: ignore
-            self.scheduler.eta_min,  # type: ignore
-        )
-
-        if self.use_data_parallel is True:
+        if self.use_data_parallel:
             network, criterion = self._load_onto_data_parallel(
                 self.model, self.criterion
             )
@@ -96,6 +103,12 @@ class DiscreteTrainer:
 
         for epoch in range(self.start_epoch, epochs):
             epoch_str = f"{epoch:03d}-{epochs:03d}"
+
+            if self.logger.search_space == "darts":
+                if isinstance(network, torch.nn.DataParallel):
+                    network.module.drop_path_prob = self.drop_path_prob * epoch / epochs
+                else:
+                    network.drop_path_prob = self.drop_path_prob * epoch / epochs
 
             base_metrics = self.train_func(
                 train_loader,
@@ -147,7 +160,7 @@ class DiscreteTrainer:
                 )
 
                 self.best_model_checkpointer.save(
-                    name="best_model_discrete", checkpointables=checkpointables
+                    name="best_model", checkpointables=checkpointables
                 )
 
             # measure elapsed time
@@ -160,7 +173,7 @@ class DiscreteTrainer:
     def train_func(
         self,
         train_loader: DataLoaderType,
-        network: SearchSpace,
+        network: SearchSpace | torch.nn.DataParallel,
         criterion: CriterionType,
         print_freq: int,
     ) -> TrainingMetrics:
@@ -189,11 +202,9 @@ class DiscreteTrainer:
             base_loss.backward()
 
             if isinstance(network, torch.nn.DataParallel):
-                torch.nn.utils.clip_grad_norm_(
-                    network.module.model_weight_parameters(), 5
-                )
+                torch.nn.utils.clip_grad_norm_(network.module.parameters(), 5)
             else:
-                torch.nn.utils.clip_grad_norm_(network.model_weight_parameters(), 5)
+                torch.nn.utils.clip_grad_norm_(network.parameters(), 5)
 
             self.model_optimizer.step()
 
@@ -295,119 +306,53 @@ class DiscreteTrainer:
 
         return test_metrics
 
-    def _update_meters(
-        self,
-        inputs: torch.Tensor,
-        logits: torch.Tensor,
-        targets: torch.Tensor,
-        loss: torch.Tensor,
-        loss_meter: AverageMeter,
-        top1_meter: AverageMeter,
-        top5_meter: AverageMeter,
-    ) -> None:
-        base_prec1, base_prec5 = calc_accuracy(logits.data, targets.data, topk=(1, 5))
-        loss_meter.update(loss.item(), inputs.size(0))
-        top1_meter.update(base_prec1.item(), inputs.size(0))
-        top5_meter.update(base_prec5.item(), inputs.size(0))
-
-    def _get_checkpointables(self, epoch: int) -> dict:
-        return {
-            "epoch": epoch,
-            "search_losses": self.search_losses,
-            "search_accs_top1": self.search_accs_top1,
-            "search_accs_top5": self.search_accs_top5,
-            "valid_losses": self.valid_losses,
-            "valid_accs_top1": self.valid_accs_top1,
-            "valid_accs_top5": self.valid_accs_top5,
-        }
-
     def _set_up_checkpointer(self, mode: str | None) -> Checkpointer:
         checkpoint_dir = self.logger.path(mode=mode)  # todo: check this
         # checkpointables = self._get_checkpointables(self.start_epoch)
+
+        checkpointables = {
+            "w_scheduler": self.scheduler,
+            "w_optimizer": self.model_optimizer,
+        }
         checkpointer = Checkpointer(
             model=self.model,
             save_dir=str(checkpoint_dir),
             save_to_disk=True,
+            **checkpointables,
         )
-        checkpointer.add_checkpointable("w_scheduler", self.scheduler)
-        checkpointer.add_checkpointable("w_optimizer", self.model_optimizer)
         return checkpointer
 
-    def _init_periodic_checkpointer(self) -> None:
-        self.checkpointer = self._set_up_checkpointer(mode="checkpoints")
-        self.periodic_checkpointer = PeriodicCheckpointer(
-            checkpointer=self.checkpointer,
-            period=self.checkpointing_freq,
-            max_iter=self.epochs,
-        )
+    # def _load_model_state_if_exists(self) -> None:
+    #     self.best_model_checkpointer = self._set_up_checkpointer(mode=None)
+    #     self._init_periodic_checkpointer()
 
-    def _set_checkpointer_info(self, last_checkpoint: dict) -> None:
-        self.model.load_state_dict(last_checkpoint["model"])
+    #     if self.load_best_model:
+    #         last_info = self.logger.path("best_model_discrete")
+    #         info = self.best_model_checkpointer._load_file(f=last_info)
+    #         self.logger.log(
+    #             f"=> loading checkpoint of the best-model '{last_info}' start"
+    #         )
+    #     elif self.start_epoch != 0:
+    #         last_info = self.logger.path("checkpoints")
+    #         last_info ="{}/{}_{:07d}.pth".format(last_info, "model", self.start_epoch)
+    #         info = self.checkpointer._load_file(f=last_info)
+    #         self.logger.log(
+    #             f"resume from discrete network trained from {self.start_epoch} epochs"
+    #         )
+    #     elif self.load_saved_model:
+    #         last_info = self.logger.path("last_checkpoint")
+    #         info = self.checkpointer._load_file(f=last_info)
+    #         self.logger.log(f"=> loading checkpoint of the last-info {last_info}")
+    #     else:
+    #         self.logger.log("=> did not find the any file")
+    #         return
 
-    def _get_checkpoint_dir(self) -> str:
-        assert (
-            sum([self.load_best_model, self.load_saved_model, (self.start_epoch > 0)])
-            <= 1
-        )
-        mode = None
+    #     # if self.use_supernet_checkpoint:
+    #     #     self.logger.use_supernet_checkpoint = False
+    #     #     self._init_empty_model_state_info()
+    #     # else:
 
-        if self.load_saved_model or self.load_best_model:
-            mode = "checkpoints"
-        return self.logger.path(mode=mode)
-
-    def _load_model_state_if_exists(self) -> None:
-        checkpoint_dir = self._get_checkpoint_dir()
-        checkpointer = Checkpointer(
-            model=self.model,
-            save_dir=checkpoint_dir,
-            save_to_disk=True,
-        )
-
-        if self.load_best_model:
-            last_info = self.logger.path("best_model_discrete")
-            info = checkpointer._load_file(f=last_info)
-            self.logger.log(
-                f"=> loading checkpoint of the best-model '{last_info}' start"
-            )
-        elif self.start_epoch != 0:
-            last_info = self.logger.path("checkpoints")
-            last_info = "{}/{}_{:07d}.pth".format(last_info, "model", self.start_epoch)
-            info = checkpointer._load_file(f=last_info)
-            self.logger.log(
-                f"resume from discrete network trained from {self.start_epoch} epochs"
-            )
-        elif self.load_saved_model:
-            last_info = self.logger.path("last_checkpoint")
-            info = checkpointer._load_file(f=last_info)
-            self.logger.log(f"=> loading checkpoint of the last-info {last_info}")
-        else:
-            self.logger.log("=> did not find the any file")
-            return
-
-        self.logger.set_up_new_run()
-        self.checkpointer.save_dir = self.logger.path(mode="checkpoints")
-        self.best_model_checkpointer.save_dir = self.logger.path(mode=None)
-        self._set_checkpointer_info(info)
-
-    def _init_empty_model_state_info(self) -> None:
-        self.search_losses: dict[int, float] = {}
-        self.search_accs_top1: dict[int, float] = {}
-        self.search_accs_top5: dict[int, float] = {}
-        self.valid_losses: dict[int, float] = {}
-        self.valid_accs_top1: dict[int | str, float | int] = {"best": -1}
-        self.valid_accs_top5: dict[int, float] = {}
-
-        self._init_periodic_checkpointer()
-        self.best_model_checkpointer = self._set_up_checkpointer(mode=None)
-        self.logger.set_up_run()
-
-    def _load_onto_data_parallel(
-        self, network: nn.Module, criterion: CriterionType
-    ) -> tuple[nn.Module, CriterionType]:
-        if torch.cuda.is_available():
-            network, criterion = (
-                torch.nn.DataParallel(self.model).cuda(),
-                criterion.cuda(),
-            )
-
-        return network, criterion
+    #     self.logger.set_up_new_run()
+    #     self.best_model_checkpointer.save_dir = self.logger.path(mode=None)
+    #     self.checkpointer.save_dir = self.logger.path(mode="checkpoints")
+    #     self._set_checkpointer_info(info)

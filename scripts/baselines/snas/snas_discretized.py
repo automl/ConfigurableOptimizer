@@ -58,7 +58,7 @@ def read_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--last_search_run_time",
+        "--last_search_runtime",
         default="NOT_VALID",
         help="The search run time to take in for the discretization step",
         type=str,
@@ -124,7 +124,7 @@ if __name__ == "__main__":
 
     experiment.initialize_from_last_run(
         profile_config=profile,
-        last_search_run_time=args.last_search_run_time,
+        last_search_runtime=args.last_search_runtime,
     )
 
     discret_trainer = experiment.run_discrete_model_with_profile(
