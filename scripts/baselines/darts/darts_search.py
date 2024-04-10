@@ -83,7 +83,7 @@ def get_darts_profile(args: argparse.Namespace) -> DartsProfile:
             "weight_decay": 1e-3,
         },
         "learning_rate_min": 0.001,
-        "learning_rate": 0.025,
+        # "learning_rate": 0.025,
     }
     profile.configure_trainer(**train_config)
 
