@@ -102,7 +102,7 @@ class TestBabyDARTS(unittest.TestCase):
 
     def test_discretize_supernet(self) -> None:
         C = 32
-        num_classes = 11
+        num_classes = 10
         search_space = BabyDARTSSearchSpace(
             C=C, num_classes=num_classes, edge_normalization=True
         )

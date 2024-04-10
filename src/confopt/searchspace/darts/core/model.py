@@ -130,11 +130,19 @@ class AuxiliaryHeadImageNet(nn.Module):
 
 class NetworkCIFAR(nn.Module):
     def __init__(
-        self, C: int, num_classes: int, layers: int, auxiliary: bool, genotype: Genotype
+        self,
+        C: int,
+        num_classes: int,
+        layers: int,
+        auxiliary: bool,
+        genotype: Genotype,
+        drop_path_prob: float = 0.0,
+        # TODO: Verify that 0. is the correct default value for drop_path_prob
     ) -> None:
         super().__init__()
         self._layers = layers
         self._auxiliary = auxiliary
+        self.drop_path_prob = drop_path_prob
 
         stem_multiplier = 3
         C_curr = stem_multiplier * C
@@ -179,11 +187,19 @@ class NetworkCIFAR(nn.Module):
 
 class NetworkImageNet(nn.Module):
     def __init__(
-        self, C: int, num_classes: int, layers: int, auxiliary: bool, genotype: Genotype
+        self,
+        C: int,
+        num_classes: int,
+        layers: int,
+        auxiliary: bool,
+        genotype: Genotype,
+        drop_path_prob: float = 0.0,
+        # TODO: Verify that 0. is the correct default value for drop_path_prob
     ) -> None:
         super().__init__()
         self._layers = layers
         self._auxiliary = auxiliary
+        self.drop_path_prob = drop_path_prob
 
         self.stem0 = nn.Sequential(
             nn.Conv2d(3, C // 2, kernel_size=3, stride=2, padding=1, bias=False),
