@@ -9,18 +9,21 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 
 def change_channel_size_conv(
-    conv2d_layer: nn.Conv2d | Conv2DLoRA, k: float, device: torch.device = DEVICE
-) -> nn.Conv2d | Conv2DLoRA:
+    conv2d_layer: nn.Conv2d | Conv2DLoRA,
+    k: float,
+    index: torch.Tensor | None = None,
+    device: torch.device = DEVICE,
+) -> tuple[nn.Conv2d | Conv2DLoRA, torch.Tensor | None]:
     if k > 1:
         return increase_conv_channels(conv2d_layer, k, device)
-    return reduce_conv_channels(conv2d_layer, k, device)
+    return reduce_conv_channels(conv2d_layer, k, device), index
 
 
 def increase_conv_channels(
     conv2d_layer: nn.Conv2d | Conv2DLoRA,
     k: float,
     device: torch.device = DEVICE,
-) -> nn.Conv2d | Conv2DLoRA:
+) -> tuple[nn.Conv2d | Conv2DLoRA, torch.Tensor]:
     if not isinstance(conv2d_layer, (nn.Conv2d, Conv2DLoRA)):
         raise TypeError("Input must be a nn.Conv2d or a LoRA wrapped conv2d layer.")
 
@@ -49,28 +52,57 @@ def increase_conv_channels(
             merge_weights=conv2d_layer.merge_weights,
         ).to(device)
     else:
-        new_groups = new_in_channels if conv2d_layer.groups != 1 else 1
-        increased_conv2d = nn.Conv2d(
-            new_in_channels,
-            new_out_channels,
-            conv2d_layer.kernel_size,
-            conv2d_layer.stride,
-            conv2d_layer.padding,
-            conv2d_layer.dilation,
-            new_groups,
-            conv2d_layer.bias is not None,
-        ).to(device)
+        increased_conv2d, _ = in_channel_wider(conv2d_layer, new_in_channels)
+        increased_conv2d, out_index = out_channel_wider(increased_conv2d, new_out_channels)
 
-    # Copy the weights and biases from the original conv2d to the new one
-    increased_conv2d.weight.data[
-        :out_channels, :in_channels, :, :
-    ] = conv2d_layer.weight.data[:out_channels, :in_channels, :, :].clone()
-    if conv2d_layer.bias is not None:
-        increased_conv2d.bias.data[:out_channels] = conv2d_layer.bias.data[
-            :out_channels
-        ].clone()
+    return increased_conv2d.to(device=device), out_index
 
-    return increased_conv2d
+
+def in_channel_wider(
+    module: nn.Conv2d, new_channels: int, index: torch.Tensor | None = None
+) -> tuple[nn.Conv2d, torch.Tensor]:
+    weight = module.weight
+    in_channels = weight.size(1)
+
+    if index is None:
+        index = torch.randint(
+            low=0, high=in_channels, size=(new_channels - in_channels,)
+        )
+    module.weight = nn.Parameter(
+        torch.cat([weight, weight[:, index, :, :].clone()], dim=1), requires_grad=True
+    )
+
+    module.in_channels = new_channels
+    module.weight.in_index = index
+    module.weight.t = "conv"
+    if hasattr(weight, "out_index"):
+        module.weight.out_index = weight.out_index
+    module.weight.raw_id = weight.raw_id if hasattr(weight, "raw_id") else id(weight)
+    return module, index
+
+
+# bias = 0
+def out_channel_wider(
+    module: nn.Conv2d, new_channels: int, index: torch.Tensor | None = None
+) -> tuple[nn.Conv2d, torch.Tensor]:
+    weight = module.weight
+    out_channels = weight.size(0)
+
+    if index is None:
+        index = torch.randint(
+            low=0, high=out_channels, size=(new_channels - out_channels,)
+        )
+    module.weight = nn.Parameter(
+        torch.cat([weight, weight[index, :, :, :].clone()], dim=0), requires_grad=True
+    )
+
+    module.out_channels = new_channels
+    module.weight.out_index = index
+    module.weight.t = "conv"
+    if hasattr(weight, "in_index"):
+        module.weight.in_index = weight.in_index
+    module.weight.raw_id = weight.raw_id if hasattr(weight, "raw_id") else id(weight)
+    return module, index
 
 
 def reduce_conv_channels(
@@ -150,16 +182,22 @@ def reduce_conv_channels(
 
 
 def change_features_bn(
-    batchnorm_layer: nn.BatchNorm2d, k: float, device: torch.device = DEVICE
-) -> nn.BatchNorm2d:
+    batchnorm_layer: nn.BatchNorm2d,
+    k: float,
+    index: torch.Tensor | None = None,
+    device: torch.device = DEVICE,
+) -> tuple[nn.BatchNorm2d, torch.Tensor | None]:
     if k > 1:
-        return increase_bn_features(batchnorm_layer, k, device)
-    return reduce_bn_features(batchnorm_layer, k, device)
+        return increase_bn_features(batchnorm_layer, k, index, device)
+    return reduce_bn_features(batchnorm_layer, k, device), index
 
 
 def increase_bn_features(
-    batchnorm_layer: nn.BatchNorm2d, k: float, device: torch.device = DEVICE
-) -> nn.BatchNorm2d:
+    batchnorm_layer: nn.BatchNorm2d,
+    k: float,
+    index: torch.Tensor | None = None,
+    device: torch.device = DEVICE,
+) -> tuple[nn.BatchNorm2d, torch.Tensor]:
     if not isinstance(batchnorm_layer, nn.BatchNorm2d):
         raise TypeError("Input must be a nn.BatchNorm2d layer.")
 
@@ -170,23 +208,47 @@ def increase_bn_features(
     new_num_features = int(max(1, num_features // k))
 
     # Create a new BatchNorm2d layer with the increased number of features
-    increased_batchnorm = nn.BatchNorm2d(
-        new_num_features,
-        eps=batchnorm_layer.eps,
-        momentum=batchnorm_layer.momentum,
-        affine=batchnorm_layer.affine,
-        track_running_stats=batchnorm_layer.track_running_stats,
-    ).to(device)
+    increased_batchnorm, index = bn_wider(batchnorm_layer, new_num_features, index)
 
-    if batchnorm_layer.affine:
-        increased_batchnorm.weight.data[:num_features] = batchnorm_layer.weight.data[
-            :num_features
-        ].clone()
-        increased_batchnorm.bias.data[:num_features] = batchnorm_layer.bias.data[
-            :num_features
-        ].clone()
+    return increased_batchnorm.to(device), index
 
-    return increased_batchnorm
+
+def bn_wider(
+    module: nn.BatchNorm2d, new_features: int, index: torch.Tensor | None = None
+) -> tuple[nn.BatchNorm2d, torch.Tensor]:
+    running_mean = module.running_mean
+    running_var = module.running_var
+    if module.affine:
+        weight = module.weight
+        bias = module.bias
+    num_features = module.num_features
+
+    if index is None:
+        index = torch.randint(
+            low=0, high=num_features, size=(new_features - num_features,)
+        )
+    module.running_mean = torch.cat([running_mean, running_mean[index].clone()])
+    module.running_var = torch.cat([running_var, running_var[index].clone()])
+    if module.affine:
+        module.weight = nn.Parameter(
+            torch.cat([weight, weight[index].clone()], dim=0), requires_grad=True
+        )
+        module.bias = nn.Parameter(
+            torch.cat([bias, bias[index].clone()], dim=0), requires_grad=True
+        )
+
+        module.weight.out_index = index
+        module.bias.out_index = index
+        module.weight.t = "bn"
+        module.bias.t = "bn"
+        if hasattr(module.weight, "raw_id"):
+            module.weight.raw_id = (
+                weight.raw_id if hasattr(weight, "raw_id") else id(weight)
+            )
+        if hasattr(module.bias, "raw_id"):
+            module.bias.raw_id = bias.raw_id if hasattr(bias, "raw_id") else id(bias)
+    module.num_features = new_features
+    return module, index
 
 
 def reduce_bn_features(
