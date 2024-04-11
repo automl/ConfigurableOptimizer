@@ -10,15 +10,24 @@ from confopt.searchspace import (
     NASBench1Shot1SearchSpace,
     NASBench201SearchSpace,
     TransNASBench101SearchSpace,
+    RobustDARTSSearchSpace,
 )
 from confopt.searchspace.common.lora_layers import LoRALayer
 from confopt.searchspace.darts.core.model_search import Cell as DARTSSearchCell
+from confopt.searchspace.darts.core.operations import (
+    Identity,
+    SepConv,
+    Zero,
+    FactorizedReduce,
+)
 from confopt.searchspace.nb1shot1.core.model_search import (
     Cell as NasBench1Shot1SearchCell,
 )
 from confopt.searchspace.nb201.core import NAS201SearchCell
 from confopt.searchspace.nb201.core.operations import ReLUConvBN, ResNetBasicblock
 from confopt.searchspace.tnb101.core.model_search import TNB101SearchCell
+from confopt.searchspace.robust_darts.core.operations import NoiseOp
+from confopt.searchspace.robust_darts.core.spaces import spaces_dict
 from utils import get_modules_of_type  # type: ignore
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -367,7 +376,7 @@ class TestDARTSSearchSpace(unittest.TestCase):
         )
 
         new_model = search_space.discretize()
-        new_model.drop_path_prob = 0.1 # type: ignore
+        new_model.drop_path_prob = 0.1  # type: ignore
 
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
         out, logits = new_model(x)
@@ -631,6 +640,92 @@ class TestTransNASBench101SearchSpace(unittest.TestCase):
         model_params = search_space.model_weight_parameters()
 
         assert model_params == model_optimizer.param_groups[0]["params"]
+
+
+class TestRobustDARTSSearchSpace(unittest.TestCase):
+    def test_init_search_spaces(self) -> None:
+        s1 = RobustDARTSSearchSpace(space="s1")
+        assert s1.model is not None
+
+        s2 = RobustDARTSSearchSpace(space="s2")
+        assert s1.model is not None
+
+        s3 = RobustDARTSSearchSpace(space="s3")
+        assert s1.model is not None
+
+        s4 = RobustDARTSSearchSpace(space="s4")
+        assert s1.model is not None
+
+        with self.assertRaises(ValueError):
+            RobustDARTSSearchSpace(space="s5")
+
+        with self.assertRaises(ValueError):
+            RobustDARTSSearchSpace(space="S1")
+
+    def _test_search_space_forward(self, space: str) -> None:
+        s1 = RobustDARTSSearchSpace(space=space)
+        x = torch.randn(2, 3, 32, 32).to(DEVICE)
+        out = s1(x)
+        assert out.shape == (2, 10)
+
+    def test_search_space_forward_s1(self) -> None:
+        self._test_search_space_forward("s1")
+
+    def test_search_space_forward_s2(self) -> None:
+        self._test_search_space_forward("s2")
+
+    def test_search_space_forward_s3(self) -> None:
+        self._test_search_space_forward("s3")
+
+    def test_search_space_forward_s4(self) -> None:
+        self._test_search_space_forward("s4")
+
+    def _test_search_space_candidate_ops(
+        self, space: str, candidate_ops: list[str]
+    ) -> None:
+        search_space = RobustDARTSSearchSpace(space=space)
+        cells = search_space.model.cells
+
+        op_mapping = {
+            "skip_connect": (Identity, FactorizedReduce),
+            "sep_conv_3x3": SepConv,
+            "none": Zero,
+            "noise": NoiseOp,
+        }
+
+        for cell in cells[:3]:
+            for operation_choices in cell._ops:
+                ops = operation_choices.ops
+
+                for idx, op in enumerate(ops):
+                    correct_op = op_mapping[candidate_ops[idx]]
+                    if isinstance(correct_op, tuple):
+                        assert isinstance(op, correct_op[0]) or isinstance(
+                            op, correct_op[1]
+                        )
+                    else:
+                        assert isinstance(op, correct_op)
+
+    def test_search_space_s1_ops(self) -> None:
+        s1 = RobustDARTSSearchSpace(space="s1")
+        cells = s1.model.cells
+
+        for cell in cells:
+            for operation_choices in cell._ops:
+                ops = operation_choices.ops
+                assert len(ops) == 2
+                assert isinstance(ops[0], nn.Module)
+
+    def test_search_space_s2_ops(self) -> None:
+        self._test_search_space_candidate_ops("s2", ["skip_connect", "sep_conv_3x3"])
+
+    def test_search_space_s3_ops(self) -> None:
+        self._test_search_space_candidate_ops(
+            "s3", ["none", "skip_connect", "sep_conv_3x3"]
+        )
+
+    def test_search_space_s4_ops(self) -> None:
+        self._test_search_space_candidate_ops("s4", ["noise", "sep_conv_3x3"])
 
 
 if __name__ == "__main__":
