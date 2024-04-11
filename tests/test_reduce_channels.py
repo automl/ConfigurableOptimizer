@@ -8,6 +8,8 @@ from confopt.utils.reduce_channels import (
     increase_conv_channels,
     reduce_bn_features,
     reduce_conv_channels,
+    increase_bn_features,
+    increase_conv_channels,
 )
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")

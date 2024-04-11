@@ -53,7 +53,9 @@ def increase_conv_channels(
         ).to(device)
     else:
         increased_conv2d, _ = in_channel_wider(conv2d_layer, new_in_channels)
-        increased_conv2d, out_index = out_channel_wider(increased_conv2d, new_out_channels)
+        increased_conv2d, out_index = out_channel_wider(
+            increased_conv2d, new_out_channels
+        )
 
     return increased_conv2d.to(device=device), out_index
 
