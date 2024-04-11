@@ -33,6 +33,7 @@ from confopt.profiles import (
 )
 from confopt.searchspace import (
     BabyDARTSSearchSpace,
+    DARTSGenotype,  # noqa: F401
     DARTSImageNetModel,
     DARTSModel,
     DARTSSearchSpace,
