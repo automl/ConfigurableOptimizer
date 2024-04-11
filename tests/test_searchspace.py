@@ -28,6 +28,9 @@ from confopt.searchspace.nb201.core.operations import ReLUConvBN, ResNetBasicblo
 from confopt.searchspace.tnb101.core.model_search import TNB101SearchCell
 from confopt.searchspace.robust_darts.core.operations import NoiseOp
 from confopt.searchspace.robust_darts.core.spaces import spaces_dict
+from confopt.searchspace.robust_darts.core.model_search import (
+    Cell as RobustDARTSSearchCell,
+)
 from utils import get_modules_of_type  # type: ignore
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -643,6 +646,67 @@ class TestTransNASBench101SearchSpace(unittest.TestCase):
 
 
 class TestRobustDARTSSearchSpace(unittest.TestCase):
+    def test_supernet_init(self) -> None:
+        C = 32
+        layers = 6
+        num_classes = 11
+        search_space = RobustDARTSSearchSpace(
+            "s1", C=C, layers=layers, num_classes=num_classes
+        )
+
+        search_cells = get_modules_of_type(search_space.model, RobustDARTSSearchCell)
+        assert len(search_cells) == layers
+
+        reduction_cells = [cell for cell in search_cells if cell.reduction is True]
+        assert len(reduction_cells) == 2
+
+        x = torch.randn(2, 3, 32, 32).to(DEVICE)
+        out, logits = search_space(x)
+
+        assert logits.shape == torch.Size([2, num_classes])
+
+    def _test_arch_parameters(self, space: str, n_ops: int) -> None:
+        search_space = RobustDARTSSearchSpace(space=space)
+        arch_params = search_space.arch_parameters
+        assert len(arch_params) == 2
+
+        assert isinstance(arch_params[0], nn.Parameter)
+        assert isinstance(arch_params[1], nn.Parameter)
+        assert arch_params[0].shape == (14, n_ops)
+        assert arch_params[0].shape == (14, n_ops)
+
+    def test_arch_parameters_s1(self) -> None:
+        self._test_arch_parameters("s1", 2)
+
+    def test_arch_parameters_s2(self) -> None:
+        self._test_arch_parameters("s2", 2)
+
+    def test_arch_parameters_s3(self) -> None:
+        self._test_arch_parameters("s3", 3)
+
+    def test_arch_parameters_s4(self) -> None:
+        self._test_arch_parameters("s4", 2)
+
+    def test_beta_parameters(self) -> None:
+        search_space = RobustDARTSSearchSpace("s1")
+        beta_params = search_space.beta_parameters
+        assert len(beta_params) == 2
+        assert isinstance(beta_params[0], nn.Parameter)
+        assert isinstance(beta_params[1], nn.Parameter)
+
+    def test_forward_pass(self) -> None:
+        search_space = RobustDARTSSearchSpace("s1")
+        x = torch.randn(2, 3, 64, 64).to(DEVICE)
+
+        out = search_space(x)
+
+        assert isinstance(out, tuple)
+        assert len(out) == 2
+        assert isinstance(out[0], torch.Tensor)
+        assert isinstance(out[1], torch.Tensor)
+        assert out[0].shape == torch.Size([2, 256])
+        assert out[1].shape == torch.Size([2, 10])
+
     def test_init_search_spaces(self) -> None:
         s1 = RobustDARTSSearchSpace(space="s1")
         assert s1.model is not None
@@ -663,10 +727,16 @@ class TestRobustDARTSSearchSpace(unittest.TestCase):
             RobustDARTSSearchSpace(space="S1")
 
     def _test_search_space_forward(self, space: str) -> None:
-        s1 = RobustDARTSSearchSpace(space=space)
-        x = torch.randn(2, 3, 32, 32).to(DEVICE)
-        out = s1(x)
-        assert out.shape == (2, 10)
+        search_space = RobustDARTSSearchSpace(space=space)
+        x = torch.randn(2, 3, 64, 64).to(DEVICE)
+        out = search_space(x)
+
+        assert isinstance(out, tuple)
+        assert len(out) == 2
+        assert isinstance(out[0], torch.Tensor)
+        assert isinstance(out[1], torch.Tensor)
+        assert out[0].shape == torch.Size([2, 256])
+        assert out[1].shape == torch.Size([2, 10])
 
     def test_search_space_forward_s1(self) -> None:
         self._test_search_space_forward("s1")
@@ -726,6 +796,29 @@ class TestRobustDARTSSearchSpace(unittest.TestCase):
 
     def test_search_space_s4_ops(self) -> None:
         self._test_search_space_candidate_ops("s4", ["noise", "sep_conv_3x3"])
+
+    def test_optim_forward_pass(self) -> None:
+        search_space = RobustDARTSSearchSpace(space="s1")
+        loss_fn = torch.nn.CrossEntropyLoss().to(DEVICE)
+        x = torch.randn(2, 3, 32, 32).to(DEVICE)
+        y = torch.randint(low=0, high=9, size=(2,)).to(DEVICE)
+        arch_optim = torch.optim.Adam(
+            [*search_space.arch_parameters, *search_space.beta_parameters]
+        )
+        arch_optim.zero_grad()
+        out = search_space(x)
+        loss = loss_fn(out[1], y)
+        loss.backward()
+        alphas_before = copy.deepcopy(search_space.arch_parameters)
+        betas_before = copy.deepcopy(search_space.beta_parameters)
+        arch_optim.step()
+        alphas_after = search_space.arch_parameters
+        betas_after = search_space.beta_parameters
+        for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
+            assert not torch.allclose(arch_param_before, arch_param_after)
+        # TODO: Uncomment this after beta normalization has been implemented
+        # for beta_param_before, beta_param_after in zip(betas_before, betas_after):
+        #     assert not torch.allclose(beta_param_before, beta_param_after)
 
 
 if __name__ == "__main__":

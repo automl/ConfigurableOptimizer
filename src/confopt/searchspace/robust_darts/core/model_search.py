@@ -11,6 +11,8 @@ from confopt.searchspace.darts.core.operations import FactorizedReduce, ReLUConv
 
 from .operations import OPS, drop_path
 
+DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
 
 class MixedOp(nn.Module):
     def __init__(self, C: int, stride: int, primitives: list[str]) -> None:
@@ -191,7 +193,7 @@ class Network(nn.Module):
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.classifier = nn.Linear(C_prev, num_classes)
 
-        self._initialize_alphas()
+        self._initialize_parameters()
 
     def new(self) -> Network:
         model_new = Network(
@@ -233,7 +235,7 @@ class Network(nn.Module):
         out = self.global_pooling(s1)
         logits = self.classifier(out.view(out.size(0), -1))
 
-        return logits
+        return out.view(out.size(0), -1), logits
 
     def discrete_model_forward(
         self, x: torch.Tensor
@@ -253,19 +255,22 @@ class Network(nn.Module):
         logits = self(x)
         return self._criterion(logits, target)
 
-    def _initialize_alphas(self) -> None:
+    def _initialize_parameters(self) -> None:
         k = sum(1 for i in range(self._steps) for n in range(2 + i))
         num_ops = len(self.primitives["primitives_normal"][0])
 
-        self.alphas_normal = Variable(
-            1e-3 * torch.randn(k, num_ops).cuda(), requires_grad=True
-        )
-        self.alphas_reduce = Variable(
-            1e-3 * torch.randn(k, num_ops).cuda(), requires_grad=True
-        )
+        self.alphas_normal = nn.Parameter(1e-3 * torch.randn(k, num_ops).to(DEVICE))
+        self.alphas_reduce = nn.Parameter(1e-3 * torch.randn(k, num_ops).to(DEVICE))
         self._arch_parameters = [
             self.alphas_normal,
             self.alphas_reduce,
+        ]
+
+        self.betas_normal = nn.Parameter(1e-3 * torch.randn(k).to(DEVICE))
+        self.betas_reduce = nn.Parameter(1e-3 * torch.randn(k).to(DEVICE))
+        self._betas = [
+            self.betas_normal,
+            self.betas_reduce,
         ]
 
     def arch_parameters(self) -> list[Variable]:
@@ -331,3 +336,12 @@ class Network(nn.Module):
             reduce_concat=concat,
         )
         return genotype
+
+    def beta_parameters(self) -> list[torch.nn.Parameter]:
+        """Get a list containing the beta parameters of partial connection used for
+        edge normalization.
+
+        Returns:
+            list[torch.Tensor]: A list containing the beta parameters for the model.
+        """
+        return self._betas
