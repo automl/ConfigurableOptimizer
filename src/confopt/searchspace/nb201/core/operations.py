@@ -202,11 +202,12 @@ class ReLUConvBN(nn.Module):
             This method dynamically changes the number of output channels in the
             ReLUConvBN block.
         """
-        self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
-        self.op[2] = rc.reduce_bn_features(self.op[2], k, device)
+        self.op[1], index = rc.change_channel_size_conv(self.op[1], k, device=device)
+        self.op[2], _ = rc.change_features_bn(self.op[2], k, index, device=device)
 
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
+
 
 
 class SepConv(nn.Module):
@@ -291,14 +292,14 @@ class SepConv(nn.Module):
             This method dynamically changes the number of output channels in the SepConv
             block.
         """
-        self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
-        self.op[2] = rc.reduce_conv_channels(self.op[2], k, device)
-        self.op[3] = rc.reduce_bn_features(self.op[3], k, device)
+        if k > 1:
+            self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
+            self.op[2] = rc.reduce_conv_channels(self.op[2], k, device)
+            self.op[3] = rc.reduce_bn_features(self.op[3], k, device)
 
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
         self.op[2].activate_lora(r)
-
 
 class DualSepConv(nn.Module):
     """Dual Separable Convolution-BatchNorm Block Class.
@@ -386,8 +387,9 @@ class DualSepConv(nn.Module):
             This method dynamically changes the number of output channels in both
             SepConv blocks of the DualSepConv block.
         """
-        self.op_b.change_channel_size(k, device)
-        self.op_b.change_channel_size(k, device)
+        if k > 1:
+            self.op_b.change_channel_size(k, device)
+            self.op_b.change_channel_size(k, device)
 
     def activate_lora(self, r: int) -> None:
         self.op_a.activate_lora(r)
@@ -817,16 +819,38 @@ class FactorizedReduce(nn.Module):
             This method dynamically changes the number of output channels in the block's
             convolutional layers and BatchNorm.
         """
-        if self.stride == 2:
-            for i in range(2):
-                self.convs[i] = rc.reduce_conv_channels(self.convs[i], k, device)
-        elif self.stride == 1:
-            self.conv = rc.reduce_conv_channels(self.conv, k, device)
+        if k > 1:
+            if self.stride == 2:
+                for i in range(2):
+                    self.convs[i] = rc.reduce_conv_channels(self.convs[i], k, device)
+            elif self.stride == 1:
+                self.conv = rc.reduce_conv_channels(self.conv, k, device)
+            else:
+                raise ValueError(f"Invalid stride: {self.stride}")
+            self.bn = rc.reduce_bn_features(self.bn, k)
+
         else:
-            raise ValueError(f"Invalid stride: {self.stride}")
+            if self.stride == 2:
+                new_C_in = int(max(1, self.convs[0].in_channels // k))
+                new_C_out = int(max(1, self.convs[0].out_channels // k))
+                self.convs[0], _ = rc.in_channel_wider(self.convs[0], new_C_in)
+                self.convs[0], index1 = rc.out_channel_wider(self.convs[0], new_C_out // 2)
+                self.convs[1], _ = rc.in_channel_wider(self.convs[1], new_C_in)
+                self.convs[1], index2 = rc.out_channel_wider(
+                    self.convs[1], new_C_out - new_C_out // 2
+                )
+                self.bn, _ = rc.bn_wider(
+                    self.bn, new_C_out, index=torch.cat([index1, index2])
+                )
+            elif self.stride == 1:
+                new_C_in = int(max(1, self.conv.in_channels // k))
+                new_C_out = int(max(1, self.conv.out_channels // k))
+                self.conv, _ = rc.in_channel_wider(self.conv, new_C_in)
+                self.conv, index = rc.out_channel_wider(self.conv, new_C_out)
+                self.bn, _ = rc.bn_wider(self.bn, new_C_out, index=index)
 
-        self.bn = rc.reduce_bn_features(self.bn, k)
-
+            self.to(device=device)
+    
     def activate_lora(self, r: int) -> None:
         if self.stride == 2:
             for i in range(2):
