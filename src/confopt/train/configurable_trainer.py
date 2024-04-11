@@ -124,6 +124,8 @@ class ConfigurableTrainer:
                 self.model_optimizer,
                 self.arch_optimizer,
                 self.print_freq,
+                logger=self.logger,
+                epoch=epoch,
                 is_warm_epoch=is_warm_epoch,
             )
 
@@ -207,6 +209,8 @@ class ConfigurableTrainer:
         w_optimizer: OptimizerType,
         arch_optimizer: OptimizerType,
         print_freq: int,
+        logger: Logger,  # noqa: ARG002  TODO:Fix
+        epoch: int,
         is_warm_epoch: bool = False,
     ) -> tuple[TrainingMetrics, TrainingMetrics]:
         data_time, batch_time = AverageMeter(), AverageMeter()
@@ -246,7 +250,12 @@ class ConfigurableTrainer:
                 _, logits = network(arch_inputs)
                 arch_loss = criterion(logits, arch_targets)
                 arch_loss.backward()
-                arch_optimizer.step()
+
+                if profile.partial_connector:
+                    if epoch >= 15:
+                        arch_optimizer.step()
+                else:
+                    arch_optimizer.step()
 
                 if self.use_data_parallel:
                     profile.perturb_parameter(network.module)
