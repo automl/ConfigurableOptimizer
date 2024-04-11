@@ -6,6 +6,7 @@ from torch import nn
 from confopt.searchspace.common import Conv2DLoRA
 import confopt.utils.reduce_channels as rc
 
+
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 OPS = {
     "none": lambda C, stride, affine: Zero(stride),  # noqa: ARG005
@@ -106,8 +107,8 @@ class ReLUConvBN(nn.Module):
             This method dynamically changes the number of output channels in the
             ReLUConvBN block.
         """
-        self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
-        self.op[2] = rc.reduce_bn_features(self.op[2], k, device)
+        self.op[1], index = rc.change_channel_size_conv(self.op[1], k, device=device)
+        self.op[2], _ = rc.change_features_bn(self.op[2], k, index, device=device)
 
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
@@ -171,8 +172,10 @@ class Pooling(nn.Module):
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
         """
-        self.op[1] = rc.reduce_bn_features(self.op[1], k, device)
-
+        # TODO: pooling for darts in pc-darts code base does not have a batch norm
+        # this is batchnorm is also not present in DARTS only in Drnas!
+        if k < 1:
+            self.op[1], _ = rc.change_features_bn(self.op[1], k, device=device)
 
 class DilConv(nn.Module):
     def __init__(
@@ -241,14 +244,22 @@ class DilConv(nn.Module):
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
         """
-        self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
-        self.op[2] = rc.reduce_conv_channels(self.op[2], k, device)
-        self.op[3] = rc.reduce_bn_features(self.op[3], k, device)
+        if k > 1:
+            self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
+            self.op[2] = rc.reduce_conv_channels(self.op[2], k, device)
+            self.op[3] = rc.reduce_bn_features(self.op[3], k, device)
+        else:
+            new_C_in = int(max(1, self.op[1].in_channels // k))
+            new_C_out = int(max(1, self.op[1].out_channels // k))
+            self.op[1], index = rc.out_channel_wider(self.op[1], new_C_out)
+            self.op[1].groups = new_C_in
+            self.op[2], _ = rc.in_channel_wider(self.op[2], new_C_in, index=index)
+            self.op[2], index = rc.out_channel_wider(self.op[2], new_C_out)
+            self.op[3], _ = rc.bn_wider(self.op[3], new_C_out, index=index)
 
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
         self.op[2].activate_lora(r)
-
 
 class SepConv(nn.Module):
     def __init__(
@@ -328,19 +339,36 @@ class SepConv(nn.Module):
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
         """
-        self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
-        self.op[2] = rc.reduce_conv_channels(self.op[2], k, device)
-        self.op[3] = rc.reduce_bn_features(self.op[3], k, device)
-        self.op[5] = rc.reduce_conv_channels(self.op[5], k, device)
-        self.op[6] = rc.reduce_conv_channels(self.op[6], k, device)
-        self.op[7] = rc.reduce_bn_features(self.op[7], k, device)
+        if k > 1:
+            self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
+            self.op[2] = rc.reduce_conv_channels(self.op[2], k, device)
+            self.op[3] = rc.reduce_bn_features(self.op[3], k, device)
+            self.op[5] = rc.reduce_conv_channels(self.op[5], k, device)
+            self.op[6] = rc.reduce_conv_channels(self.op[6], k, device)
+            self.op[7] = rc.reduce_bn_features(self.op[7], k, device)
+        else:
+            new_C_in = int(max(1, self.op[1].in_channels // k))  # type: ignore
+            new_C_out = int(max(1, self.op[1].out_channels // k))  # type: ignore
+            self.op[1], index = rc.out_channel_wider(self.op[1], new_C_out)
+            self.op[1].groups = new_C_in
+            self.op[2], _ = rc.in_channel_wider(self.op[2], new_C_in, index=index)
+            self.op[2], index = rc.out_channel_wider(self.op[2], new_C_out)
+            self.op[3], _ = rc.bn_wider(self.op[3], new_C_out, index=index)
+
+            self.op[5], index = rc.out_channel_wider(self.op[5], new_C_out)
+            self.op[5].groups = new_C_in
+            self.op[6], _ = rc.in_channel_wider(self.op[6], new_C_in, index=index)
+            self.op[6], index = rc.out_channel_wider(self.op[6], new_C_out)
+            self.op[7], _ = rc.bn_wider(self.op[7], new_C_out, index=index)
+
+        for op in self.op:
+            op.to(device)
 
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
         self.op[2].activate_lora(r)
         self.op[5].activate_lora(r)
         self.op[6].activate_lora(r)
-
 
 class Identity(nn.Module):
     def __init__(self) -> None:
@@ -492,14 +520,22 @@ class FactorizedReduce(nn.Module):
             This method dynamically changes the number of output channels in the block's
             convolutional layers and BatchNorm.
         """
-        self.conv_1 = rc.reduce_conv_channels(self.conv_1, k, device)
-        self.conv_2 = rc.reduce_conv_channels(self.conv_2, k, device)
-        self.bn = rc.reduce_bn_features(self.bn, k, device)
-
+        if k > 1:
+            self.conv_1 = rc.reduce_conv_channels(self.conv_1, k, device)
+            self.conv_2 = rc.reduce_conv_channels(self.conv_2, k, device)
+            self.bn = rc.reduce_bn_features(self.bn, k, device)
+        else:
+            new_C_in = int(max(1, self.conv_1.in_channels // k))
+            new_C_out = int(max(1, self.conv_1.out_channels // k))
+            self.conv_1, _ = rc.in_channel_wider(self.conv_1, new_C_in)
+            self.conv_1, index1 = rc.out_channel_wider(self.conv_1, new_C_out // 2)
+            self.conv_2, _ = rc.in_channel_wider(self.conv_2, new_C_in)
+            self.conv_2, index2 = rc.out_channel_wider(self.conv_2, new_C_out // 2)
+            self.bn, _ = rc.bn_wider(self.bn, new_C_out, index=torch.cat([index1, index2]))
+    
     def activate_lora(self, r: int) -> None:
         self.conv_1.activate_lora(r)
         self.conv_2.activate_lora(r)
-
 
 class Conv7x1Conv1x7BN(nn.Module):
     def __init__(
@@ -549,6 +585,7 @@ class Conv7x1Conv1x7BN(nn.Module):
         Note: This method is used for architectural search and adjusts the number of
         channels in the Convolution operation.
         """
-        self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
-        self.op[2] = rc.reduce_conv_channels(self.op[2], k, device)
-        self.op[3] = rc.reduce_bn_features(self.op[3], k, device)
+        if k > 1:
+            self.op[1] = rc.in_channel_wider(self.op[1], k, device)
+            self.op[2] = rc.reduce_conv_channels(self.op[2], k, device)
+            self.op[3] = rc.reduce_bn_features(self.op[3], k, device)
