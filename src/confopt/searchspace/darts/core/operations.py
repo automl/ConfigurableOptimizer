@@ -553,4 +553,5 @@ class Conv7x1Conv1x7BN(nn.Module):
         self.op[2] = rc.reduce_conv_channels(self.op[2], k, device)
         self.op[3] = rc.reduce_bn_features(self.op[3], k, device)
 
+
 OLES_OPS = [Zero, Pooling, Identity, SepConv, DilConv]

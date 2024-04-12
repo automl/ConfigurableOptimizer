@@ -106,7 +106,7 @@ class DARTSSearchSpace(SearchSpace):
         return self.model._discretize()  # type: ignore
 
     def get_genotype(self) -> DARTSGenotype:
-        return self.model.genotype() # type: ignore
+        return self.model.genotype()  # type: ignore
 
     def preserve_grads(self) -> None:
         self.model.apply(partial(preserve_grads))

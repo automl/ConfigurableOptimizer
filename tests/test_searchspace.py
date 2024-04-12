@@ -367,7 +367,7 @@ class TestDARTSSearchSpace(unittest.TestCase):
         )
 
         new_model = search_space.discretize()
-        new_model.drop_path_prob = 0.1 # type: ignore
+        new_model.drop_path_prob = 0.1  # type: ignore
 
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
         out, logits = new_model(x)
