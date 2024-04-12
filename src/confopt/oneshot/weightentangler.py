@@ -131,7 +131,7 @@ class WeightEntangler(OneShotComponent):
             kernel_sizes.add(m.kernel_size)
 
     def _forward_entangled_ops(
-        self, x: torch.Tensor, entangled_modules: list[nn.Module]
+        self, x: torch.Tensor, entangled_modules: list[WeightEntanglementModule]
     ) -> torch.Tensor:
         self._verify_modules(entangled_modules)
 
@@ -208,7 +208,9 @@ class WeightEntangler(OneShotComponent):
         non_we_outputs = [op(x) * op._alpha for op in non_we_candidate_ops]
 
         we_candidate_types = list({type(m) for m in we_candidate_ops})
-        we_candidate_ops_by_type: list[list[type]] = [[] for _ in we_candidate_types]
+        we_candidate_ops_by_type: list[list[WeightEntanglementModule]] = [
+            [] for _ in we_candidate_types
+        ]
 
         for idx, op_class in enumerate(we_candidate_types):
             we_candidate_ops_by_type[idx].extend(
