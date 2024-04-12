@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 import pytest
 import torch
+import numpy as np
 
 from confopt.oneshot.weightentangler import WeightEntangler
 from confopt.searchspace.darts.core.operations import (
@@ -148,8 +149,8 @@ class TestWeightEntangler(unittest.TestCase):
         entangler = WeightEntangler()
         x = torch.ones((1, 3, 7, 7))
         alphas = torch.Tensor([0.1, 0.2, 0.7])
-
         sep_convs = [SepConv(3, 1, k, 1, d) for k, d in zip([3, 5, 7], [1, 2, 3])]
+
         for sep_conv, alpha in zip(sep_convs, alphas):
             for op in sep_conv.op:
                 if hasattr(op, "weight"):
@@ -158,11 +159,17 @@ class TestWeightEntangler(unittest.TestCase):
                     op.bias.data = torch.ones_like(op.bias)
             sep_conv._alpha = alpha
 
+        out_normal = entangler._forward_entangled_ops(x, sep_convs)
+        out_normal2 = entangler._forward_entangled_ops(x, sep_convs)
+        assert np.allclose(out_normal.detach().numpy(), out_normal2.detach().numpy())
+
+        for sep_conv, alpha in zip(sep_convs, alphas):
             sep_conv.op[1].activate_lora(r=1)
             sep_conv.op[1].lora_A.data = torch.ones_like(sep_conv.op[1].lora_A)
             sep_conv.op[1].lora_B.data = torch.ones_like(sep_conv.op[1].lora_B)
 
-        out = entangler._forward_entangled_ops(x, sep_convs)
+        out_we = entangler._forward_entangled_ops(x, sep_convs)
+        assert not np.allclose(out_normal.detach().numpy(), out_we.detach().numpy())
 
         expected_new_weights = torch.ones_like(sep_conv.op[1].weight)
         expected_new_weights *= alphas[2]
