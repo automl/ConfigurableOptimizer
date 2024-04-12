@@ -10,6 +10,7 @@ ADVERSERIAL_DATA = (
     torch.randn(2, 3, 32, 32).to(DEVICE),
     torch.randint(0, 9, (2,)).to(DEVICE),
 )
+INIT_CHANNEL_NUM = 16
 
 
 class ProfileConfig:
@@ -191,6 +192,12 @@ class ProfileConfig:
             self.partial_connector_config[config_key] = kwargs[  # type: ignore
                 config_key
             ]
+        if not hasattr(self, "searchspace_config"):
+            self.searchspace_config = {}
+        if "C" in self.trainer_config:
+            self.searchspace_config["C"] = self.trainer_config["C"] // kwargs["k"]
+        else:
+            self.searchspace_config["C"] = INIT_CHANNEL_NUM // kwargs["k"]
 
     def configure_trainer(self, **kwargs) -> None:  # type: ignore
         for config_key in kwargs:
@@ -215,7 +222,10 @@ class ProfileConfig:
 
     @abstractmethod
     def set_searchspace_config(self, config: dict) -> None:
-        self.searchspace_config = config
+        if not hasattr(self, "searchspcae_config"):
+            self.searchspace_config = config
+        else:
+            self.searchspace_config.update(config)
 
     @abstractmethod
     def configure_extra_config(self, config: dict) -> None:
