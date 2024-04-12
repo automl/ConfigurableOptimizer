@@ -172,10 +172,7 @@ class Pooling(nn.Module):
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
         """
-        # TODO: pooling for darts in pc-darts code base does not have a batch norm
-        # this is batchnorm is also not present in DARTS only in Drnas!
-        if k < 1:
-            self.op[1], _ = rc.change_features_bn(self.op[1], k, device=device)
+        self.op[1], _ = rc.change_features_bn(self.op[1], k, device=device)
 
 class DilConv(nn.Module):
     def __init__(
