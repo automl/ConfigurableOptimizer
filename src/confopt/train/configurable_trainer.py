@@ -116,6 +116,7 @@ class ConfigurableTrainer:
             ), "Value of r should be greater than 0"
             is_warm_epoch = True
         warm_epochs = lora_warm_epochs
+
         if search_space_handler.partial_connector:
             warm_epochs = max(
                 search_space_handler.partial_connector.num_warm_epoch, lora_warm_epochs
@@ -123,7 +124,6 @@ class ConfigurableTrainer:
             is_warm_epoch = True
 
         layer_alignment_scores = (AverageMeter(), AverageMeter())
-
         for epoch in range(self.start_epoch + 1, self.epochs + 1):
             epoch_str = f"{epoch:03d}-{self.epochs:03d}"
             if epoch == warm_epochs + 1:
