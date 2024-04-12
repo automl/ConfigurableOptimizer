@@ -7,7 +7,6 @@ from torch import nn
 
 from confopt.searchspace.common.base_search import SearchSpace
 
-from .core import NB201SearchModel
 from .core.genotypes import Structure as NB201Gynotype
 from .core.model_search import NB201SearchModel, check_grads_cosine, preserve_grads
 
