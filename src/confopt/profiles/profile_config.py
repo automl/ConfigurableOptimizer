@@ -268,6 +268,12 @@ class BaseProfile:
             self.partial_connector_config[config_key] = kwargs[  # type: ignore
                 config_key
             ]
+        if not hasattr(self, "searchspace_config"):
+            self.searchspace_config = {}
+        if "C" in self.trainer_config:
+            self.searchspace_config["C"] = self.trainer_config["C"] // kwargs["k"]
+        else:
+            self.searchspace_config["C"] = INIT_CHANNEL_NUM // kwargs["k"]
 
     def configure_trainer(self, **kwargs) -> None:  # type: ignore
         for config_key in kwargs:
