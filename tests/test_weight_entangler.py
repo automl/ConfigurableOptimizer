@@ -112,16 +112,20 @@ class TestWeightEntangler(unittest.TestCase):
 
     def test_forward_entangled_ops(self) -> None:
         entangler = WeightEntangler()
-        x = torch.ones((2, 32, 10, 10))
+        x = torch.ones((1, 3, 7, 7))
         alphas = torch.Tensor([0.1, 0.2, 0.7])
 
-        sep_convs = [SepConv(32, 32, k, 1, d) for k, d in zip([3, 5, 7], [1, 2, 3])]
+        sep_convs = [SepConv(3, 1, k, 1, d) for k, d in zip([3, 5, 7], [1, 2, 3])]
         for sep_conv, alpha in zip(sep_convs, alphas):
-            sep_conv.op[1].weight.data = torch.ones_like(sep_conv.op[1].weight)
-            sep_conv.op[5].weight.data = torch.ones_like(sep_conv.op[5].weight)
+
+            for op in sep_conv.op:
+                if hasattr(op, "weight"):
+                    op.weight.data = torch.ones_like(op.weight)
+                if hasattr(op, "bias") and op.bias is not None:
+                    op.bias.data = torch.ones_like(op.bias)
             sep_conv._alpha = alpha
 
-        entangler._forward_entangled_ops(x, sep_convs)
+        out = entangler._forward_entangled_ops(x, sep_convs)
 
         expected_new_weights = torch.ones_like(sep_conv.op[1].weight)
         expected_new_weights *= alphas[2]
@@ -139,6 +143,42 @@ class TestWeightEntangler(unittest.TestCase):
         assert (entangler.original_weights[1] == sep_convs[2].op[1].weight).all()
         assert (entangler.original_weights[5] == sep_convs[2].op[5].weight).all()
         assert (entangler.new_weights[1] == expected_new_weights).all()
+
+    def test_forward_entangled_ops_with_lora(self) -> None:
+        entangler = WeightEntangler()
+        x = torch.ones((1, 3, 7, 7))
+        alphas = torch.Tensor([0.1, 0.2, 0.7])
+
+        sep_convs = [SepConv(3, 1, k, 1, d) for k, d in zip([3, 5, 7], [1, 2, 3])]
+        for sep_conv, alpha in zip(sep_convs, alphas):
+            for op in sep_conv.op:
+                if hasattr(op, "weight"):
+                    op.weight.data = torch.ones_like(op.weight)
+                if hasattr(op, "bias") and op.bias is not None:
+                    op.bias.data = torch.ones_like(op.bias)
+            sep_conv._alpha = alpha
+
+            sep_conv.op[1].activate_lora(r=1)
+            sep_conv.op[1].lora_A.data = torch.ones_like(sep_conv.op[1].lora_A)
+            sep_conv.op[1].lora_B.data = torch.ones_like(sep_conv.op[1].lora_B)
+
+        out = entangler._forward_entangled_ops(x, sep_convs)
+
+        expected_new_weights = torch.ones_like(sep_conv.op[1].weight)
+        expected_new_weights *= alphas[2]
+        expected_new_weights[:, :, 1:6, 1:6] += (
+            sep_conv.op[1].weight[:, :, 1:6, 1:6] * alphas[1]
+        )
+        expected_new_weights[:, :, 2:5, 2:5] += (
+            sep_conv.op[1].weight[:, :, 2:5, 2:5] * alphas[0]
+        )
+
+        assert len(entangler.original_weights) == 2
+        assert set([1, 5]) == set(entangler.original_weights.keys())
+        assert (entangler.original_weights[1] == sep_convs[2].op[1].weight).all()
+        assert (entangler.original_weights[5] == sep_convs[2].op[5].weight).all()
+        assert (entangler.new_weights[1] == expected_new_weights).all()
+
 
     def test_forward_entangled_ops_illegal_inputs(self) -> None:
         entangler = WeightEntangler()
