@@ -50,12 +50,12 @@ class NB301Benchmark(BenchmarkBase):
             )
 
     def query(
-        self, genotype: Genotype, dataset: str = "cifar10"
+        self, genotype: Genotype, dataset: str = "cifar10", **api_kwargs: str
     ) -> tuple[float, float, float]:
         if dataset != "cifar10":
             raise ValueError(f"Dataset {dataset} is not supported with NB301 API")
         result_test = self.api.predict(
-            config=genotype, representation="genotype", with_noise=True
+            config=genotype, representation="genotype", **api_kwargs
         )
         return 0.0, 0.0, result_test
 

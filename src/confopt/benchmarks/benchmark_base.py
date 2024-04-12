@@ -10,7 +10,10 @@ class BenchmarkBase:
 
     @abstractmethod
     def query(
-        self, genotype: Any, dataset: str = "cifar10"
+        self,
+        genotype: Any,
+        dataset: str = "cifar10",
+        **api_kwargs: str,  # type: ignore
     ) -> tuple[float, float, float]:
         pass
 

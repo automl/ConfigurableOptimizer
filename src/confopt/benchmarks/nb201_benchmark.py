@@ -14,18 +14,21 @@ from .benchmark_base import BenchmarkBase
 class NB201Benchmark(BenchmarkBase):
     def __init__(self) -> None:
         self.api_dir = "api/nb201"
-        self.api_file_name = "NAS-Bench-201-v1_1-096897.pth"
+        # self.api_file_name = "NAS-Bench-201-v1_1-096897.pth" # newer version
+        self.api_file_name = "NAS-Bench-201-v1_0-e61699.pth"
         self.api_path = f"{self.api_dir}/{self.api_file_name}"
         self.download_api()
         api = NASBench201API(self.api_path)
         super().__init__(api)
 
     def download_api(self) -> None:
-        file_id = "16Y0UwGisiouVRxW-W5hEtbxmcHw_0hF_"
+        # file_id = "16Y0UwGisiouVRxW-W5hEtbxmcHw_0hF_" # newer version (4.7 GB)
+        file_id = "1SKW0Cu0u8-gb18zDpaAGi0f74UdXeGKs"  # older version (2.2 GB)
         if not os.path.exists(self.api_path):
             os.makedirs(self.api_dir)
             gdown.download(
-                f"https://drive.google.com/uc?id={file_id}", output=self.api_path
+                f"https://drive.google.com/uc?id={file_id}",
+                output=self.api_path,
             )
 
     def query(
@@ -34,6 +37,7 @@ class NB201Benchmark(BenchmarkBase):
         dataset: Literal[  # type: ignore
             "cifar10", "cifar100", "imagenet16"
         ] = "cifar10",
+        **api_kwargs: str,  # noqa: ARG002
     ) -> tuple[float, float, float]:
         result = self.api.query_by_arch(genotype, hp="200")
         result_train, result_valid, result_test = self._distill_result(  # type: ignore
