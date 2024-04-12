@@ -201,3 +201,10 @@ def reduce_bn_features(
         ].clone()
 
     return reduced_batchnorm
+
+
+def reduce_ops_channel_size(ops: list[nn.Module], k: int) -> list[nn.Module]:
+    for op in ops:
+        if not (isinstance(op, (nn.AvgPool2d, nn.MaxPool2d))):
+            op.change_channel_size(k, DEVICE)  # type: ignore
+    return ops
