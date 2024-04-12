@@ -66,7 +66,7 @@ class ConfigurableTrainer:
         self.epochs = epochs
         self.debug_mode = debug_mode
 
-    def train(  # noqa: C901, PLR0915
+    def train(  # noqa: C901, PLR0915, PLR0912
         self,
         profile: Profile,
         epochs: int,
@@ -105,11 +105,17 @@ class ConfigurableTrainer:
                 profile.lora_configs.get("r", 0) > 0
             ), "Value of r should be greater than 0"
             is_warm_epoch = True
-
+        warm_epochs = lora_warm_epochs
+        if profile.partial_connector:
+            warm_epochs = max(
+                profile.partial_connector.num_warm_epoch, lora_warm_epochs
+            )
+            is_warm_epoch = True
         for epoch in range(self.start_epoch + 1, self.epochs + 1):
             epoch_str = f"{epoch:03d}-{self.epochs:03d}"
-            if lora_warm_epochs > 0 and epoch == lora_warm_epochs:
-                self._initialize_lora_modules(lora_warm_epochs, profile, network)
+            if epoch == warm_epochs + 1:
+                if lora_warm_epochs > 0:
+                    self._initialize_lora_modules(lora_warm_epochs, profile, network)
                 is_warm_epoch = False
 
             self._component_new_step_or_epoch(network, calling_frequency="epoch")
@@ -197,7 +203,7 @@ class ConfigurableTrainer:
             epoch_time.update(time.time() - start_time)
             start_time = time.time()
 
-    def train_func(
+    def train_func(  # noqa: PLR0912, PLR0915, C901
         self,
         profile: Profile,
         train_loader: DataLoaderType,
