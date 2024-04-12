@@ -6,6 +6,7 @@ from confopt.oneshot.archsampler import BaseSampler, DARTSSampler, GDASSampler
 from confopt.oneshot.dropout import Dropout
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import BasePerturbator
+from confopt.oneshot.weightentangler import WeightEntangler
 from confopt.searchspace import DARTSSearchSpace
 from confopt.searchspace.common import (
     LoRALayer,
@@ -23,6 +24,7 @@ class Profile:
         partial_connector: PartialConnector | None = None,
         perturbation: BasePerturbator | None = None,
         dropout: Dropout | None = None,
+        weight_entangler: WeightEntangler | None = None,
         lora_configs: dict | None = None,
     ) -> None:
         self.sampler = sampler
@@ -30,6 +32,7 @@ class Profile:
         self.partial_connector = partial_connector
         self.perturbation = perturbation
         self.dropout = dropout
+        self.weight_entangler = weight_entangler
         self.lora_configs = lora_configs
 
         self.is_argmax_sampler = False
@@ -77,9 +80,10 @@ class Profile:
     ) -> OperationBlock:
         op_block = OperationBlock(
             ops,
-            is_reduction_cell,
-            self.partial_connector,
-            self.dropout,
+            is_reduction_cell=is_reduction_cell,
+            partial_connector=self.partial_connector,
+            dropout=self.dropout,
+            weight_entangler=self.weight_entangler,
             is_argmax_sampler=self.is_argmax_sampler,
         )
         return op_block
