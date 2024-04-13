@@ -25,6 +25,9 @@ class NoiseOp(nn.Module):
         noise = noise.to(DEVICE)
         return noise
 
+    def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
+        pass
+
 
 def drop_path(x: torch.Tensor, drop_prob: float) -> torch.Tensor:
     if drop_prob > 0.0:
