@@ -40,6 +40,7 @@ from confopt.searchspace import (
     NASBench1Shot1SearchSpace,
     NASBench201Model,
     NASBench201SearchSpace,
+    RobustDARTSSearchSpace,
     SearchSpace,
     TransNASBench101SearchSpace,
 )
@@ -62,6 +63,7 @@ class SearchSpaceType(Enum):
     NB1SHOT1 = "nb1shot1"
     TNB101 = "tnb101"
     BABYDARTS = "baby_darts"
+    RobustDARTS = "robust_darts"
 
 
 class ModelType(Enum):
@@ -325,6 +327,8 @@ class Experiment:
             self.search_space = TransNASBench101SearchSpace(**config)
         elif search_space == SearchSpaceType.BABYDARTS:
             self.search_space = BabyDARTSSearchSpace(**config)
+        elif search_space == SearchSpaceType.RobustDARTS:
+            self.search_space = RobustDARTSSearchSpace(**config)
 
     def set_sampler(
         self,
