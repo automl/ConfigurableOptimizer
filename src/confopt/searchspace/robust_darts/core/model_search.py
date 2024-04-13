@@ -6,7 +6,7 @@ from torch.autograd import Variable
 import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common.mixop import OperationChoices
-from confopt.searchspace.darts.core.genotypes import Genotype
+from confopt.searchspace.darts.core.genotypes import DARTSGenotype
 from confopt.searchspace.darts.core.operations import FactorizedReduce, ReLUConvBN
 
 from .operations import OPS, drop_path
@@ -20,8 +20,6 @@ class MixedOp(nn.Module):
         self._ops = nn.ModuleList()
         for primitive in primitives:
             op = OPS[primitive](C, stride, False)
-            if "pool" in primitive:
-                op = nn.Sequential(op, nn.BatchNorm2d(C, affine=False))
             self._ops.append(op)
 
     def forward(self, x: torch.Tensor, weights: torch.Tensor) -> torch.Tensor:
@@ -276,7 +274,7 @@ class Network(nn.Module):
     def arch_parameters(self) -> list[Variable]:
         return self._arch_parameters
 
-    def genotype(self) -> Genotype:
+    def genotype(self) -> DARTSGenotype:
         def _parse(weights: torch.Tensor, normal: bool = True) -> list[tuple[str, int]]:
             primitives = self.primitives[
                 "primitives_normal" if normal else "primitives_reduct"
@@ -329,7 +327,7 @@ class Network(nn.Module):
         )
 
         concat = range(2 + self._steps - self._multiplier, self._steps + 2)
-        genotype = Genotype(
+        genotype = DARTSGenotype(
             normal=gene_normal,
             normal_concat=concat,
             reduce=gene_reduce,

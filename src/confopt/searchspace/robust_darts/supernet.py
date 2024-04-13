@@ -4,6 +4,7 @@ import torch
 from torch import nn
 
 from confopt.searchspace.common.base_search import SearchSpace
+from confopt.searchspace.darts.core.genotypes import DARTSGenotype
 
 from .core import RobustDARTSSearchModel
 from .core.spaces import spaces_dict
@@ -109,3 +110,6 @@ class RobustDARTSSearchSpace(SearchSpace):
 
     def discretize(self) -> nn.Module:
         return self.model._discretize()  # type: ignore
+
+    def get_genotype(self) -> DARTSGenotype:
+        return self.model.genotype()  # type: ignore
