@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from functools import partial
-
 import torch
 from torch import nn
 
@@ -109,7 +107,7 @@ class DARTSSearchSpace(SearchSpace):
         return self.model.genotype()  # type: ignore
 
     def preserve_grads(self) -> None:
-        self.model.apply(partial(preserve_grads))
+        self.model.apply(preserve_grads)
 
     def check_grads_cosine(self) -> None:
         self.model.apply(check_grads_cosine)
