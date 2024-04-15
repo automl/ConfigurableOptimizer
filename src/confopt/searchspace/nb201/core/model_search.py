@@ -441,11 +441,6 @@ def check_grads_cosine(m: nn.Module) -> None:
     ):
         return
 
-    # for op in OLES_OPS:
-    #     if isinstance(m, op):
-    #         flag = 1
-    #         break
-
     i = 0
     true_i = 0
     temp = 0
@@ -455,8 +450,6 @@ def check_grads_cosine(m: nn.Module) -> None:
             g = param.grad.detach().cpu()
             if len(g) != 0:
                 temp += torch.cosine_similarity(g, m.pre_grads[i], dim=0).mean()
-                # import pdb
-                # pdb.set_trace()
                 true_i += 1
             i += 1
 
