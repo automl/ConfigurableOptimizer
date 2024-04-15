@@ -17,6 +17,7 @@ from confopt.utils.normalize_params import normalize_params
 from .cells import NAS201SearchCell as SearchCell
 from .genotypes import Structure
 from .operations import NAS_BENCH_201, OLES_OPS, ResNetBasicblock
+from .model import NASBench201Model
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -38,7 +39,6 @@ class NB201SearchModel(nn.Module):
         BatchNorm in cells. Defaults to False.
         edge_normalization (bool, optional): Whether to enable edge normalization for
         partial connection. Defaults to False.
-        discretized (int): shows if we have a supernet or a discretized search space
         with one operation on each edge
 
     Attributes:
@@ -68,7 +68,6 @@ class NB201SearchModel(nn.Module):
         affine: bool = False,
         track_running_stats: bool = False,
         edge_normalization: bool = False,
-        discretized: bool = False,
     ):
         super().__init__()
         self._C = C
@@ -78,7 +77,6 @@ class NB201SearchModel(nn.Module):
         self.affine = affine
         self.track_running_stats = track_running_stats
         self.edge_normalization = edge_normalization
-        self.discretized = discretized
         self.mask: None | torch.Tensor = None
         self.stem = nn.Sequential(
             nn.Conv2d(3, C, kernel_size=3, padding=1, bias=False),
@@ -252,9 +250,6 @@ class NB201SearchModel(nn.Module):
             - The output tensor after the forward pass.
             - The logits tensor produced by the model.
         """
-        if self.discretized:
-            return self.discrete_model_forward(inputs)
-
         if self.edge_normalization:
             return self.edge_normalization_forward(inputs)
 
@@ -269,20 +264,6 @@ class NB201SearchModel(nn.Module):
                 feature = cell(feature, alphas)
             else:
                 feature = cell(feature)
-
-        out = self.lastact(feature)
-        out = self.global_pooling(out)
-        out = out.view(out.size(0), -1)
-        logits = self.classifier(out)
-
-        return out, logits
-
-    def discrete_model_forward(
-        self, inputs: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        feature = self.stem(inputs)
-        for _i, cell in enumerate(self.cells):
-            feature = cell(feature)
 
         out = self.lastact(feature)
         out = self.global_pooling(out)
@@ -361,24 +342,15 @@ class NB201SearchModel(nn.Module):
         if self.arch_parameters.data[~self.mask].grad:  # type: ignore
             self.arch_parameters.data[~self.mask].grad.zero_()  # type: ignore
 
-    def _discretize(self) -> NB201SearchModel:
-        discrete_model = NB201SearchModel(
+    def _discretize(self) -> NASBench201Model:
+        genotype = self.genotype()
+
+        discrete_model = NASBench201Model(
             C=self._C,
             N=self._layerN,
-            max_nodes=self.max_nodes,
+            genotype=genotype,
             num_classes=self.classifier.out_features,
-            steps=self._steps,
-            search_space=NAS_BENCH_201,
-            affine=self.affine,
-            track_running_stats=self.track_running_stats,
-            edge_normalization=False,
-            discretized=True,  # TODO: do we need this?
         ).to(next(self.parameters()).device)
-
-        for cell in discrete_model.cells:
-            if isinstance(cell, SearchCell):
-                cell._discretize(self.arch_parameters)  # type: ignore
-        discrete_model.arch_parameters = None
 
         return discrete_model
 
