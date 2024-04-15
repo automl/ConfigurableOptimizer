@@ -11,6 +11,7 @@ import torch
 from torch.backends import cudnn
 import wandb
 
+from confopt.benchmarks import NB201Benchmark, NB301Benchmark
 from confopt.dataset import (
     CIFAR10Data,
     CIFAR100Data,
@@ -26,6 +27,7 @@ from confopt.oneshot.archsampler import (
 from confopt.oneshot.dropout import Dropout
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import SDARTSPerturbator
+from confopt.oneshot.weightentangler import WeightEntangler
 from confopt.profiles import (
     DiscreteProfile,
     GDASProfile,
@@ -41,6 +43,7 @@ from confopt.searchspace import (
     NASBench1Shot1SearchSpace,
     NASBench201Model,
     NASBench201SearchSpace,
+    RobustDARTSSearchSpace,
     SearchSpace,
     TransNASBench101SearchSpace,
 )
@@ -63,6 +66,7 @@ class SearchSpaceType(Enum):
     NB1SHOT1 = "nb1shot1"
     TNB101 = "tnb101"
     BABYDARTS = "baby_darts"
+    RobustDARTS = "robust_darts"
 
 
 class ModelType(Enum):
@@ -149,6 +153,7 @@ class Experiment:
         start_epoch: int = 0,
         load_saved_model: bool = False,
         load_best_model: bool = False,
+        use_benchmark: bool = True,
     ) -> ConfigurableTrainer:
         config = profile.get_config()
 
@@ -158,12 +163,14 @@ class Experiment:
         self.is_partial_connection = profile.is_partial_connection
         self.dropout = profile.dropout
         self.edge_normalization = profile.is_partial_connection
+        self.entangle_op_weights = profile.entangle_op_weights
         assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
         return self.runner(
             config,
             start_epoch,
             load_saved_model,
             load_best_model,
+            use_benchmark,
         )
 
     def runner(
@@ -172,6 +179,7 @@ class Experiment:
         start_epoch: int = 0,
         load_saved_model: bool = False,
         load_best_model: bool = False,
+        use_benchmark: bool = True,
     ) -> ConfigurableTrainer:
         assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
 
@@ -208,6 +216,7 @@ class Experiment:
             self.sampler_str,
             self.perturbator_str,
             config=config,
+            use_benchmark=use_benchmark,
         )
         if self.is_wandb_log:
             wandb.init(  # type: ignore
@@ -280,6 +289,8 @@ class Experiment:
             checkpointing_freq=arg_config.checkpointing_freq,  # type: ignore
             epochs=arg_config.epochs,  # type: ignore
             debug_mode=self.debug_mode,
+            query_dataset=self.dataset_str.value,
+            benchmark_api=self.benchmark_api,
         )
 
         trainer.train(
@@ -299,16 +310,22 @@ class Experiment:
         sampler_enum: SamplerType,
         perturbator_enum: PerturbatorType,
         config: dict | None = None,
+        use_benchmark: bool = True,
     ) -> None:
         if config is None:
             config = {}  # type : ignore
         self.set_search_space(search_space_enum, config.get("search_space", {}))
         self.set_sampler(sampler_enum, config.get("sampler", {}))
-
         self.set_perturbator(perturbator_enum, config.get("perturbator", {}))
-
         self.set_partial_connector(config.get("partial_connector", {}))
         self.set_dropout(config.get("dropout", {}))
+
+        if use_benchmark:
+            self.set_benchmark_api(search_space_enum, config.get("benchmark", {}))
+        else:
+            self.benchmark_api = None
+
+        self.set_weight_entangler()
         self.set_profile(config)
 
     def set_search_space(
@@ -326,6 +343,20 @@ class Experiment:
             self.search_space = TransNASBench101SearchSpace(**config)
         elif search_space == SearchSpaceType.BABYDARTS:
             self.search_space = BabyDARTSSearchSpace(**config)
+        elif search_space == SearchSpaceType.RobustDARTS:
+            self.search_space = RobustDARTSSearchSpace(**config)
+
+    def set_benchmark_api(
+        self,
+        search_space: SearchSpaceType,
+        config: dict,
+    ) -> None:
+        if search_space == SearchSpaceType.NB201:
+            self.benchmark_api = NB201Benchmark()
+        elif search_space == SearchSpaceType.DARTS:
+            self.benchmark_api = NB301Benchmark(**config)
+        else:
+            print(f"Benchmark does not exist for the {search_space.value} searchspace")
 
     def set_sampler(
         self,
@@ -369,6 +400,9 @@ class Experiment:
         else:
             self.dropout = None
 
+    def set_weight_entangler(self) -> None:
+        self.weight_entangler = WeightEntangler() if self.entangle_op_weights else None
+
     def set_profile(self, config: dict) -> None:
         assert self.sampler is not None
 
@@ -378,6 +412,7 @@ class Experiment:
             partial_connector=self.partial_connector,
             perturbation=self.perturbator,
             dropout=self.dropout,
+            weight_entangler=self.weight_entangler,
             lora_configs=config.get("lora"),
         )
 

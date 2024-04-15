@@ -12,6 +12,7 @@ from .genotypes import BABY_PRIMITIVES, PRIMITIVES, DARTSGenotype
 from .model import NetworkCIFAR, NetworkImageNet
 from .operations import OLES_OPS, OPS, FactorizedReduce, Identity, ReLUConvBN
 
+
 NUM_CIFAR_CLASSES = 10
 NUM_CIFAR100_CLASSES = 100
 NUM_IMAGENET_CLASSES = 120
