@@ -25,7 +25,8 @@ class NB201Benchmark(BenchmarkBase):
         # file_id = "16Y0UwGisiouVRxW-W5hEtbxmcHw_0hF_" # newer version (4.7 GB)
         file_id = "1SKW0Cu0u8-gb18zDpaAGi0f74UdXeGKs"  # older version (2.2 GB)
         if not os.path.exists(self.api_path):
-            os.makedirs(self.api_dir)
+            if not os.path.exists(self.api_dir):
+                os.makedirs(self.api_dir)
             gdown.download(
                 f"https://drive.google.com/uc?id={file_id}",
                 output=self.api_path,
