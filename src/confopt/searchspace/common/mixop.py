@@ -46,12 +46,12 @@ class OperationBlock(nn.Module):
     ) -> None:
         super().__init__()
         self.device = device
-        # if partial_connector:
-        #     for op in ops:
-        #         if not (isinstance(op, (nn.AvgPool2d, nn.MaxPool2d))):
-        #             op.change_channel_size(
-        #                 partial_connector.k, self.device  # type: ignore
-        #             )
+        if partial_connector:
+            for op in ops:
+                if not (isinstance(op, (nn.AvgPool2d, nn.MaxPool2d))):
+                    op.change_channel_size(
+                        partial_connector.k, self.device  # type: ignore
+                    )
         self.ops = ops
         self.partial_connector = partial_connector
         self.is_reduction_cell = is_reduction_cell
