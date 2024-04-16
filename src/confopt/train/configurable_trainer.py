@@ -75,11 +75,9 @@ class ConfigurableTrainer:
     def train(  # noqa: C901, PLR0915, PLR0912
         self,
         profile: Profile,
-        epochs: int,
         is_wandb_log: bool = True,
         lora_warm_epochs: int = 0,
     ) -> None:
-        self.epochs = epochs
         profile.adapt_search_space(self.model)
 
         if self.load_saved_model or self.load_best_model or self.start_epoch != 0:
