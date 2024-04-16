@@ -7,6 +7,7 @@ from .nb1shot1.supernet import NASBench1Shot1SearchSpace  # type: ignore
 from .nb201.core import NASBench201Model  # type: ignore
 from .nb201.core.genotypes import Structure as NAS201Genotype
 from .nb201.supernet import NASBench201SearchSpace  # type: ignore
+from .robust_darts.supernet import RobustDARTSSearchSpace  # type: ignore
 from .tnb101.supernet import TransNASBench101SearchSpace  # type: ignore
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     "NASBench201Model",
     "NAS201Genotype",
     "BabyDARTSSearchSpace",
+    "RobustDARTSSearchSpace",
 ]

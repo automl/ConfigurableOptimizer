@@ -22,6 +22,7 @@ class ProfileConfig:
         dropout: float | None = None,
         perturbation: str | None = None,
         perturbator_sample_frequency: str = "epoch",
+        entangle_op_weights: bool = False,
         lora_rank: int = 0,
         lora_warm_epochs: int = 0,
     ) -> None:
@@ -34,6 +35,7 @@ class ProfileConfig:
         self._set_lora_configs(lora_rank)
         self._set_dropout(dropout)
         self._set_perturb(perturbation, perturbator_sample_frequency)
+        self.entangle_op_weights = entangle_op_weights
 
     def _set_lora_configs(
         self,

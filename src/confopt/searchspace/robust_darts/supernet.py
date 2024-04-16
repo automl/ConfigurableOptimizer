@@ -4,22 +4,23 @@ import torch
 from torch import nn
 
 from confopt.searchspace.common.base_search import SearchSpace
+from confopt.searchspace.darts.core.genotypes import DARTSGenotype
 
-from .core import DARTSSearchModel
-from .core.genotypes import DARTSGenotype
-from .core.model_search import check_grads_cosine, preserve_grads
+from .core import RobustDARTSSearchModel
+from .core.spaces import spaces_dict
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
-class DARTSSearchSpace(SearchSpace):
-    def __init__(self, *args, **kwargs):  # type: ignore
-        """DARTS Search Space for Neural Architecture Search.
+class RobustDARTSSearchSpace(SearchSpace):
+    def __init__(self, space: str = "s1", *args, **kwargs):  # type: ignore
+        """Robust-DARTS Search Space for Neural Architecture Search.
 
         This class represents a search space for neural architecture search using
         DARTS (Differentiable Architecture Search).
 
         Args:
+            space: The space to use (s1, s2, s3, s4)
             *args: Variable length positional arguments. These arguments will be
                 passed to the constructor of the internal DARTSSearchModel.
             **kwargs: Variable length keyword arguments. These arguments will be
@@ -53,7 +54,14 @@ class DARTSSearchSpace(SearchSpace):
                                     edge_normalization=True,
                                     dropout=0.2)
         """
-        model = DARTSSearchModel(*args, **kwargs).to(DEVICE)
+        try:
+            primitives = spaces_dict[space]
+        except KeyError as err:
+            raise ValueError(
+                f"Invalid space {space}. Available spaces are {spaces_dict.keys()}"
+            ) from err
+
+        model = RobustDARTSSearchModel(primitives, *args, **kwargs).to(DEVICE)
         super().__init__(model)
 
     @property
@@ -105,9 +113,3 @@ class DARTSSearchSpace(SearchSpace):
 
     def get_genotype(self) -> DARTSGenotype:
         return self.model.genotype()  # type: ignore
-
-    def preserve_grads(self) -> None:
-        self.model.apply(preserve_grads)
-
-    def check_grads_cosine(self) -> None:
-        self.model.apply(check_grads_cosine)

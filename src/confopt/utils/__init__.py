@@ -88,6 +88,11 @@ def get_num_classes(dataset: str) -> int:
     return num_classes
 
 
+def freeze(m: torch.nn.Module) -> None:
+    for param in m.parameters():
+        param.requires_grad_(False)
+
+
 __all__ = [
     "calc_accuracy",
     "save_checkpoint",

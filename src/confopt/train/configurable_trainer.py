@@ -7,7 +7,9 @@ from fvcore.common.checkpoint import Checkpointer, PeriodicCheckpointer
 import torch
 from torch import nn
 from typing_extensions import TypeAlias
+import wandb
 
+from confopt.benchmarks import BenchmarkBase
 from confopt.dataset import AbstractData
 from confopt.searchspace import SearchSpace
 from confopt.utils import AverageMeter, Logger, calc_accuracy
@@ -44,6 +46,8 @@ class ConfigurableTrainer:
         checkpointing_freq: int = 2,
         epochs: int = 100,
         debug_mode: bool = False,
+        query_dataset: str = "cifar10",
+        benchmark_api: BenchmarkBase | None = None,
     ) -> None:
         self.model = model
         self.model_optimizer = model_optimizer
@@ -65,6 +69,8 @@ class ConfigurableTrainer:
         self.checkpointing_freq = checkpointing_freq
         self.epochs = epochs
         self.debug_mode = debug_mode
+        self.query_dataset = query_dataset
+        self.benchmark_api = benchmark_api
 
     def train(  # noqa: C901, PLR0915, PLR0912
         self,
@@ -194,6 +200,8 @@ class ConfigurableTrainer:
                     genotype, epoch, self.checkpointing_freq, save_best_model=True
                 )
 
+            self.log_benchmark_result(network, is_wandb_log)
+
             if not is_warm_epoch:
                 with torch.no_grad():
                     for i, alpha in enumerate(self.model.arch_parameters):
@@ -269,9 +277,15 @@ class ConfigurableTrainer:
                     top5_meter=arch_top5,
                 )
 
-                # update the model weights
-                w_optimizer.zero_grad()
-                arch_optimizer.zero_grad()
+            # calculate gm_score
+            if isinstance(network, nn.DataParallel):
+                network.module.check_grads_cosine()  # type: ignore
+            else:
+                network.check_grads_cosine()  # type: ignore
+
+            # update the model weights
+            w_optimizer.zero_grad()
+            arch_optimizer.zero_grad()
 
             _, logits = network(base_inputs)
             base_loss = criterion(logits, base_targets)
@@ -285,6 +299,12 @@ class ConfigurableTrainer:
                 torch.nn.utils.clip_grad_norm_(network.model_weight_parameters(), 5)
 
             w_optimizer.step()
+
+            # save grads of operations
+            if isinstance(network, nn.DataParallel):
+                network.module.preserve_grads()  # type: ignore
+            else:
+                network.preserve_grads()  # type: ignore
 
             w_optimizer.zero_grad()
             if not is_warm_epoch:
@@ -512,6 +532,32 @@ class ConfigurableTrainer:
             model.new_epoch()
         elif calling_frequency == "step":
             model.new_step()
+
+    def log_benchmark_result(
+        self, network: torch.nn.Module, is_wandb_log: bool = False
+    ) -> None:
+        if self.benchmark_api is None:
+            return
+        genotype = (
+            network.module.model.genotype()
+            if self.use_data_parallel
+            else network.model.genotype()
+        )
+        result_train, rusult_valid, result_test = self.benchmark_api.query(
+            genotype, dataset=self.query_dataset
+        )
+        self.logger.log(
+            f"Benchmark Results for {self.query_dataset} -> train: {result_train}, "
+            + f"valid: {rusult_valid}, test: {result_test}"
+        )
+
+        if is_wandb_log:
+            log_dict = {
+                "benchmark/train": result_train,
+                "benchmark/valid": rusult_valid,
+                "benchmark/test": result_test,
+            }
+            wandb.log(log_dict)  # type: ignore
 
     def _initialize_lora_modules(
         self,

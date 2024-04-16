@@ -100,6 +100,9 @@ class ConvLoRA(nn.Module, LoRALayer):
         self.reset_parameters()
         self.merged = False
 
+        self.weight = self.conv.weight
+        self.bias = self.conv.bias
+
     def _initialize_AB(self) -> None:  # noqa: N802
         assert (
             self.r > 0

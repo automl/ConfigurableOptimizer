@@ -11,11 +11,13 @@ class PartialConnector(nn.Module):
         self,
         is_reduction_cell: bool = False,
         k: int = 4,
+        num_warm_epoch: int = 15,
     ) -> None:
         super().__init__()
         self.k = k
         self.is_reduction_cell = is_reduction_cell
         self.mp = nn.MaxPool2d(2, 2)
+        self.num_warm_epoch = num_warm_epoch
 
     def forward(
         self,
