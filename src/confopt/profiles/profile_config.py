@@ -218,7 +218,7 @@ class ProfileConfig:
 
     @abstractmethod
     def set_searchspace_config(self, config: dict) -> None:
-        if not hasattr(self, "searchspcae_config"):
+        if not hasattr(self, "searchspace_config"):
             self.searchspace_config = config
         else:
             self.searchspace_config.update(config)
