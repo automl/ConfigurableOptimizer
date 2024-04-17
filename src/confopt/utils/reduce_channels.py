@@ -17,7 +17,7 @@ def change_channel_size_conv(
     index: torch.Tensor | None = None,
     device: torch.device = DEVICE,
 ) -> tuple[nn.Conv2d | Conv2DLoRA, torch.Tensor | None]:
-    if k > 1:
+    if k < 1:
         return increase_conv_channels(conv2d_layer, k, device)
     return reduce_conv_channels(conv2d_layer, k, device), index
 
@@ -192,7 +192,7 @@ def change_features_bn(
     index: torch.Tensor | None = None,
     device: torch.device = DEVICE,
 ) -> tuple[nn.BatchNorm2d, torch.Tensor | None]:
-    if k > 1:
+    if k < 1:
         return increase_bn_features(batchnorm_layer, k, index, device)
     return reduce_bn_features(batchnorm_layer, k, device), index
 
