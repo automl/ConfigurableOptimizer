@@ -10,6 +10,8 @@ from confopt.utils.reduce_channels import (
     reduce_conv_channels,
     increase_bn_features,
     increase_conv_channels,
+    change_channel_size_conv,
+    change_features_bn,
 )
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -94,6 +96,38 @@ class TestReduceChannels(unittest.TestCase):
                 torch.eq(reduced_batchnorm.bias[:6], original_batchnorm.bias[:6])
             )
 
+    def test_change_conv_channels(self) -> None:
+        in_channels = 6
+        out_channels = 12
+        conv2d = nn.Conv2d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+        ).to(DEVICE)
+
+        k = 2.0
+        reduced, _ = change_channel_size_conv(conv2d, k, device=DEVICE)
+        assert reduced.in_channels < in_channels
+        assert reduced.out_channels < out_channels
+
+        k = 0.5
+        increased, _ = change_channel_size_conv(conv2d, k, device=DEVICE)
+        assert increased.in_channels > in_channels
+        assert increased.out_channels > out_channels
+
+    def test_change_bn_channels(self) -> None:
+        num_features = 6
+        bn = nn.BatchNorm2d(num_features=num_features).to(DEVICE)
+
+        k = 2.0
+        reduced, _ = change_features_bn(bn, k, device=DEVICE)
+        assert reduced.num_features < num_features
+
+        k = 0.5
+        increased, _ = change_features_bn(bn, k, device=DEVICE)
+        assert increased.num_features > num_features
 
 if __name__ == "__main__":
     unittest.main()
