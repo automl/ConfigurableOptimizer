@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from typing import TypeAlias
+
 import torch
 from torch import nn, optim
 
 from confopt.searchspace.common import Conv2DLoRA
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+LRSchedulerType: TypeAlias = torch.optim.lr_scheduler.LRScheduler
 
 
 def change_channel_size_conv(
@@ -334,3 +337,11 @@ def configure_optimizer(
             if hasattr(p, "out_index"):
                 del p.out_index
     return optimizer_new
+
+
+def configure_scheduler(
+    scheduler_old: LRSchedulerType,
+    scheduler_new: LRSchedulerType,
+) -> LRSchedulerType:
+    scheduler_new.load_state_dict(scheduler_old.state_dict())
+    return scheduler_new
