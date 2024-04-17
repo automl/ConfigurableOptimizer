@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import torch
-from torch import nn
+from torch import nn, optim
 
 from confopt.searchspace.common import Conv2DLoRA
 
@@ -284,3 +284,53 @@ def reduce_bn_features(
         ].clone()
 
     return reduced_batchnorm
+
+
+def configure_optimizer(
+    optimizer_old: optim.Optimizer, optimizer_new: optim.Optimizer
+) -> optim.Optimizer:
+    for p in optimizer_new.param_groups[0]["params"]:
+        if not hasattr(p, "raw_id"):
+            optimizer_new.state[p] = optimizer_old.state[p]
+            continue
+        state_old = optimizer_old.state_dict()["state"][p.raw_id]
+        state_new = optimizer_new.state[p]
+
+        state_new["momentum_buffer"] = state_old["momentum_buffer"]
+        if p.t == "bn":
+            # BN layer
+            state_new["momentum_buffer"] = torch.cat(
+                [
+                    state_new["momentum_buffer"],
+                    state_new["momentum_buffer"][p.out_index].clone(),
+                ],
+                dim=0,
+            )
+            # clean to enable multiple call
+            del p.t, p.raw_id, p.out_index
+
+        elif p.t == "conv":
+            # conv layer
+            if hasattr(p, "in_index"):
+                state_new["momentum_buffer"] = torch.cat(
+                    [
+                        state_new["momentum_buffer"],
+                        state_new["momentum_buffer"][:, p.in_index, :, :].clone(),
+                    ],
+                    dim=1,
+                )
+            if hasattr(p, "out_index"):
+                state_new["momentum_buffer"] = torch.cat(
+                    [
+                        state_new["momentum_buffer"],
+                        state_new["momentum_buffer"][p.out_index, :, :, :].clone(),
+                    ],
+                    dim=0,
+                )
+            # clean to enable multiple call
+            del p.t, p.raw_id
+            if hasattr(p, "in_index"):
+                del p.in_index
+            if hasattr(p, "out_index"):
+                del p.out_index
+    return optimizer_new
