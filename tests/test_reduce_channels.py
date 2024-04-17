@@ -62,7 +62,9 @@ class TestReduceChannels(unittest.TestCase):
         ).to(DEVICE)
         original_conv2d.weight.data.fill_(0.5)
 
-        increased_conv2d = increase_conv_channels(original_conv2d, k=0.5, device=DEVICE)
+        increased_conv2d, _ = increase_conv_channels(
+            original_conv2d, k=0.5, device=DEVICE
+        )
 
         assert increased_conv2d.in_channels == 6
         assert increased_conv2d.out_channels == 12
@@ -82,7 +84,7 @@ class TestReduceChannels(unittest.TestCase):
         original_batchnorm = nn.BatchNorm2d(num_features=6).to(DEVICE)
         original_batchnorm.weight.data.fill_(0.5)
 
-        reduced_batchnorm = increase_bn_features(
+        reduced_batchnorm, _ = increase_bn_features(
             original_batchnorm, k=0.5, device=DEVICE
         )
 
