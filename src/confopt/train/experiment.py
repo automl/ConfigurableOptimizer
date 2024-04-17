@@ -157,6 +157,7 @@ class Experiment:
         use_benchmark: bool = True,
     ) -> ConfigurableTrainer:
         config = profile.get_config()
+        run_name = profile.get_name_wandb_run()
 
         assert hasattr(profile, "sampler_type")
         self.sampler_str = SamplerType(profile.sampler_type)
@@ -172,6 +173,7 @@ class Experiment:
             load_saved_model,
             load_best_model,
             use_benchmark,
+            run_name,
         )
 
     def runner(
@@ -181,6 +183,7 @@ class Experiment:
         load_saved_model: bool = False,
         load_best_model: bool = False,
         use_benchmark: bool = True,
+        run_name: str = "supernet_run",
     ) -> ConfigurableTrainer:
         assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
 
@@ -221,6 +224,7 @@ class Experiment:
         )
         if self.is_wandb_log:
             wandb.init(  # type: ignore
+                name=run_name,
                 project=(
                     config.get("project_name", "Configurable_Optimizer")
                     if config is not None
