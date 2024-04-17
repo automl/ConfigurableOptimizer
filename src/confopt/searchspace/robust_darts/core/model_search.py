@@ -195,6 +195,10 @@ class Network(nn.Module):
             x.data.copy_(y.data)
         return model_new
 
+    def sample(self, alphas: torch.Tensor) -> torch.Tensor:
+        # Replace this function on the fly to change the sampling method
+        return F.softmax(alphas, dim=-1)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if self.edge_normalization:
             return self.edge_normalized_forward(x)
@@ -206,9 +210,10 @@ class Network(nn.Module):
 
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
-                weights = F.softmax(self.alphas_reduce, dim=-1)
+                weights = self.sample(self.alphas_reduce)
             else:
-                weights = F.softmax(self.alphas_normal, dim=-1)
+                weights = self.sample(self.alphas_normal)
+
             s0, s1 = s1, cell(s0, s1, weights, drop_prob=self.drop_path_prob)
 
         out = self.global_pooling(s1)
