@@ -76,6 +76,8 @@ class GDASProfile(ProfileConfig, ABC):
     ) -> None:
         PROFILE_TYPE = "GDAS"
         self.sampler_sample_frequency = sampler_sample_frequency
+        self.tau_min = tau_min
+        self.tau_max = tau_max
         super().__init__(
             PROFILE_TYPE,
             epochs,
@@ -90,8 +92,6 @@ class GDASProfile(ProfileConfig, ABC):
             searchspace_str,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
-        self.tau_min = tau_min
-        self.tau_max = tau_max
 
         if partial_connector_config is not None:
             self.configure_partial_connector(**partial_connector_config)
@@ -131,6 +131,10 @@ class SNASProfile(ProfileConfig, ABC):
     ) -> None:
         PROFILE_TYPE = "SNAS"
         self.sampler_sample_frequency = sampler_sample_frequency
+        self.temp_init = temp_init
+        self.temp_min = temp_min
+        self.temp_annealing = temp_annealing
+        self.total_epochs = total_epochs
         super().__init__(  # type: ignore
             PROFILE_TYPE,
             epochs,
@@ -145,10 +149,6 @@ class SNASProfile(ProfileConfig, ABC):
             searchspace_str,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
-        self.temp_init = temp_init
-        self.temp_min = temp_min
-        self.temp_annealing = temp_annealing
-        self.total_epochs = total_epochs
 
         if partial_connector_config is not None:
             self.configure_partial_connector(**partial_connector_config)
