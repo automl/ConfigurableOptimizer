@@ -12,7 +12,7 @@ import wandb
 from confopt.benchmarks import BenchmarkBase
 from confopt.dataset import AbstractData
 from confopt.searchspace import SearchSpace
-from confopt.utils import AverageMeter, Logger, calc_accuracy
+from confopt.utils import AverageMeter, Logger, calc_accuracy, clear_grad_cosine
 
 from .searchprofile import Profile
 
@@ -299,7 +299,7 @@ class ConfigurableTrainer:
             w_optimizer.step()
 
             # save grads of operations
-            if isinstance(network, nn.DataParallel):
+            if self.use_data_parallel:
                 network.module.preserve_grads()  # type: ignore
             else:
                 network.preserve_grads()  # type: ignore
@@ -571,6 +571,11 @@ class ConfigurableTrainer:
             "LoRA layers have been initialized for all operations with"
             + " Conv2DLoRA module"
         )
+        # clear OLES_OPS from pre_grads, avg and count
+        if self.use_data_parallel:
+            network.module.apply(clear_grad_cosine)
+        else:
+            network.apply(clear_grad_cosine)
         # reinitialize optimizer
         optimizer_hyperparameters = self.model_optimizer.defaults
         old_param_lrs = []
