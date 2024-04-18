@@ -83,6 +83,9 @@ class ProfileConfig:
         assert (
             self.sampler_config is not None
         ), "atleast a sampler is needed to initialize the search space"
+        weight_type = (
+            "weight_entanglement" if self.entangle_op_weights else "weight_sharing"
+        )
         config = {
             "sampler": self.sampler_config,
             "perturbator": self.perturb_config,
@@ -90,8 +93,11 @@ class ProfileConfig:
             "dropout": self.dropout_config,
             "trainer": self.trainer_config,
             "lora": self.lora_config,
-            "searchsapce_str": self.searchspace_str,
+            "sampler_type": self.sampler_type,
+            "searchspace_str": self.searchspace_str,
+            "weight_type": weight_type,
         }
+
         if hasattr(self, "searchspace_config") and self.searchspace_config is not None:
             config.update({"search_space": self.searchspace_config})
 
