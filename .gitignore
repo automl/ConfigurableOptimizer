@@ -103,6 +103,3 @@ logs/
 
 # wandb
 wandb/
-
-# api
-api/
