@@ -285,12 +285,15 @@ class Network(nn.Module):
                 for j in edges:
                     k_best = None
                     for k in range(len(W[j])):
-                        if ("none" in primitives[j]) and (
-                            k != primitives[j].index("none")
+                        if (
+                            ("none" in primitives[j])
+                            and (k != primitives[j].index("none"))
+                            and (k_best is None or W[j][k] > W[j][k_best])
                         ):
-                            if k_best is None or W[j][k] > W[j][k_best]:
-                                k_best = k
-                        elif k_best is None or W[j][k] > W[j][k_best]:
+                            k_best = k
+                        if "none" not in primitives[j] and (
+                            k_best is None or W[j][k] > W[j][k_best]
+                        ):
                             k_best = k
                     gene.append((primitives[start + j][k_best], j))
                 start = end
