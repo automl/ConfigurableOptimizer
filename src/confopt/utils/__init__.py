@@ -93,6 +93,14 @@ def freeze(m: torch.nn.Module) -> None:
         param.requires_grad_(False)
 
 
+def clear_grad_cosine(m: torch.nn.Module) -> None:
+    if not hasattr(m, "avg"):
+        return
+    m.pre_grads.clear()
+    m.avg = 0
+    m.count = 0
+
+
 __all__ = [
     "calc_accuracy",
     "save_checkpoint",
