@@ -28,6 +28,7 @@ class DartsProfile(ProfileConfig, ABC):
         searchspace_str: str = "nb201",
     ) -> None:
         PROFILE_TYPE = "DARTS"
+        self.sampler_sample_frequency = sampler_sample_frequency
         super().__init__(
             PROFILE_TYPE,
             epochs,
@@ -42,7 +43,6 @@ class DartsProfile(ProfileConfig, ABC):
             searchspace_str,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
-        self.sampler_sample_frequency = sampler_sample_frequency
 
         if partial_connector_config is not None:
             self.configure_partial_connector(**partial_connector_config)
@@ -75,6 +75,7 @@ class GDASProfile(ProfileConfig, ABC):
         searchspace_str: str = "nb201",
     ) -> None:
         PROFILE_TYPE = "GDAS"
+        self.sampler_sample_frequency = sampler_sample_frequency
         super().__init__(
             PROFILE_TYPE,
             epochs,
@@ -89,7 +90,6 @@ class GDASProfile(ProfileConfig, ABC):
             searchspace_str,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
-        self.sampler_sample_frequency = sampler_sample_frequency
         self.tau_min = tau_min
         self.tau_max = tau_max
 
@@ -130,6 +130,7 @@ class SNASProfile(ProfileConfig, ABC):
         searchspace_str: str = "nb201",
     ) -> None:
         PROFILE_TYPE = "SNAS"
+        self.sampler_sample_frequency = sampler_sample_frequency
         super().__init__(  # type: ignore
             PROFILE_TYPE,
             epochs,
@@ -144,7 +145,6 @@ class SNASProfile(ProfileConfig, ABC):
             searchspace_str,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
-        self.sampler_sample_frequency = sampler_sample_frequency
         self.temp_init = temp_init
         self.temp_min = temp_min
         self.temp_annealing = temp_annealing
@@ -185,6 +185,7 @@ class DRNASProfile(ProfileConfig, ABC):
         searchspace_str: str = "nb201",
     ) -> None:
         PROFILE_TYPE = "DRNAS"
+        self.sampler_sample_frequency = sampler_sample_frequency
         super().__init__(  # type: ignore
             PROFILE_TYPE,
             epochs,
@@ -199,7 +200,6 @@ class DRNASProfile(ProfileConfig, ABC):
             searchspace_str,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
-        self.sampler_sample_frequency = sampler_sample_frequency
 
         if partial_connector_config is not None:
             self.configure_partial_connector(**partial_connector_config)
