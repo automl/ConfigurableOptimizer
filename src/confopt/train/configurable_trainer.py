@@ -7,7 +7,6 @@ from fvcore.common.checkpoint import Checkpointer, PeriodicCheckpointer
 import torch
 from torch import nn
 from typing_extensions import TypeAlias
-import wandb
 
 from confopt.benchmarks import BenchmarkBase
 from confopt.dataset import AbstractData
@@ -125,6 +124,7 @@ class ConfigurableTrainer:
             self._component_new_step_or_epoch(network, calling_frequency="epoch")
             self.update_sample_function(profile, network, calling_frequency="epoch")
 
+            self.logger.reset_wandb_logs()
             base_metrics, arch_metrics = self.train_func(
                 profile,
                 train_loader,
@@ -154,12 +154,11 @@ class ConfigurableTrainer:
             valid_metrics = self.valid_func(val_loader, self.model, self.criterion)
             self.logger.log_metrics("Evaluation: ", valid_metrics, epoch_str)
 
-            if is_wandb_log:
-                self.logger.wandb_log_metrics(
-                    "search/model", base_metrics, epoch, search_time.sum
-                )
-                self.logger.wandb_log_metrics("search/arch", arch_metrics, epoch)
-                self.logger.wandb_log_metrics("eval", valid_metrics, epoch)
+            self.logger.add_wandb_log_metrics(
+                "search/model", base_metrics, epoch, search_time.sum
+            )
+            self.logger.add_wandb_log_metrics("search/arch", arch_metrics, epoch)
+            self.logger.add_wandb_log_metrics("eval", valid_metrics, epoch)
 
             (
                 self.valid_losses[epoch],
@@ -198,8 +197,9 @@ class ConfigurableTrainer:
                     genotype, epoch, self.checkpointing_freq, save_best_model=True
                 )
 
-            self.log_benchmark_result(network, is_wandb_log)
-
+            self.log_benchmark_result(network)
+            if is_wandb_log:
+                self.logger.push_wandb_logs()
             if not is_warm_epoch:
                 with torch.no_grad():
                     for i, alpha in enumerate(self.model.arch_parameters):
@@ -532,7 +532,8 @@ class ConfigurableTrainer:
             model.new_step()
 
     def log_benchmark_result(
-        self, network: torch.nn.Module, is_wandb_log: bool = False
+        self,
+        network: torch.nn.Module,
     ) -> None:
         if self.benchmark_api is None:
             return
@@ -549,13 +550,12 @@ class ConfigurableTrainer:
             + f"valid: {rusult_valid}, test: {result_test}"
         )
 
-        if is_wandb_log:
-            log_dict = {
-                "benchmark/train": result_train,
-                "benchmark/valid": rusult_valid,
-                "benchmark/test": result_test,
-            }
-            wandb.log(log_dict)  # type: ignore
+        log_dict = {
+            "benchmark/train": result_train,
+            "benchmark/valid": rusult_valid,
+            "benchmark/test": result_test,
+        }
+        self.logger.update_wandb_logs(log_dict)
 
     def _initialize_lora_modules(
         self,
