@@ -5,7 +5,7 @@ from torch import nn
 import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
-from confopt.utils import freeze
+from confopt.utils import AverageMeter, freeze
 from confopt.utils.normalize_params import normalize_params
 
 from .genotypes import BABY_PRIMITIVES, PRIMITIVES, DARTSGenotype
@@ -470,12 +470,9 @@ class Network(nn.Module):
 
             self.mask.append(mask)
 
-    def _discretize(self) -> NetworkCIFAR | NetworkImageNet:
+    def discretize(self) -> NetworkCIFAR | NetworkImageNet:
         genotype = self.genotype()
-        if (
-            self._num_classes == NUM_CIFAR_CLASSES
-            or self._num_classes == NUM_CIFAR100_CLASSES
-        ):
+        if self._num_classes in {NUM_CIFAR_CLASSES, NUM_CIFAR100_CLASSES}:
             discrete_model = NetworkCIFAR(
                 C=self._C,
                 num_classes=self._num_classes,
@@ -540,7 +537,7 @@ def preserve_grads(m: nn.Module) -> None:
 
 
 # TODO: break function from OLES paper to have less branching.
-def check_grads_cosine(m: nn.Module) -> None:
+def check_grads_cosine(m: nn.Module, oles: int = False) -> None:
     if (
         isinstance(m, (OperationBlock, OperationChoices, Cell, MixedOp, Network))
         or not isinstance(m, tuple(OLES_OPS))
@@ -561,19 +558,23 @@ def check_grads_cosine(m: nn.Module) -> None:
                 true_i += 1
             i += 1
 
-    if true_i != 0:
-        sim_avg = temp / true_i
+    assert true_i != 0
+    sim_avg = temp / true_i
     m.pre_grads.clear()
 
     if not hasattr(m, "avg"):
         m.avg = 0
     m.avg += sim_avg
 
+    if not hasattr(m, "running_sim"):
+        m.running_sim = AverageMeter()
+    m.running_sim.update(sim_avg)
+
     if not hasattr(m, "count"):
         m.count = 0
 
     if m.count == 20:
-        if m.avg / m.count < 0.4:
+        if m.avg / m.count < 0.4 and oles:
             freeze(m)
         m.count = 0
         m.avg = 0
