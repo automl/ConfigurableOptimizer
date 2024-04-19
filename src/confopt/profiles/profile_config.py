@@ -27,6 +27,8 @@ class ProfileConfig:
         lora_warm_epochs: int = 0,
         seed: int = 100,
         searchspace_str: str = "nb201",
+        oles: bool = False,
+        calc_gm_score: bool = False,
     ) -> None:
         self.config_type = config_type
         self.epochs = epochs
@@ -40,6 +42,7 @@ class ProfileConfig:
         self._set_dropout(dropout)
         self._set_perturb(perturbation, perturbator_sample_frequency)
         self.entangle_op_weights = entangle_op_weights
+        self._set_oles_configs(oles, calc_gm_score)
         PROFILE_TYPE = "BASE"
         self.sampler_type = str.lower(PROFILE_TYPE)
 
@@ -56,6 +59,14 @@ class ProfileConfig:
             "lora_alpha": lora_alpha,
             "merge_weights": merge_weights,
         }
+
+    def _set_oles_configs(
+        self,
+        oles: bool = False,
+        calc_gm_score: bool = False,
+    ) -> None:
+        assert not (oles is True and calc_gm_score is False)
+        self.oles_config = {"oles": oles, "calc_gm_score": calc_gm_score}
 
     def _set_perturb(
         self,
@@ -96,6 +107,7 @@ class ProfileConfig:
             "sampler_type": self.sampler_type,
             "searchspace_str": self.searchspace_str,
             "weight_type": weight_type,
+            "oles": self.oles_config,
         }
 
         if hasattr(self, "searchspace_config") and self.searchspace_config is not None:
@@ -230,6 +242,13 @@ class ProfileConfig:
             ), f"{config_key} not a valid configuration for the lora layers"
             self.lora_config[config_key] = kwargs[config_key]
 
+    def configure_oles_config(self, **kwargs) -> None:  # type: ignore
+        for config_key in kwargs:
+            assert (
+                config_key in self.oles_config
+            ), f"{config_key} not a valid configuration for the lora layers"
+            self.oles_config[config_key] = kwargs[config_key]
+
     @abstractmethod
     def set_searchspace_config(self, config: dict) -> None:
         if not hasattr(self, "searchspace_config"):
@@ -254,5 +273,7 @@ class ProfileConfig:
             name_wandb_run.append(f"lorawarmup_{self.lora_warm_epochs}")
         name_wandb_run.append(f"epochs_{self.trainer_config.get('epochs')}")
         name_wandb_run.append(f"seed_{self.seed}")
+        if self.oles_config.get("oles"):
+            name_wandb_run.append("with_oles")
         name_wandb_run_str = "-".join(name_wandb_run)
         return name_wandb_run_str
