@@ -868,4 +868,4 @@ class FactorizedReduce(nn.Module):
         return "C_in={C_in}, C_out={C_out}, stride={stride}".format(**self.__dict__)
 
 
-OLES_OPS = [Zero, Pooling, ReLUConvBN, DualSepConv, SepConv, Identity]
+OLES_OPS = [Zero, Pooling, DualSepConv, SepConv, Identity]
