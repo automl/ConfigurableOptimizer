@@ -26,6 +26,8 @@ class DartsProfile(ProfileConfig, ABC):
         lora_warm_epochs: int = 0,
         seed: int = 100,
         searchspace_str: str = "nb201",
+        oles: bool = False,
+        calc_gm_score: bool = False,
     ) -> None:
         PROFILE_TYPE = "DARTS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -41,6 +43,8 @@ class DartsProfile(ProfileConfig, ABC):
             lora_warm_epochs,
             seed,
             searchspace_str,
+            oles,
+            calc_gm_score,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
@@ -73,6 +77,8 @@ class GDASProfile(ProfileConfig, ABC):
         lora_warm_epochs: int = 0,
         seed: int = 100,
         searchspace_str: str = "nb201",
+        oles: bool = False,
+        calc_gm_score: bool = False,
     ) -> None:
         PROFILE_TYPE = "GDAS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -90,6 +96,8 @@ class GDASProfile(ProfileConfig, ABC):
             lora_warm_epochs,
             seed,
             searchspace_str,
+            oles,
+            calc_gm_score,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
@@ -128,6 +136,8 @@ class SNASProfile(ProfileConfig, ABC):
         lora_warm_epochs: int = 0,
         seed: int = 100,
         searchspace_str: str = "nb201",
+        oles: bool = False,
+        calc_gm_score: bool = False,
     ) -> None:
         PROFILE_TYPE = "SNAS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -147,6 +157,8 @@ class SNASProfile(ProfileConfig, ABC):
             lora_warm_epochs,
             seed,
             searchspace_str,
+            oles,
+            calc_gm_score,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
@@ -183,6 +195,8 @@ class DRNASProfile(ProfileConfig, ABC):
         lora_warm_epochs: int = 0,
         seed: int = 100,
         searchspace_str: str = "nb201",
+        oles: bool = False,
+        calc_gm_score: bool = False,
     ) -> None:
         PROFILE_TYPE = "DRNAS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -198,6 +212,8 @@ class DRNASProfile(ProfileConfig, ABC):
             lora_warm_epochs,
             seed,
             searchspace_str,
+            oles,
+            calc_gm_score,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
