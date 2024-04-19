@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import partial
+
 import torch
 from torch import nn
 
@@ -101,7 +103,7 @@ class DARTSSearchSpace(SearchSpace):
         self.model._prune(sparsity, wider)  # type: ignore
 
     def discretize(self) -> nn.Module:
-        return self.model._discretize()  # type: ignore
+        return self.model.discretize()  # type: ignore
 
     def get_genotype(self) -> DARTSGenotype:
         return self.model.genotype()  # type: ignore
@@ -109,5 +111,14 @@ class DARTSSearchSpace(SearchSpace):
     def preserve_grads(self) -> None:
         self.model.apply(preserve_grads)
 
-    def check_grads_cosine(self) -> None:
-        self.model.apply(check_grads_cosine)
+    def check_grads_cosine(self, oles: bool = False) -> None:
+        check_grads_cosine_part = partial(check_grads_cosine, oles=oles)
+        self.model.apply(check_grads_cosine_part)
+
+    def calc_avg_gm_score(self) -> float:
+        sim_avg = []
+        for module in self.model.modules():
+            if hasattr(module, "running_sim"):
+                sim_avg.append(module.running_sim.avg)
+        avg_gm_score = sum(sim_avg) / len(sim_avg)
+        return avg_gm_score
