@@ -74,6 +74,11 @@ class ConvLoRA(nn.Module, LoRALayer):
         self.in_channels = in_channels
         self.out_channels = out_channels
 
+        # TODO Refactor this line for a better design
+        assert r == 0, (
+            "Setting r at initialization is prohibited,"
+            + "r can only be set via activate_lora function"
+        )
         LoRALayer.__init__(
             self,
             r=r,
@@ -95,8 +100,9 @@ class ConvLoRA(nn.Module, LoRALayer):
             self.kernel_size = kernel_size
 
         # Actual trainable parameters
-        if r > 0:
-            self._initialize_AB()
+        # TODO Refactor ConvLoRA to think of a better way to initialize lora parameters
+        # if r > 0:
+        #     self._initialize_AB()
         self.reset_parameters()
         self.merged = False
 
