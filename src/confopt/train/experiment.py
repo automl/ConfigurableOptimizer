@@ -166,13 +166,6 @@ class Experiment:
         self.dropout = profile.dropout
         self.edge_normalization = profile.is_partial_connection
         self.entangle_op_weights = profile.entangle_op_weights
-        oles_config = config.get("oles")
-        if oles_config:
-            oles = oles_config.get("oles")
-            calc_gm_score = oles_config.get("calc_gm_score")
-        else:
-            oles = False
-            calc_gm_score = False
         assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
         return self.runner(
             config,
@@ -181,8 +174,6 @@ class Experiment:
             load_best_model,
             use_benchmark,
             run_name,
-            oles,
-            calc_gm_score,
         )
 
     def runner(
@@ -193,8 +184,6 @@ class Experiment:
         load_best_model: bool = False,
         use_benchmark: bool = True,
         run_name: str = "supernet_run",
-        oles: bool = False,
-        calc_gm_score: bool = False,
     ) -> ConfigurableTrainer:
         assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
 
@@ -319,8 +308,6 @@ class Experiment:
             lora_warm_epochs=config["trainer"].get(  # type: ignore
                 "lora_warm_epochs", 0
             ),
-            oles=oles,
-            calc_gm_score=calc_gm_score,
         )
 
         return trainer
@@ -831,20 +818,6 @@ if __name__ == "__main__":
         type=str,
     )
 
-    parser.add_argument(
-        "--oles",
-        action="store_true",
-        default=False,
-        help="freezes weights if it passes the threshold",
-    )
-
-    parser.add_argument(
-        "--calc_gm_score",
-        action="store_true",
-        default=False,
-        help="calculates gm scores during training the supernet",
-    )
-
     args = parser.parse_args()
     IS_DEBUG_MODE = True
     is_wandb_log = IS_DEBUG_MODE is False
@@ -858,8 +831,6 @@ if __name__ == "__main__":
         is_partial_connection=args.is_partial_connector,
         perturbation=args.perturbator,
         dropout=args.dropout,
-        oles=args.oles,
-        calc_gm_score=args.calc_gm_score,
     )
 
     config = profile.get_config()

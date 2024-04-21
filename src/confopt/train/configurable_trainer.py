@@ -76,8 +76,6 @@ class ConfigurableTrainer:
         profile: Profile,
         is_wandb_log: bool = True,
         lora_warm_epochs: int = 0,
-        oles: bool = False,
-        calc_gm_score: bool = False,
     ) -> None:
         profile.adapt_search_space(self.model)
 
@@ -137,8 +135,6 @@ class ConfigurableTrainer:
                 self.arch_optimizer,
                 self.print_freq,
                 is_warm_epoch=is_warm_epoch,
-                oles=oles,
-                calc_gm_score=calc_gm_score,
             )
 
             # Logging
@@ -163,16 +159,6 @@ class ConfigurableTrainer:
             )
             self.logger.add_wandb_log_metrics("search/arch", arch_metrics, epoch)
             self.logger.add_wandb_log_metrics("eval", valid_metrics, epoch)
-            if calc_gm_score:
-                if self.use_data_parallel:
-                    gm_score = network.module.calc_avg_gm_score()
-                else:
-                    gm_score = network.calc_avg_gm_score()
-                gm_metrics = {
-                    "gm_scores/mean_gm": gm_score,
-                    "gm_scores/epochs": epoch,
-                }
-                self.logger.update_wandb_logs(gm_metrics)
 
             (
                 self.valid_losses[epoch],
@@ -234,8 +220,6 @@ class ConfigurableTrainer:
         arch_optimizer: OptimizerType,
         print_freq: int,
         is_warm_epoch: bool = False,
-        oles: bool = False,
-        calc_gm_score: bool = False,
     ) -> tuple[TrainingMetrics, TrainingMetrics]:
         data_time, batch_time = AverageMeter(), AverageMeter()
         base_losses, base_top1, base_top5 = (
@@ -292,11 +276,10 @@ class ConfigurableTrainer:
                 )
 
             # calculate gm_score
-            if calc_gm_score:
-                if self.use_data_parallel:
-                    network.module.check_grads_cosine(oles)  # type: ignore
-                else:
-                    network.check_grads_cosine(oles)  # type: ignore
+            if isinstance(network, nn.DataParallel):
+                network.module.check_grads_cosine()  # type: ignore
+            else:
+                network.check_grads_cosine()  # type: ignore
 
             # update the model weights
             w_optimizer.zero_grad()

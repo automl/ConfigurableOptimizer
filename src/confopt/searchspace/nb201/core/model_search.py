@@ -11,7 +11,7 @@ import torch
 from torch import nn
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
-from confopt.utils import AverageMeter, freeze
+from confopt.utils import freeze
 from confopt.utils.normalize_params import normalize_params
 
 from .cells import NAS201SearchCell as SearchCell
@@ -195,7 +195,9 @@ class NB201SearchModel(nn.Module):
         """
         string = self.extra_repr()
         for i, cell in enumerate(self.cells):
-            string += f"\n {i:02d}/{len(self.cells):02d} :: {cell.extra_repr()}"
+            string += "\n {:02d}/{:02d} :: {:}".format(
+                i, len(self.cells), cell.extra_repr()
+            )
         return string
 
     def extra_repr(self) -> str:
@@ -394,7 +396,7 @@ def preserve_grads(m: nn.Module) -> None:
 
 
 # TODO: break function from OLES paper to have less branching.
-def check_grads_cosine(m: nn.Module, oles: int = False) -> None:
+def check_grads_cosine(m: nn.Module) -> None:
     if (
         isinstance(
             m,
@@ -423,23 +425,19 @@ def check_grads_cosine(m: nn.Module, oles: int = False) -> None:
                 true_i += 1
             i += 1
 
-    assert true_i != 0
-    sim_avg = temp / true_i
+    if true_i != 0:
+        sim_avg = temp / true_i
     m.pre_grads.clear()
 
     if not hasattr(m, "avg"):
         m.avg = 0
     m.avg += sim_avg
 
-    if not hasattr(m, "running_sim"):
-        m.running_sim = AverageMeter()
-    m.running_sim.update(sim_avg)
-
     if not hasattr(m, "count"):
         m.count = 0
 
     if m.count == 20:
-        if m.avg / m.count < 0.4 and oles:
+        if m.avg / m.count < 0.4:
             freeze(m)
         m.count = 0
         m.avg = 0
