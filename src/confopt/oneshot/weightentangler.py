@@ -8,6 +8,38 @@ from torch import nn
 import torch.nn.functional as F  # noqa: N812
 
 from confopt.oneshot.base_component import OneShotComponent
+from confopt.searchspace.common.lora_layers import Conv2DLoRA
+
+
+class WeightEntanglementSequential(nn.Sequential):
+    def __init__(self, *args: nn.Module) -> None:
+        super().__init__(*args)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        for module in self:
+            if (
+                isinstance(module, nn.Conv2d)
+                and getattr(module, "can_entangle_weight", False)
+                and hasattr(module, "mixed_weight")
+            ) or (
+                isinstance(module, Conv2DLoRA)
+                and getattr(module, "can_entangle_weight", False)
+                and hasattr(module.conv, "mixed_weight")
+            ):
+                if isinstance(module, Conv2DLoRA):
+                    weight = module.conv.mixed_weight
+                    bias = getattr(module.conv, "mixed_bias", None)
+                    x = module(x, weight, bias)
+                else:
+                    weight = module.mixed_weight
+                    bias = getattr(module, "mixed_bias", None)
+                    x = module._conv_forward(x, weight, bias)
+            else:
+                x = module(x)
+        return x
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({', '.join([str(m) for m in self])})"
 
 
 class WeightEntanglementModule(nn.Module, ABC):
@@ -26,8 +58,8 @@ class ConvolutionalWEModule(WeightEntanglementModule):
         assert self.kernel_size is not None, "self.kernel_size cannot be None"
         assert self.stride is not None, "self.stride cannot be None"
         assert isinstance(
-            self.op, nn.Sequential
-        ), "self.op must be of type nn.Sequential"
+            self.op, WeightEntanglementSequential
+        ), "self.op must be of type WeightEntanglementSequential"
         self.mark_entanglement_weights()
 
         is_module_marked = False
@@ -152,14 +184,8 @@ class WeightEntangler(OneShotComponent):
         entanglement_ops_sets = self._get_entanglement_op_sets(entangled_modules)
 
         # Step 3, create the merged weight, weighted by alphas,
-        # and assign it to the largest kernel. Also, back up the original weights
-        # of the largest kernel to be restored later
-        self.original_weights = {}
-        self.new_weights = {}
-
-        for idx, entangle_ops_set in entanglement_ops_sets.items():
+        for _, entangle_ops_set in entanglement_ops_sets.items():
             largest_op = entangle_ops_set[0]
-            self.original_weights[idx] = largest_op.weight
             sub_kernel_weights = [largest_op.weight * largest_op._entangle_alpha]
 
             for op in entangle_ops_set[1:]:
@@ -170,16 +196,16 @@ class WeightEntangler(OneShotComponent):
                 sub_kernel_weights.append(sliced_weight * op._entangle_alpha)
 
             new_weight = sum(sub_kernel_weights)
-            self.new_weights[idx] = new_weight
-            largest_op.weight = nn.Parameter(new_weight)
+            largest_op.mixed_weight = new_weight
 
         # Step 4 - Forward pass through the module with the largest kernel
         output = largest_module(x)
 
-        # Step 5 - Restore original weights to the largest kernel
-        for idx, entangle_ops_set in entanglement_ops_sets.items():
+        # Step 5 - Remove the mixed weights stored in the largest operation
+        for _, entangle_ops_set in entanglement_ops_sets.items():
             largest_op = entangle_ops_set[0]
-            largest_op.weight = self.original_weights[idx]
+            largest_op.mixed_weight = None
+            largest_op.mixed_bias = None
 
         # Step 6 - delete the stored alphas
         for module in entangled_modules:
