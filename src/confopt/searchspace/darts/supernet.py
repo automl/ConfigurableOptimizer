@@ -122,3 +122,8 @@ class DARTSSearchSpace(SearchSpace):
                 sim_avg.append(module.running_sim.avg)
         avg_gm_score = sum(sim_avg) / len(sim_avg)
         return avg_gm_score
+
+    def reset_gm_scores(self) -> None:
+        for module in self.model.modules():
+            if hasattr(module, "running_sim"):
+                module.running_sim.reset()
