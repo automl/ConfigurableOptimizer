@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+import warnings
 
 import torch
 
@@ -65,7 +66,11 @@ class ProfileConfig:
         oles: bool = False,
         calc_gm_score: bool = False,
     ) -> None:
-        assert not (oles is True and calc_gm_score is False)
+        if oles and not calc_gm_score:
+            calc_gm_score = True
+            warnings.warn(
+                "OLES needs gm_score, please pass calc_gm_score as True.", stacklevel=2
+            )
         self.oles_config = {"oles": oles, "calc_gm_score": calc_gm_score}
 
     def _set_perturb(
@@ -246,7 +251,7 @@ class ProfileConfig:
         for config_key in kwargs:
             assert (
                 config_key in self.oles_config
-            ), f"{config_key} not a valid configuration for the lora layers"
+            ), f"{config_key} not a valid configuration for the oles config"
             self.oles_config[config_key] = kwargs[config_key]
 
     @abstractmethod
