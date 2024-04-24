@@ -219,6 +219,11 @@ class ConfigurableTrainer:
                     for i, alpha in enumerate(self.model.arch_parameters):
                         self.logger.log(f"alpha {i} is {alpha}")
 
+            if self.use_data_parallel:
+                network.module.reset_gm_scores()
+            else:
+                network.reset_gm_scores()
+
             # measure elapsed time
             epoch_time.update(time.time() - start_time)
             start_time = time.time()
