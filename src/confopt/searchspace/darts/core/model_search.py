@@ -537,7 +537,7 @@ def preserve_grads(m: nn.Module) -> None:
 
 
 # TODO: break function from OLES paper to have less branching.
-def check_grads_cosine(m: nn.Module, oles: int = False) -> None:
+def check_grads_cosine(m: nn.Module, oles: bool = False) -> None:
     if (
         isinstance(m, (OperationBlock, OperationChoices, Cell, MixedOp, Network))
         or not isinstance(m, tuple(OLES_OPS))
