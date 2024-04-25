@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Callable
+
 import torch
 from torch import nn
 
@@ -24,7 +26,7 @@ class PartialConnector(nn.Module):
         x: torch.Tensor,
         alphas: list[torch.Tensor],
         ops: list[nn.Module],
-        is_argmax_sampler: bool = False,
+        forward_method: Callable,
     ) -> torch.Tensor:
         assert len(alphas) == len(
             ops
@@ -34,15 +36,7 @@ class PartialConnector(nn.Module):
         xtemp = x[:, : dim_2 // self.k, :, :]
         xtemp2 = x[:, dim_2 // self.k :, :, :]
 
-        if is_argmax_sampler:
-            argmax = torch.argmax(alphas)
-            temp1 = [
-                alphas[i] * op(xtemp) if i == argmax else alphas[i]
-                for i, op in enumerate(ops)
-            ]
-            temp1 = sum(temp1)
-        else:
-            temp1 = sum(op(xtemp) * alpha for op, alpha in zip(ops, alphas))
+        temp1 = forward_method(xtemp, ops, alphas)
 
         if (
             hasattr(ops[-1], "C_in")

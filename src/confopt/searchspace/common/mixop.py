@@ -59,6 +59,23 @@ class OperationBlock(nn.Module):
         self.weight_entangler = weight_entangler
         self.is_argmax_sampler = is_argmax_sampler
 
+    def forward_method(
+        self, x: torch.Tensor, ops: list[nn.Module], alphas: list[torch.Tensor]
+    ) -> torch.Tensor:
+        if self.weight_entangler is not None:
+            return self.weight_entangler.forward(x, ops, alphas)
+
+        if self.is_argmax_sampler:
+            argmax = torch.argmax(alphas)
+            states = [
+                alphas[i] * op(x) if i == argmax else alphas[i]
+                for i, op in enumerate(ops)
+            ]
+        else:
+            states = [op(x) * alpha for op, alpha in zip(ops, alphas)]
+
+        return sum(states)
+
     def forward(
         self,
         x: torch.Tensor,
@@ -67,27 +84,10 @@ class OperationBlock(nn.Module):
         if self.dropout:
             alphas = self.dropout.apply_mask(alphas)
 
-        # TODO[DESIGN]: How can weight entanglement work with partial connections?
-        if self.weight_entangler is not None:
-            return self.weight_entangler.forward(x, self.ops, alphas)
-
-        # TODO[DESIGN]: PartialConnector shouldn't have to implement everything that
-        # follows this if block, but it does. Not very clean.
         if self.partial_connector:
-            self.partial_connector.is_reduction_cell = self.is_reduction_cell
-            return self.partial_connector(x, alphas, self.ops, self.is_argmax_sampler)
+            return self.partial_connector(x, alphas, self.ops, self.forward_method)
 
-        if self.is_argmax_sampler:
-            argmax = torch.argmax(alphas)
-            states = [
-                alphas[i] * op(x) if i == argmax else alphas[i]
-                for i, op in enumerate(self.ops)
-            ]
-        else:
-            states = [op(x) * alpha for op, alpha in zip(self.ops, alphas)]
-
-        output = sum(states)
-        return output
+        return self.forward_method(x, self.ops, alphas)
 
     def change_op_channel_size(self, wider: int | None = None) -> None:
         if wider is None:
