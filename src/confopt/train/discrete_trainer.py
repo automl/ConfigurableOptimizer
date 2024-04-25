@@ -118,6 +118,7 @@ class DiscreteTrainer(ConfigurableTrainer):
             )
 
             # Logging
+            self.logger.reset_wandb_logs()
             search_time.update(time.time() - start_time)
             self.logger.log_metrics(
                 "[Discrete] Train: Model/Network metrics ",
@@ -129,11 +130,10 @@ class DiscreteTrainer(ConfigurableTrainer):
             valid_metrics = self.valid_func(val_loader, network, criterion)
             self.logger.log_metrics("[Discrete] Evaluation: ", valid_metrics, epoch_str)
 
-            if is_wandb_log:
-                self.logger.wandb_log_metrics(
-                    "discrete/train/model", base_metrics, epoch, search_time.sum
-                )
-                self.logger.wandb_log_metrics("discrete/eval", valid_metrics, epoch)
+            self.logger.add_wandb_log_metrics(
+                "discrete/train/model", base_metrics, epoch, search_time.sum
+            )
+            self.logger.add_wandb_log_metrics("discrete/eval", valid_metrics, epoch)
 
             (
                 self.valid_losses[epoch],
@@ -151,6 +151,9 @@ class DiscreteTrainer(ConfigurableTrainer):
             self.periodic_checkpointer.step(
                 iteration=epoch, checkpointables=checkpointables
             )
+
+            if is_wandb_log:
+                self.logger.push_wandb_logs()
 
             if valid_metrics.acc_top1 > self.valid_accs_top1["best"]:
                 self.valid_accs_top1["best"] = valid_metrics.acc_top1
@@ -268,6 +271,7 @@ class DiscreteTrainer(ConfigurableTrainer):
             AverageMeter(),
             AverageMeter(),
         )
+        self.logger.reset_wandb_logs()
         if self.use_data_parallel is True:
             network, criterion = self._load_onto_data_parallel(
                 self.model, self.criterion
@@ -299,8 +303,10 @@ class DiscreteTrainer(ConfigurableTrainer):
                 test_top5.update(test_prec5.item(), test_inputs.size(0))
 
         test_metrics = TrainingMetrics(test_losses.avg, test_top1.avg, test_top5.avg)
+
+        self.logger.add_wandb_log_metrics("discrete/test", test_metrics)
         if is_wandb_log:
-            self.logger.wandb_log_metrics("discrete/test", test_metrics)
+            self.logger.push_wandb_logs()
 
         self.logger.log_metrics("[Discrete] Test", test_metrics, epoch_str="---")
 
