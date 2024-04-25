@@ -96,6 +96,8 @@ class NASBench201SearchSpace(SearchSpace):
         for module in self.model.modules():
             if hasattr(module, "running_sim"):
                 sim_avg.append(module.running_sim.avg)
+        if len(sim_avg) == 0:
+            return 0
         avg_gm_score = sum(sim_avg) / len(sim_avg)
         return avg_gm_score
 
