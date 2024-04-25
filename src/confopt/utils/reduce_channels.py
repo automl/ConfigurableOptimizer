@@ -48,6 +48,13 @@ def increase_conv_channels(
             lora_dropout=conv2d_layer.lora_dropout_p,
             merge_weights=conv2d_layer.merge_weights,
         ).to(device)
+        if conv2d_layer.r > 0:
+            increased_conv2d.activate_lora(
+                r=conv2d_layer.r,
+                lora_alpha=conv2d_layer.lora_alpha,
+                lora_dropout_rate=conv2d_layer.lora_dropout_p,
+                merge_weights=conv2d_layer.merge_weights,
+            )
     else:
         new_groups = new_in_channels if conv2d_layer.groups != 1 else 1
         increased_conv2d = nn.Conv2d(
@@ -89,11 +96,14 @@ def reduce_conv_channels(
             dilation=conv2d_layer.conv.dilation,
             groups=new_groups,
             bias=conv2d_layer.conv.bias is not None,
-            r=conv2d_layer.r,
-            lora_alpha=conv2d_layer.lora_alpha,
-            lora_dropout=conv2d_layer.lora_dropout_p,
-            merge_weights=conv2d_layer.merge_weights,
         ).to(device)
+        if conv2d_layer.r > 0:
+            reduced_conv2d.activate_lora(
+                r=conv2d_layer.r,
+                lora_alpha=conv2d_layer.lora_alpha,
+                lora_dropout_rate=conv2d_layer.lora_dropout_p,
+                merge_weights=conv2d_layer.merge_weights,
+            )
 
         # Copy the weights and bias of conv2d layer and LoRA layers
         reduced_conv2d.conv.weight.data[
