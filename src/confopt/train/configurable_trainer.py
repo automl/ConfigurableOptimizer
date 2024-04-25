@@ -321,10 +321,11 @@ class ConfigurableTrainer:
             w_optimizer.step()
 
             # save grads of operations
-            if self.use_data_parallel:
-                network.module.preserve_grads()  # type: ignore
-            else:
-                network.preserve_grads()  # type: ignore
+            if calc_gm_score:
+                if self.use_data_parallel:
+                    network.module.preserve_grads()  # type: ignore
+                else:
+                    network.preserve_grads()  # type: ignore
 
             w_optimizer.zero_grad()
             if not is_warm_epoch:
