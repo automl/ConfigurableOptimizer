@@ -52,6 +52,9 @@ class OperationBlock(nn.Module):
                     op.change_channel_size(
                         partial_connector.k, self.device  # type: ignore
                     )
+                    if hasattr(op, "__post__init__"):
+                        op.__post__init__()
+
         self.ops = ops
         self.partial_connector = partial_connector
         self.is_reduction_cell = is_reduction_cell
