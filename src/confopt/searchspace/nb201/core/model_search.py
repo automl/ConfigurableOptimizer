@@ -394,7 +394,7 @@ def preserve_grads(m: nn.Module) -> None:
 
 
 # TODO: break function from OLES paper to have less branching.
-def check_grads_cosine(m: nn.Module, oles: bool = False) -> None:
+def check_grads_cosine(m: nn.Module, oles: bool = False) -> None:  # noqa: C901
     if (
         isinstance(
             m,
@@ -423,9 +423,10 @@ def check_grads_cosine(m: nn.Module, oles: bool = False) -> None:
                 true_i += 1
             i += 1
 
-    assert true_i != 0
-    sim_avg = temp / true_i
     m.pre_grads.clear()
+    if true_i == 0:
+        return
+    sim_avg = temp / true_i
 
     if not hasattr(m, "avg"):
         m.avg = 0
