@@ -118,7 +118,6 @@ class TestWeightEntangler(unittest.TestCase):
 
         sep_convs = [SepConv(3, 1, k, 1, d) for k, d in zip([3, 5, 7], [1, 2, 3])]
         for sep_conv, alpha in zip(sep_convs, alphas):
-
             for op in sep_conv.op:
                 if hasattr(op, "weight"):
                     op.weight.data = torch.ones_like(op.weight)
@@ -136,14 +135,20 @@ class TestWeightEntangler(unittest.TestCase):
         expected_new_weights[:, :, 2:5, 2:5] += (
             sep_conv.op[1].weight[:, :, 2:5, 2:5] * alphas[0]
         )
-        # print(expected_new_weights[0, 0])
-        # print(entangler.new_weights[1][0, 0])
 
-        assert len(entangler.original_weights) == 2
-        assert set([1, 5]) == set(entangler.original_weights.keys())
-        assert (entangler.original_weights[1] == sep_convs[2].op[1].weight).all()
-        assert (entangler.original_weights[5] == sep_convs[2].op[5].weight).all()
-        assert (entangler.new_weights[1] == expected_new_weights).all()
+        baseline_sep_conv = SepConv(3, 1, 7, 1, 3)
+
+        for op in baseline_sep_conv.op:
+            if hasattr(op, "weight"):
+                op.weight.data = torch.ones_like(op.weight)
+            if hasattr(op, "bias") and op.bias is not None:
+                op.bias.data = torch.ones_like(op.bias)
+
+        baseline_sep_conv.op[1].conv.weight.data = expected_new_weights
+        baseline_sep_conv.op[5].conv.weight.data = expected_new_weights
+        baseline_out = baseline_sep_conv(x)
+
+        assert np.allclose(out.detach().numpy(), baseline_out.detach().numpy())
 
     def test_forward_entangled_ops_with_lora(self) -> None:
         entangler = WeightEntangler()
@@ -180,12 +185,19 @@ class TestWeightEntangler(unittest.TestCase):
             sep_conv.op[1].weight[:, :, 2:5, 2:5] * alphas[0]
         )
 
-        assert len(entangler.original_weights) == 2
-        assert set([1, 5]) == set(entangler.original_weights.keys())
-        assert (entangler.original_weights[1] == sep_convs[2].op[1].weight).all()
-        assert (entangler.original_weights[5] == sep_convs[2].op[5].weight).all()
-        assert (entangler.new_weights[1] == expected_new_weights).all()
+        baseline_sep_conv = SepConv(3, 1, 7, 1, 3)
 
+        for op in baseline_sep_conv.op:
+            if hasattr(op, "weight"):
+                op.weight.data = torch.ones_like(op.weight)
+            if hasattr(op, "bias") and op.bias is not None:
+                op.bias.data = torch.ones_like(op.bias)
+
+        baseline_sep_conv.op[1].conv.weight.data = expected_new_weights
+        baseline_sep_conv.op[5].conv.weight.data = expected_new_weights
+        baseline_out = baseline_sep_conv(x)
+
+        assert np.allclose(out_normal.detach().numpy(), baseline_out.detach().numpy())
 
     def test_forward_entangled_ops_illegal_inputs(self) -> None:
         entangler = WeightEntangler()

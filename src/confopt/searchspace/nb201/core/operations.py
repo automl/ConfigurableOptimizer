@@ -6,7 +6,10 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from confopt.oneshot.weightentangler import ConvolutionalWEModule
+from confopt.oneshot.weightentangler import (
+    ConvolutionalWEModule,
+    WeightEntanglementSequential,
+)
 from confopt.searchspace.common import Conv2DLoRA
 import confopt.utils.reduce_channels as rc
 
@@ -163,7 +166,7 @@ class ReLUConvBN(ConvolutionalWEModule):
             kernel_size if isinstance(kernel_size, int) else kernel_size[0]
         )
         self.stride = stride
-        self.op = nn.Sequential(
+        self.op = WeightEntanglementSequential(
             nn.ReLU(inplace=False),
             Conv2DLoRA(
                 C_in,

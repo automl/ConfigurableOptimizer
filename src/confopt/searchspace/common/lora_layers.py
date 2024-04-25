@@ -152,16 +152,20 @@ class ConvLoRA(nn.Module, LoRALayer):
                     ) * self.scaling
                 self.merged = True
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, weight: torch.Tensor = None, bias: torch.Tensor = None
+    ) -> torch.Tensor:
+        weight = self.conv.weight if weight is None else weight
+        bias = self.conv.bias if bias is None else bias
+
         if self.r > 0 and not self.merged:
             return self.conv._conv_forward(  # type: ignore
                 x,
-                self.conv.weight
-                + (self.lora_B @ self.lora_A).view(self.conv.weight.shape)
-                * self.scaling,
-                self.conv.bias,
+                weight + (self.lora_B @ self.lora_A).view(weight.shape) * self.scaling,
+                bias,
             )
-        return self.conv(x)  # type: ignore
+
+        return self.conv._conv_forward(x, weight, bias)
 
 
 class Conv2DLoRA(ConvLoRA):
