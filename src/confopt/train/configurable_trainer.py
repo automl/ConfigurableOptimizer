@@ -120,7 +120,9 @@ class ConfigurableTrainer:
             epoch_str = f"{epoch:03d}-{self.epochs:03d}"
             if epoch == warm_epochs + 1:
                 if lora_warm_epochs > 0:
-                    self._initialize_lora_modules(lora_warm_epochs, profile, network)
+                    self._initialize_lora_modules(
+                        lora_warm_epochs, profile, network, calc_gm_score
+                    )
                 is_warm_epoch = False
 
             self._component_new_step_or_epoch(network, calling_frequency="epoch")
@@ -585,6 +587,7 @@ class ConfigurableTrainer:
         lora_warm_epochs: int,
         profile: Profile,
         network: torch.nn.Module,
+        is_gm_score_enabled: bool = False,
     ) -> None:
         self.logger.log(
             f"The searchspace has been warm started with {lora_warm_epochs} epochs"
@@ -642,6 +645,12 @@ class ConfigurableTrainer:
             self.model_optimizer,
             **scheduler_config,
         )
+
+        if is_gm_score_enabled:
+            if self.use_data_parallel:
+                network.module.reset_gm_score_attributes()
+            else:
+                network.reset_gm_score_attributes()
 
     def update_sample_function(
         self,
