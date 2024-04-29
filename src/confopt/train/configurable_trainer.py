@@ -174,6 +174,9 @@ class ConfigurableTrainer:
                     "gm_scores/mean_gm": gm_score,
                     "gm_scores/epochs": epoch,
                 }
+                gm_metrics.update(self.get_all_running_mean_scores(network))
+
+                # Add for all modules
                 self.logger.update_wandb_logs(gm_metrics)
 
             (
@@ -651,6 +654,14 @@ class ConfigurableTrainer:
                 network.module.reset_gm_score_attributes()
             else:
                 network.reset_gm_score_attributes()
+
+    def get_all_running_mean_scores(self, network: torch.nn.Module) -> dict:
+        running_sim_dict = {}
+        model = network.module if self.use_data_parallel else network
+        for name, module in model.named_modules():
+            if hasattr(module, "running_sim"):
+                running_sim_dict[f"gm_scores/{name}"] = module.running_sim.avg
+        return running_sim_dict
 
     def update_sample_function(
         self,
