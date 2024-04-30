@@ -125,6 +125,9 @@ class DARTSSearchSpace(SearchSpace):
         avg_gm_score = sum(sim_avg) / len(sim_avg)
         return avg_gm_score
 
+    def get_mean_layer_alignment_score(self) -> tuple[float, float]:
+        return self.model._get_mean_layer_alignment_score()
+
     def reset_gm_scores(self) -> None:
         for module in self.model.modules():
             if hasattr(module, "running_sim"):

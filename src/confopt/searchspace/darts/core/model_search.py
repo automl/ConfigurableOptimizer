@@ -5,7 +5,7 @@ from torch import nn
 import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
-from confopt.utils import AverageMeter, freeze
+from confopt.utils import AverageMeter, calc_layer_alignment_score, freeze
 from confopt.utils.normalize_params import normalize_params
 
 from .genotypes import BABY_PRIMITIVES, PRIMITIVES, DARTSGenotype
@@ -238,6 +238,7 @@ class Network(nn.Module):
 
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.classifier = nn.Linear(C_prev, num_classes)
+        self.weights: dict[str, list[torch.Tensor]] = {}
 
         self._initialize_parameters()
 
@@ -277,6 +278,8 @@ class Network(nn.Module):
             return self.edge_normalization_forward(x)
 
         s0 = s1 = self.stem(x)
+        self.weights["normal"] = []
+        self.weights["reduce"] = []
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
                 weights = self.sample(self.alphas_reduce)
@@ -286,6 +289,16 @@ class Network(nn.Module):
                 weights = self.sample(self.alphas_normal)
                 if self.mask is not None:
                     weights = normalize_params(weights, self.mask[0])
+
+            # Retain grads for calculating layer alignment score
+            if self.training:
+                if isinstance(weights, list):
+                    for weight in weights:
+                        weight.retain_grad()
+                else:
+                    assert isinstance(weights, torch.Tensor)
+                    weights.retain_grad()
+                self.weights["reduce" if cell.reduction else "normal"].append(weights)
             s0, s1 = s1, cell(s0, s1, weights)
         out = self.global_pooling(s1)
         logits = self.classifier(out.view(out.size(0), -1))
@@ -298,6 +311,8 @@ class Network(nn.Module):
         # TODO: normalization of alphas
 
         s0 = s1 = self.stem(inputs)
+        self.weights["normal"] = []
+        self.weights["reduce"] = []
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
                 weights = self.sample(self.alphas_reduce)
@@ -325,6 +340,16 @@ class Network(nn.Module):
                     start = end
                     n += 1
                     weights2 = torch.cat([weights2, tw2], dim=0)
+
+            # Retain grads for calculating layer alignment score
+            if self.training:
+                if isinstance(weights, list):
+                    for weight in weights:
+                        weight.retain_grad()
+                else:
+                    assert isinstance(weights, torch.Tensor)
+                    weights.retain_grad()
+                self.weights["reduce" if cell.reduction else "normal"].append(weights)
             s0, s1 = s1, cell(s0, s1, weights, weights2)
 
         out = self.global_pooling(s1)
@@ -433,6 +458,35 @@ class Network(nn.Module):
             reduce_concat=concat,
         )
         return genotype
+
+    def get_arch_grads(self) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+        def get_grads(alphas_list: list[torch.Tensor]) -> list[torch.Tensor]:
+            grads = []
+            for alphas in alphas_list:
+                if isinstance(alphas, list):
+                    alphas_grads = [
+                        alpha.grad.data.clone().detach() for alpha in alphas
+                    ]
+                    grads.append(torch.stack(alphas_grads).detach().reshape(-1))
+                else:
+                    grads.append(alphas.grad.data.clone().detach().reshape(-1))
+
+            return grads
+
+        grads_normal = get_grads(self.weights["normal"])
+        grads_reduce = get_grads(self.weights["reduce"])
+        return grads_normal, grads_reduce
+
+    def _get_mean_layer_alignment_score(self) -> tuple[float, float]:
+        grads_normal, grads_reduce = self.get_arch_grads()
+        mean_score_normal = calc_layer_alignment_score(grads_normal)
+        mean_score_reduce = calc_layer_alignment_score(grads_reduce)
+
+        if str(mean_score_normal) == "nan":
+            mean_score_normal = 0
+        if str(mean_score_reduce) == "nan":
+            mean_score_reduce = 0
+        return mean_score_normal, mean_score_reduce
 
     def _prune(self, op_sparsity: float, wider: int | None = None) -> None:
         """Discretize architecture parameters to enforce sparsity.
