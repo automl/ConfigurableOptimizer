@@ -116,6 +116,9 @@ class ConfigurableTrainer:
                 profile.partial_connector.num_warm_epoch, lora_warm_epochs
             )
             is_warm_epoch = True
+
+        layer_alignment_scores = (AverageMeter(), AverageMeter())
+
         for epoch in range(self.start_epoch + 1, self.epochs + 1):
             epoch_str = f"{epoch:03d}-{self.epochs:03d}"
             if epoch == warm_epochs + 1:
@@ -128,7 +131,9 @@ class ConfigurableTrainer:
             self._component_new_step_or_epoch(network, calling_frequency="epoch")
             self.update_sample_function(profile, network, calling_frequency="epoch")
 
+            # Reset WandB Log dictionary
             self.logger.reset_wandb_logs()
+
             base_metrics, arch_metrics = self.train_func(
                 profile,
                 train_loader,
@@ -141,9 +146,11 @@ class ConfigurableTrainer:
                 is_warm_epoch=is_warm_epoch,
                 oles=oles,
                 calc_gm_score=calc_gm_score,
+                layer_alignment_scores=layer_alignment_scores,
             )
 
             # Logging
+            # Log Search Metrics
             search_time.update(time.time() - start_time)
             self.logger.log_metrics(
                 "Search: Model metrics ",
@@ -157,6 +164,7 @@ class ConfigurableTrainer:
                     "Search: Architecture metrics ", arch_metrics, epoch_str
                 )
 
+            # Log Valid Metrics
             valid_metrics = self.valid_func(val_loader, self.model, self.criterion)
             self.logger.log_metrics("Evaluation: ", valid_metrics, epoch_str)
 
@@ -165,6 +173,8 @@ class ConfigurableTrainer:
             )
             self.logger.add_wandb_log_metrics("search/arch", arch_metrics, epoch)
             self.logger.add_wandb_log_metrics("eval", valid_metrics, epoch)
+
+            # Log GM scores
             if calc_gm_score:
                 if self.use_data_parallel:
                     gm_score = network.module.calc_avg_gm_score()
@@ -176,6 +186,19 @@ class ConfigurableTrainer:
                 }
                 self.logger.update_wandb_logs(gm_metrics)
 
+            # Log Layer Alignment scores
+            self.logger.log(
+                f"[{epoch_str}] Layer Alignment score: "
+                + f" normal: {layer_alignment_scores[0].avg:.4f},"
+                + f" reduce: {layer_alignment_scores[1].avg:.4f}"
+            )
+            layer_alignment_metric = {
+                "layer_alignment/normal": layer_alignment_scores[0].avg,
+                "layer_alignment/reduce": layer_alignment_scores[1].avg,
+            }
+            self.logger.update_wandb_logs(layer_alignment_metric)
+
+            # Create checkpoints
             (
                 self.valid_losses[epoch],
                 self.valid_accs_top1[epoch],
@@ -196,6 +219,7 @@ class ConfigurableTrainer:
                 iteration=epoch, checkpointables=checkpointables
             )
 
+            # Save Genotype and log best model
             # genotype = str(self.model.get_genotype())
             genotype = self.model.get_genotype().tostr()  # type: ignore
             self.logger.save_genotype(genotype, epoch, self.checkpointing_freq)
@@ -213,18 +237,25 @@ class ConfigurableTrainer:
                     genotype, epoch, self.checkpointing_freq, save_best_model=True
                 )
 
+            # Log Benchmark Results
             self.log_benchmark_result(network)
+
+            # Push WandB Logs
             if is_wandb_log:
                 self.logger.push_wandb_logs()
+
+            # Log alpha values
             if not is_warm_epoch:
                 with torch.no_grad():
                     for i, alpha in enumerate(self.model.arch_parameters):
                         self.logger.log(f"alpha {i} is {alpha}")
 
-            if self.use_data_parallel:
-                network.module.reset_gm_scores()
-            else:
-                network.reset_gm_scores()
+            # Reset GM Scores
+            if calc_gm_score:
+                if self.use_data_parallel:
+                    network.module.reset_gm_scores()
+                else:
+                    network.reset_gm_scores()
 
             # measure elapsed time
             epoch_time.update(time.time() - start_time)
@@ -243,6 +274,7 @@ class ConfigurableTrainer:
         is_warm_epoch: bool = False,
         oles: bool = False,
         calc_gm_score: bool = False,
+        layer_alignment_scores: tuple[AverageMeter, AverageMeter] | None = None,
     ) -> tuple[TrainingMetrics, TrainingMetrics]:
         data_time, batch_time = AverageMeter(), AverageMeter()
         base_losses, base_top1, base_top5 = (
@@ -257,6 +289,8 @@ class ConfigurableTrainer:
         )
         network.train()
         end = time.time()
+        layer_alignment_scores[0].reset()  # type: ignore
+        layer_alignment_scores[1].reset()  # type: ignore
 
         for step, (base_inputs, base_targets) in enumerate(train_loader):
             # FIXME: What was the point of this? and is it safe to remove?
@@ -312,6 +346,20 @@ class ConfigurableTrainer:
             _, logits = network(base_inputs)
             base_loss = criterion(logits, base_targets)
             base_loss.backward()
+
+            if self.use_data_parallel and hasattr(
+                network.module, "get_mean_layer_alignment_score"
+            ):
+                (
+                    score_normal,
+                    score_reduce,
+                ) = network.module.get_mean_layer_alignment_score()
+                layer_alignment_scores[0].update(val=score_normal)  # type: ignore
+                layer_alignment_scores[1].update(val=score_reduce)  # type: ignore
+            elif hasattr(network, "get_mean_layer_alignment_score"):
+                score_normal, score_reduce = network.get_mean_layer_alignment_score()
+                layer_alignment_scores[0].update(val=score_normal)  # type: ignore
+                layer_alignment_scores[1].update(val=score_reduce)  # type: ignore
 
             if self.use_data_parallel:
                 torch.nn.utils.clip_grad_norm_(
