@@ -101,6 +101,19 @@ def clear_grad_cosine(m: torch.nn.Module) -> None:
     m.count = 0
 
 
+def calc_layer_alignment_score(layer_gradients: list[torch.Tensor]) -> float:
+    scale = len(layer_gradients) * (len(layer_gradients) - 1) / 2
+    score = 0
+    for i in range(len(layer_gradients)):
+        for j in range(i + 1, len(layer_gradients)):
+            g, g_ = layer_gradients[i], layer_gradients[j]
+            numerator = torch.dot(g, g_)
+            denominator = g.norm(p=2.0) * g_.norm(p=2.0)
+            score += numerator / denominator
+    assert score.shape == torch.Size([])  # type: ignore
+    return score.item() / scale  # type: ignore
+
+
 __all__ = [
     "calc_accuracy",
     "save_checkpoint",
@@ -114,4 +127,5 @@ __all__ = [
     "BaseProfile",
     "get_device",
     "normalize_params",
+    "calc_layer_alignment_score",
 ]
