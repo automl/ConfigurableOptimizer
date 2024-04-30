@@ -11,7 +11,7 @@ import torch
 from torch import nn
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
-from confopt.utils import AverageMeter, freeze
+from confopt.utils import AverageMeter, calc_layer_alignment_score, freeze
 from confopt.utils.normalize_params import normalize_params
 
 from .cells import NAS201SearchCell as SearchCell
@@ -127,6 +127,7 @@ class NB201SearchModel(nn.Module):
         self.beta_parameters = nn.Parameter(
             1e-3 * torch.randn(num_edge)  # type: ignore
         )
+        self.weights: dict[str, list[torch.Tensor]] = {}
 
     def get_weights(self) -> list[nn.Parameter]:
         """Get a list of learnable parameters in the model. (does not include alpha or
@@ -251,14 +252,26 @@ class NB201SearchModel(nn.Module):
         if self.edge_normalization:
             return self.edge_normalization_forward(inputs)
 
-        alphas = self.sample(self.arch_parameters)
-
-        if self.mask is not None:
-            alphas = normalize_params(alphas, self.mask)
+        self.weights["alphas"] = []
+        # alphas = self.sample(self.arch_parameters)
+        # if self.mask is not None:
+        #     alphas = normalize_params(alphas, self.mask)
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
             if isinstance(cell, SearchCell):
+                alphas = self.sample(self.arch_parameters)
+                # alphas = torch.nn.functional.softmax(self.arch_parameters, dim=-1)
+                if self.mask is not None:
+                    alphas = normalize_params(alphas, self.mask)
+                if self.training:
+                    if isinstance(alphas, list):
+                        for alpha in alphas:
+                            alpha.retain_grad()
+                    else:
+                        assert isinstance(alphas, torch.Tensor)
+                        alphas.retain_grad()
+                    self.weights["alphas"].append(alphas)
                 feature = cell(feature, alphas)
             else:
                 feature = cell(feature)
@@ -274,6 +287,7 @@ class NB201SearchModel(nn.Module):
         self,
         inputs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        self.weights["alphas"] = []
         alphas = self.sample(self.arch_parameters)
 
         if self.mask is not None:
@@ -293,6 +307,14 @@ class NB201SearchModel(nn.Module):
                     )
                     betas = torch.cat([betas, beta_node_v], dim=0)
 
+                if self.training:
+                    if isinstance(alphas, list):
+                        for alpha in alphas:
+                            alpha.retain_grad()
+                    else:
+                        assert isinstance(alphas, torch.Tensor)
+                        alphas.retain_grad()
+                    self.weights["alphas"].append(alphas)
                 feature = cell(feature, alphas, betas)
             else:
                 feature = cell(feature)
@@ -303,6 +325,25 @@ class NB201SearchModel(nn.Module):
         logits = self.classifier(out)
 
         return out, logits
+
+    def get_arch_grads(self) -> list[torch.Tensor]:
+        grads = []
+        for alphas in self.weights["alphas"]:
+            if isinstance(alphas, list):
+                alphas_grads = [alpha.grad.data.clone().detach() for alpha in alphas]
+                grads.append(torch.stack(alphas_grads).detach().reshape(-1))
+            else:
+                grads.append(alphas.grad.data.clone().detach().reshape(-1))
+
+        return grads
+
+    def _get_mean_layer_alignment_score(self) -> float:
+        grads = self.get_arch_grads()
+        mean_score = calc_layer_alignment_score(grads)
+
+        if str(mean_score) == "nan":
+            mean_score = 0
+        return mean_score
 
     def _prune(self, op_sparsity: float, wider: int | None = None) -> None:
         """Masks architecture parameters to enforce sparsity.

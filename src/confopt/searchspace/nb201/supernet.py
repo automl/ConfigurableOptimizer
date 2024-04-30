@@ -116,3 +116,6 @@ class NASBench201SearchSpace(SearchSpace):
                 module.pre_grads.clear()
             if hasattr(module, "running_sim"):
                 module.running_sim.reset()
+
+    def get_mean_layer_alignment_score(self) -> tuple[float, float]:
+        return self.model._get_mean_layer_alignment_score(), 0
