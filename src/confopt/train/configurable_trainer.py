@@ -350,17 +350,12 @@ class ConfigurableTrainer:
             base_loss = criterion(logits, base_targets)
             base_loss.backward()
 
-            if self.use_data_parallel and hasattr(
-                network.module, "get_mean_layer_alignment_score"
-            ):
+            network_module = network.module if self.use_data_parallel else network
+            if hasattr(network_module, "get_mean_layer_alignment_score"):
                 (
                     score_normal,
                     score_reduce,
-                ) = network.module.get_mean_layer_alignment_score()
-                layer_alignment_scores[0].update(val=score_normal)  # type: ignore
-                layer_alignment_scores[1].update(val=score_reduce)  # type: ignore
-            elif hasattr(network, "get_mean_layer_alignment_score"):
-                score_normal, score_reduce = network.get_mean_layer_alignment_score()
+                ) = network_module.get_mean_layer_alignment_score()
                 layer_alignment_scores[0].update(val=score_normal)  # type: ignore
                 layer_alignment_scores[1].update(val=score_reduce)  # type: ignore
 
