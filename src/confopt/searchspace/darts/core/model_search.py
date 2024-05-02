@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import torch
 from torch import nn
 import torch.nn.functional as F  # noqa: N812
@@ -482,9 +484,9 @@ class Network(nn.Module):
         mean_score_normal = calc_layer_alignment_score(grads_normal)
         mean_score_reduce = calc_layer_alignment_score(grads_reduce)
 
-        if str(mean_score_normal) == "nan":
+        if math.isnan(mean_score_normal):
             mean_score_normal = 0
-        if str(mean_score_reduce) == "nan":
+        if math.isnan(mean_score_reduce):
             mean_score_reduce = 0
         return mean_score_normal, mean_score_reduce
 
