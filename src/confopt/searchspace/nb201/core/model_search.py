@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import math
 
 import torch
 from torch import nn
@@ -341,8 +342,9 @@ class NB201SearchModel(nn.Module):
         grads = self.get_arch_grads()
         mean_score = calc_layer_alignment_score(grads)
 
-        if str(mean_score) == "nan":
+        if math.isnan(mean_score):
             mean_score = 0
+
         return mean_score
 
     def _prune(self, op_sparsity: float, wider: int | None = None) -> None:
