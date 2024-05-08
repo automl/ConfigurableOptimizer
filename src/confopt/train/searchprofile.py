@@ -4,7 +4,7 @@ import torch
 
 from confopt.oneshot.archsampler import BaseSampler, DARTSSampler, GDASSampler
 from confopt.oneshot.dropout import Dropout
-from confopt.oneshot.lora_activator import LoRAToggler
+from confopt.oneshot.lora_toggler import LoRAToggler
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import BasePerturbator
 from confopt.oneshot.weightentangler import WeightEntangler

@@ -26,7 +26,7 @@ from confopt.oneshot.archsampler import (
     SNASSampler,
 )
 from confopt.oneshot.dropout import Dropout
-from confopt.oneshot.lora_activator import LoRAToggler
+from confopt.oneshot.lora_toggler import LoRAToggler
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import SDARTSPerturbator
 from confopt.oneshot.weightentangler import WeightEntangler
