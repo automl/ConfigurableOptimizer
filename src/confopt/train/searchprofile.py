@@ -6,6 +6,7 @@ from confopt.oneshot.archsampler import BaseSampler, DARTSSampler, GDASSampler
 from confopt.oneshot.dropout import Dropout
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import BasePerturbator
+from confopt.oneshot.pruner import Pruner
 from confopt.oneshot.weightentangler import WeightEntangler
 from confopt.searchspace import DARTSSearchSpace
 from confopt.searchspace.common import (
@@ -26,6 +27,7 @@ class Profile:
         dropout: Dropout | None = None,
         weight_entangler: WeightEntangler | None = None,
         lora_configs: dict | None = None,
+        pruner: Pruner | None = None,
     ) -> None:
         self.sampler = sampler
         self.edge_normalization = edge_normalization
@@ -34,6 +36,7 @@ class Profile:
         self.dropout = dropout
         self.weight_entangler = weight_entangler
         self.lora_configs = lora_configs
+        self.pruner = pruner
 
         self.is_argmax_sampler = False
         if isinstance(self.sampler, GDASSampler):
@@ -60,6 +63,9 @@ class Profile:
 
         if self.dropout:
             search_space.components.append(self.dropout)
+
+        if self.pruner:
+            search_space.components.append(self.pruner)
 
     def perturb_parameter(self, search_space: SearchSpace) -> None:
         if self.perturbation is not None:
