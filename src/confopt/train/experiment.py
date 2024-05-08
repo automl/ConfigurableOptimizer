@@ -26,6 +26,7 @@ from confopt.oneshot.archsampler import (
     SNASSampler,
 )
 from confopt.oneshot.dropout import Dropout
+from confopt.oneshot.lora_activator import LoRAToggler
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import SDARTSPerturbator
 from confopt.oneshot.weightentangler import WeightEntangler
@@ -357,6 +358,7 @@ class Experiment:
         else:
             self.benchmark_api = None
 
+        self.set_lora_toggler(config.get("lora", {}).get("toggle_epochs"))
         self.set_weight_entangler()
         self.set_profile(config)
 
@@ -439,6 +441,15 @@ class Experiment:
     def set_weight_entangler(self) -> None:
         self.weight_entangler = WeightEntangler() if self.entangle_op_weights else None
 
+    def set_lora_toggler(self, toggle_epochs: list[int]) -> None:
+        if toggle_epochs:
+            self.lora_toggler = LoRAToggler(
+                searchspace=self.search_space,
+                toggle_epochs=toggle_epochs,
+            )
+        else:
+            self.lora_toggler = None
+
     def set_profile(self, config: dict) -> None:
         assert self.sampler is not None
 
@@ -449,6 +460,7 @@ class Experiment:
             perturbation=self.perturbator,
             dropout=self.dropout,
             weight_entangler=self.weight_entangler,
+            lora_toggler=self.lora_toggler,
             lora_configs=config.get("lora"),
         )
 

@@ -26,6 +26,7 @@ class ProfileConfig:
         entangle_op_weights: bool = False,
         lora_rank: int = 0,
         lora_warm_epochs: int = 0,
+        lora_toggle_epochs: list[int] | None = None,
         seed: int = 100,
         searchspace_str: str = "nb201",
         oles: bool = False,
@@ -39,7 +40,7 @@ class ProfileConfig:
         self._initialize_trainer_config()
         self._initialize_sampler_config()
         self._set_partial_connector(is_partial_connection)
-        self._set_lora_configs(lora_rank)
+        self._set_lora_configs(lora_rank, toggle_epochs=lora_toggle_epochs)
         self._set_dropout(dropout)
         self._set_perturb(perturbation, perturbator_sample_frequency)
         self.entangle_op_weights = entangle_op_weights
@@ -53,8 +54,10 @@ class ProfileConfig:
         lora_dropout: float = 0,
         lora_alpha: int = 1,
         merge_weights: bool = True,
+        toggle_epochs: list[int] | None = None,
     ) -> None:
         self.lora_config = {
+            "toggle_epochs": toggle_epochs,
             "r": lora_rank,
             "lora_dropout": lora_dropout,
             "lora_alpha": lora_alpha,
