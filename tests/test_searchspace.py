@@ -12,6 +12,7 @@ from confopt.searchspace import (
     TransNASBench101SearchSpace,
     RobustDARTSSearchSpace,
 )
+from confopt.searchspace.common.base_search import SearchSpace
 from confopt.searchspace.common.lora_layers import LoRALayer
 from confopt.searchspace.darts.core.model_search import Cell as DARTSSearchCell
 from confopt.searchspace.darts.core.operations import (
@@ -34,6 +35,58 @@ from confopt.searchspace.robust_darts.core.model_search import (
 from utils import get_modules_of_type  # type: ignore
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+
+def _test_deactivate_lora(search_space: SearchSpace) -> None:
+    for _, module in search_space.named_modules(remove_duplicate=False):
+        if isinstance(module, LoRALayer):
+            module.activate_lora(r=4)
+
+    for _, module in search_space.named_modules(remove_duplicate=False):
+        if isinstance(module, LoRALayer):
+            assert module.r == 4
+            assert module.conv.weight.requires_grad == False
+
+    for _, module in search_space.named_modules(remove_duplicate=False):
+        if isinstance(module, LoRALayer):
+            module.deactivate_lora()
+
+    for _, module in search_space.named_modules(remove_duplicate=False):
+        if isinstance(module, LoRALayer):
+            assert module.r == 0
+            assert hasattr(module, "_original_r") and module._original_r == 4
+            assert module.conv.weight.requires_grad == True
+
+
+def _test_toggle_lora(search_space: SearchSpace) -> None:
+    for _, module in search_space.named_modules(remove_duplicate=False):
+        if isinstance(module, LoRALayer):
+            module.activate_lora(r=4)
+
+    for _, module in search_space.named_modules(remove_duplicate=False):
+        if isinstance(module, LoRALayer):
+            assert module.r == 4
+            assert module.conv.weight.requires_grad == False
+
+    for _, module in search_space.named_modules(remove_duplicate=False):
+        if isinstance(module, LoRALayer):
+            module.toggle_lora()
+
+    for _, module in search_space.named_modules(remove_duplicate=False):
+        if isinstance(module, LoRALayer):
+            assert module.r == 0
+            assert hasattr(module, "_original_r") and module._original_r == 4
+            assert module.conv.weight.requires_grad == True
+
+    for _, module in search_space.named_modules(remove_duplicate=True):
+        if isinstance(module, LoRALayer):
+            module.toggle_lora()
+
+    for _, module in search_space.named_modules(remove_duplicate=False):
+        if isinstance(module, LoRALayer):
+            assert module.r == 4
+            assert not hasattr(module, "_original_r")
+            assert module.conv.weight.requires_grad == False
 
 
 class TestBabyDARTS(unittest.TestCase):
@@ -290,6 +343,12 @@ class TestNASBench201SearchSpace(unittest.TestCase):
 
         assert model_params == model_optimizer.param_groups[0]["params"]
 
+    def test_deactivate_lora(self) -> None:
+        _test_deactivate_lora(NASBench201SearchSpace())
+
+    def test_toggle_lora(self) -> None:
+        _test_toggle_lora(NASBench201SearchSpace())
+
 
 class TestDARTSSearchSpace(unittest.TestCase):
     def test_arch_parameters(self) -> None:
@@ -421,6 +480,12 @@ class TestDARTSSearchSpace(unittest.TestCase):
         model_params = search_space.model_weight_parameters()
 
         assert model_params == model_optimizer.param_groups[0]["params"]
+
+    def test_deactivate_lora(self) -> None:
+        _test_deactivate_lora(DARTSSearchSpace())
+
+    def test_toggle_lora(self) -> None:
+        _test_toggle_lora(DARTSSearchSpace())
 
 
 class TestNASBench1Shot1SearchSpace(unittest.TestCase):
