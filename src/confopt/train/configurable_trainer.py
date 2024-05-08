@@ -174,6 +174,10 @@ class ConfigurableTrainer:
             self.logger.add_wandb_log_metrics("search/arch", arch_metrics, epoch)
             self.logger.add_wandb_log_metrics("eval", valid_metrics, epoch)
 
+            # Log architectural parameter values
+            arch_values_dict = self.get_arch_values_as_dict(network)
+            self.logger.update_wandb_logs(arch_values_dict)
+
             # Log GM scores
             if calc_gm_score:
                 if self.use_data_parallel:
@@ -727,3 +731,19 @@ class ConfigurableTrainer:
             calling_frequency == "step" and profile.sampler.sample_frequency == "epoch"
         ):
             profile.reset_sample_function(model)
+
+    def get_arch_values_as_dict(self, model: SearchSpace) -> dict:
+        if isinstance(model, torch.nn.DataParallel):
+            model = model.module
+        arch_values = model.arch_parameters
+        arch_values_dict = {}
+
+        for i, alpha in enumerate(arch_values):
+            data = {}
+            alpha = torch.nn.functional.softmax(alpha, dim=-1).detach().cpu().numpy()
+            for edge_idx in range(alpha.shape[0]):
+                for op_idx in range(alpha.shape[1]):
+                    data[f"edge_{edge_idx}_op_{op_idx}"] = alpha[edge_idx][op_idx]
+            arch_values_dict[f"arch_values/alpha_{i}"] = data
+
+        return arch_values_dict
