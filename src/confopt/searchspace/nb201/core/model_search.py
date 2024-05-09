@@ -263,8 +263,7 @@ class NB201SearchModel(nn.Module):
             if isinstance(cell, SearchCell):
                 alphas = self.sample(self.arch_parameters)
                 # alphas = torch.nn.functional.softmax(self.arch_parameters, dim=-1)
-                if self.mask is not None:
-                    alphas = normalize_params(alphas, self.mask)
+                # Retain Grads for weights
                 if self.training:
                     if isinstance(alphas, list):
                         for alpha in alphas:
@@ -273,6 +272,8 @@ class NB201SearchModel(nn.Module):
                         assert isinstance(alphas, torch.Tensor)
                         alphas.retain_grad()
                     self.weights["alphas"].append(alphas)
+                if self.mask is not None:
+                    alphas = normalize_params(alphas, self.mask)
                 feature = cell(feature, alphas)
             else:
                 feature = cell(feature)
@@ -289,14 +290,12 @@ class NB201SearchModel(nn.Module):
         inputs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         self.weights["alphas"] = []
-        alphas = self.sample(self.arch_parameters)
-
-        if self.mask is not None:
-            alphas = normalize_params(alphas, self.mask)
+        # alphas = self.sample(self.arch_parameters)
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
             if isinstance(cell, SearchCell):
+                alphas = self.sample(self.arch_parameters)
                 betas = torch.empty((0,)).to(alphas[0].device)  # type: ignore
                 for v in range(1, self.max_nodes):
                     idx_nodes = []
@@ -307,7 +306,7 @@ class NB201SearchModel(nn.Module):
                         self.beta_parameters[idx_nodes], dim=-1
                     )
                     betas = torch.cat([betas, beta_node_v], dim=0)
-
+                # Retain Grads for weights
                 if self.training:
                     if isinstance(alphas, list):
                         for alpha in alphas:
@@ -316,6 +315,9 @@ class NB201SearchModel(nn.Module):
                         assert isinstance(alphas, torch.Tensor)
                         alphas.retain_grad()
                     self.weights["alphas"].append(alphas)
+
+                if self.mask is not None:
+                    alphas = normalize_params(alphas, self.mask)
                 feature = cell(feature, alphas, betas)
             else:
                 feature = cell(feature)
@@ -347,38 +349,21 @@ class NB201SearchModel(nn.Module):
 
         return mean_score
 
-    def _prune(self, op_sparsity: float, wider: int | None = None) -> None:
+    def prune(self, num_keep: int) -> None:
         """Masks architecture parameters to enforce sparsity.
 
         Args:
-            op_sparsity (float): The desired sparsity level, represented as a
-            fraction of operations to keep.
-            wider (int): If provided, this parameter determines how much wider the
-            search space should be by multiplying the number of channels by this factor.
-
-        Note:
-            This method enforces sparsity in the architecture parameters by zeroing out
-            a fraction of the smallest values, as specified by the `op_sparsity`
-            parameter.
-            It modifies the architecture parameters in-place to achieve the desired
-            sparsity.
+            num_keep (int): Number of operations to keep.
         """
-        if self.arch_parameters is None:
-            ValueError("cannot prune discretized search space")
-        # self.edge_normalization = False TODO: we could have partial connections and
-        # prune
-        for _name, module in self.named_modules():
-            if isinstance(module, (OperationBlock, OperationChoices)):
-                module.change_op_channel_size(wider)
-
         sorted_arch_params, _ = torch.sort(
             self.arch_parameters.data, dim=1, descending=True  # type: ignore
         )
-        top_k = int(op_sparsity * len(self.op_names))
-        thresholds = sorted_arch_params[:, :top_k]
+        top_k = num_keep
+        thresholds = sorted_arch_params[:, top_k - 1].unsqueeze(1)
         self.mask = self.arch_parameters.data >= thresholds  # type: ignore
 
         self.arch_parameters.data *= self.mask.float()  # type: ignore
+        self.arch_parameters.data[self.mask].requires_grad = True  # type: ignore
         self.arch_parameters.data[~self.mask].requires_grad = False  # type: ignore
         if self.arch_parameters.data[~self.mask].grad:  # type: ignore
             self.arch_parameters.data[~self.mask].grad.zero_()  # type: ignore
