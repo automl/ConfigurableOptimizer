@@ -443,7 +443,7 @@ class Experiment:
             self.pruner = Pruner(
                 searchspace=self.search_space,
                 prune_epochs=config.get("prune_epochs", []),
-                prune_widers=config.get("prune_widers"),
+                prune_num_keeps=config.get("prune_num_keeps", []),
             )
         else:
             self.pruner = None

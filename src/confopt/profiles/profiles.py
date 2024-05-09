@@ -29,7 +29,7 @@ class DartsProfile(ProfileConfig, ABC):
         oles: bool = False,
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
-        prune_widers: list[int | None] | None = None,
+        prune_num_keeps: list[int] | None = None,
     ) -> None:
         PROFILE_TYPE = "DARTS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -48,7 +48,7 @@ class DartsProfile(ProfileConfig, ABC):
             oles,
             calc_gm_score,
             prune_epochs,
-            prune_widers,
+            prune_num_keeps,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
@@ -84,7 +84,7 @@ class GDASProfile(ProfileConfig, ABC):
         oles: bool = False,
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
-        prune_widers: list[int | None] | None = None,
+        prune_num_keeps: list[int] | None = None,
     ) -> None:
         PROFILE_TYPE = "GDAS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -105,7 +105,7 @@ class GDASProfile(ProfileConfig, ABC):
             oles,
             calc_gm_score,
             prune_epochs,
-            prune_widers,
+            prune_num_keeps,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
@@ -147,7 +147,7 @@ class SNASProfile(ProfileConfig, ABC):
         oles: bool = False,
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
-        prune_widers: list[int | None] | None = None,
+        prune_num_keeps: list[int] | None = None,
     ) -> None:
         PROFILE_TYPE = "SNAS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -170,7 +170,7 @@ class SNASProfile(ProfileConfig, ABC):
             oles,
             calc_gm_score,
             prune_epochs,
-            prune_widers,
+            prune_num_keeps,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
@@ -210,7 +210,7 @@ class DRNASProfile(ProfileConfig, ABC):
         oles: bool = False,
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
-        prune_widers: list[int | None] | None = None,
+        prune_num_keeps: list[int] | None = None,
     ) -> None:
         PROFILE_TYPE = "DRNAS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -229,7 +229,7 @@ class DRNASProfile(ProfileConfig, ABC):
             oles,
             calc_gm_score,
             prune_epochs,
-            prune_widers,
+            prune_num_keeps,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
