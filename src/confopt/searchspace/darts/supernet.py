@@ -98,9 +98,8 @@ class DARTSSearchSpace(SearchSpace):
             self.model.alphas_reduce,
         ]
 
-    def prune(self, wider: int | None = None) -> None:
-        sparsity = 0.125
-        self.model._prune(sparsity, wider)  # type: ignore
+    def prune(self, num_keep: int) -> None:
+        self.model.prune(num_keep)  # type: ignore
 
     def discretize(self) -> nn.Module:
         return self.model.discretize()  # type: ignore

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from typing import Literal
 
 import torch
 from torch import nn
@@ -263,6 +264,20 @@ class Network(nn.Module):
         # Replace this function on the fly to change the sampling method
         return F.softmax(alphas, dim=-1)
 
+    def retain_weight_grad(
+        self, weights: torch.Tensor, weight_type: Literal["reduce", "normal"]
+    ) -> None:
+        # Retain grads for calculating layer alignment score
+        assert weight_type in ["reduce", "normal"]
+        if self.training:
+            if isinstance(weights, list):
+                for weight in weights:
+                    weight.retain_grad()
+            else:
+                assert isinstance(weights, torch.Tensor)
+                weights.retain_grad()
+        self.weights[weight_type].append(weights)
+
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the network model.
 
@@ -285,22 +300,14 @@ class Network(nn.Module):
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
                 weights = self.sample(self.alphas_reduce)
+                self.retain_weight_grad(weights, "reduce")
                 if self.mask is not None:
                     weights = normalize_params(weights, self.mask[1])
             else:
                 weights = self.sample(self.alphas_normal)
+                self.retain_weight_grad(weights, "normal")
                 if self.mask is not None:
                     weights = normalize_params(weights, self.mask[0])
-
-            # Retain grads for calculating layer alignment score
-            if self.training:
-                if isinstance(weights, list):
-                    for weight in weights:
-                        weight.retain_grad()
-                else:
-                    assert isinstance(weights, torch.Tensor)
-                    weights.retain_grad()
-                self.weights["reduce" if cell.reduction else "normal"].append(weights)
             s0, s1 = s1, cell(s0, s1, weights)
         out = self.global_pooling(s1)
         logits = self.classifier(out.view(out.size(0), -1))
@@ -318,6 +325,7 @@ class Network(nn.Module):
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
                 weights = self.sample(self.alphas_reduce)
+                self.retain_weight_grad(weights, "reduce")
                 if self.mask is not None:
                     weights = normalize_params(weights, self.mask[1])
                 n = 3
@@ -331,6 +339,7 @@ class Network(nn.Module):
                     weights2 = torch.cat([weights2, tw2], dim=0)
             else:
                 weights = self.sample(self.alphas_normal)
+                self.retain_weight_grad(weights, "normal")
                 if self.mask is not None:
                     weights = normalize_params(weights, self.mask[0])
                 n = 3
@@ -342,16 +351,6 @@ class Network(nn.Module):
                     start = end
                     n += 1
                     weights2 = torch.cat([weights2, tw2], dim=0)
-
-            # Retain grads for calculating layer alignment score
-            if self.training:
-                if isinstance(weights, list):
-                    for weight in weights:
-                        weight.retain_grad()
-                else:
-                    assert isinstance(weights, torch.Tensor)
-                    weights.retain_grad()
-                self.weights["reduce" if cell.reduction else "normal"].append(weights)
             s0, s1 = s1, cell(s0, s1, weights, weights2)
 
         out = self.global_pooling(s1)
@@ -490,36 +489,22 @@ class Network(nn.Module):
             mean_score_reduce = 0
         return mean_score_normal, mean_score_reduce
 
-    def _prune(self, op_sparsity: float, wider: int | None = None) -> None:
+    def prune(self, num_keep: int) -> None:
         """Discretize architecture parameters to enforce sparsity.
 
         Args:
-            op_sparsity (float): The desired sparsity level, represented as a
-            fraction of operations to keep.
-            wider (int): If provided, this parameter determines how much wider the
-            search space should be by multiplying the number of channels by this factor.
-
-        Note:
-            This method enforces sparsity in the architecture parameters by zeroing out
-            a fraction of the smallest values, as specified by the `op_sparsity`
-            parameter.
-            It modifies the architecture parameters in-place to achieve the desired
-            sparsity.
+            num_keep (float): Number of operations to keep.
         """
-        # TODO: should be removed from prune function to a seperate function
-        # TODO: write wider function for ops
         self.mask = []
-        for _name, module in self.named_modules():
-            if isinstance(module, (OperationBlock, OperationChoices)):
-                module.change_op_channel_size(wider)
 
-        top_k = int(op_sparsity * len(self.primitives))
+        top_k = num_keep
         for p in self._arch_parameters:
             sorted_arch_params, _ = torch.sort(p.data, dim=1, descending=True)
-            thresholds = sorted_arch_params[:, :top_k]
+            thresholds = sorted_arch_params[:, top_k - 1].unsqueeze(1)
             mask = p.data >= thresholds
 
             p.data *= mask.float()
+            p.data[mask].requires_grad = True
             p.data[~mask].requires_grad = False
             if p.data[~mask].grad:
                 p.data[~mask].grad.zero_()
