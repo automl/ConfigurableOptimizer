@@ -11,8 +11,8 @@ class Pruner(OneShotComponent):
         self,
         searchspace: SearchSpace,
         prune_epochs: list[int],
-        prune_widers: list[int | None] | None = None,
-    ):
+        prune_num_keeps: list[int],
+    ) -> None:
         super().__init__()
         self.prune_epochs = prune_epochs
         self.searchspace = searchspace
@@ -25,14 +25,15 @@ class Pruner(OneShotComponent):
             )
             self.use_prune = False
 
-        self.prune_epoch_to_wider = {}
-        if prune_widers is not None:
-            assert len(prune_widers) == len(prune_epochs)
-            for idx, epoch in enumerate(prune_epochs):
-                self.prune_epoch_to_wider[epoch] = prune_widers[idx]
+        self.prune_epoch_to_num_keep = {}
+        assert len(prune_num_keeps) == len(prune_epochs)
+        for idx, epoch in enumerate(prune_epochs):
+            self.prune_epoch_to_num_keep[epoch] = prune_num_keeps[idx]
 
     def new_epoch(self) -> None:
         super().new_epoch()
         if self.use_prune and self._epoch in self.prune_epochs:
             # apply the pruning mask
-            self.searchspace.prune(wider=self.prune_epoch_to_wider.get(self._epoch))
+            self.searchspace.prune(
+                num_keep=self.prune_epoch_to_num_keep.get(self._epoch)
+            )
