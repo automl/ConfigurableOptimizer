@@ -104,9 +104,9 @@ class RobustDARTSSearchSpace(SearchSpace):
             self.model.alphas_reduce,
         ]
 
-    def prune(self, wider: int | None = None) -> None:
-        sparsity = 0.125
-        self.model._prune(sparsity, wider)  # type: ignore
+    def prune(self, num_keep: int) -> None:
+        # self.model.prune(sparsity, wider)  # type: ignore
+        raise NotImplementedError("Prune has not been implemented for Robust DARTS")
 
     def discretize(self) -> nn.Module:
         return self.model._discretize()  # type: ignore
