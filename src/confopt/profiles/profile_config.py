@@ -60,13 +60,13 @@ class ProfileConfig:
         toggle_epochs: list[int] | None = None,
     ) -> None:
         self.lora_config = {
-            "toggle_epochs": toggle_epochs,
-            "lora_warm_epochs": lora_warm_epochs,
             "r": lora_rank,
             "lora_dropout": lora_dropout,
             "lora_alpha": lora_alpha,
             "merge_weights": merge_weights,
         }
+        self.lora_toggle_epochs = toggle_epochs
+        self.lora_warm_epochs = lora_warm_epochs
 
     def _set_oles_configs(
         self,
@@ -116,6 +116,10 @@ class ProfileConfig:
             "dropout": self.dropout_config,
             "trainer": self.trainer_config,
             "lora": self.lora_config,
+            "lora_extra": {
+                "toggle_epochs": self.lora_toggle_epochs,
+                "warm_epochs": self.lora_warm_epochs,
+            },
             "sampler_type": self.sampler_type,
             "searchspace_str": self.searchspace_str,
             "weight_type": weight_type,

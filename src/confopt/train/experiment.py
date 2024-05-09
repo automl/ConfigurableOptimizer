@@ -358,7 +358,7 @@ class Experiment:
         else:
             self.benchmark_api = None
 
-        self.set_lora_toggler(config.get("lora", {}))
+        self.set_lora_toggler(config.get("lora", {}), config.get("lora_extra", {}))
         self.set_weight_entangler()
         self.set_profile(config)
 
@@ -441,15 +441,15 @@ class Experiment:
     def set_weight_entangler(self) -> None:
         self.weight_entangler = WeightEntangler() if self.entangle_op_weights else None
 
-    def set_lora_toggler(self, lora_config: dict) -> None:
+    def set_lora_toggler(self, lora_config: dict, lora_extra: dict) -> None:
         if lora_config.get("r", 0) == 0:
             self.lora_toggler = None
             return
 
-        toggle_epochs = lora_config.get("toggle_epochs")
+        toggle_epochs = lora_extra.get("toggle_epochs")
         if toggle_epochs is not None:
-            assert min(toggle_epochs) > lora_config.get(
-                "lora_warm_epochs"
+            assert min(toggle_epochs) > lora_extra.get(
+                "warm_epochs"
             ), "The first toggle epoch should be after the warmup epochs"
             self.lora_toggler = LoRAToggler(
                 searchspace=self.search_space,
