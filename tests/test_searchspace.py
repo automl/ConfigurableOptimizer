@@ -96,7 +96,7 @@ class TestBabyDARTS(unittest.TestCase):
     def test_prune(self) -> None:
         search_space = BabyDARTSSearchSpace(edge_normalization=True)
         x = torch.randn(2, 3, 64, 64).to(DEVICE)
-        search_space.prune()
+        search_space.prune(num_keep=1)
         arch_params = search_space.arch_parameters
         for p in arch_params:
             assert torch.count_nonzero(p) == len(p)
@@ -238,7 +238,8 @@ class TestNASBench201SearchSpace(unittest.TestCase):
     def test_prune(self) -> None:
         search_space = NASBench201SearchSpace(edge_normalization=True)
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
-        search_space.prune()
+        num_keep=1
+        search_space.prune(num_keep)
         arch_params = search_space.arch_parameters[0]
         assert torch.count_nonzero(arch_params) == len(arch_params)
         assert torch.equal(
@@ -352,7 +353,8 @@ class TestDARTSSearchSpace(unittest.TestCase):
     def test_prune(self) -> None:
         search_space = DARTSSearchSpace(edge_normalization=True)
         x = torch.randn(2, 3, 64, 64).to(DEVICE)
-        search_space.prune()
+        num_keep = 1
+        search_space.prune(num_keep)
         arch_params = search_space.arch_parameters
         for p in arch_params:
             assert torch.count_nonzero(p) == len(p)
@@ -576,7 +578,8 @@ class TestTransNASBench101SearchSpace(unittest.TestCase):
     def test_prune(self) -> None:
         search_space = TransNASBench101SearchSpace(edge_normalization=True)
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
-        search_space.prune()
+        num_keep = 1
+        search_space.prune(num_keep)
         arch_params = search_space.arch_parameters[0]
         assert torch.count_nonzero(arch_params) == len(arch_params)
         assert torch.equal(
