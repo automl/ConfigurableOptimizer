@@ -48,6 +48,8 @@ class LoRALayer:
         ):  # if it's being activated again after deactivation
             self.r = self._original_r
             self.conv.weight.requires_grad = False  # type: ignore
+            self.lora_A.requires_grad = True  # type: ignore
+            self.lora_B.requires_grad = True  # type: ignore
             del self._original_r
             return
 
@@ -67,6 +69,9 @@ class LoRALayer:
             self._original_r = self.r
             self.r = 0
             self.conv.weight.requires_grad = True  # type: ignore
+            self.lora_A.requires_grad = False
+            self.lora_B.requires_grad = False
+
             if self.conv.bias is not None:  # type: ignore
                 self.conv.bias.requires_grad = True  # type: ignore
 
