@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import numpy as np
+from torch.nn import DataParallel
 
 from confopt.oneshot.base_component import OneShotComponent
 from confopt.searchspace.common.base_search import SearchSpace
 from confopt.searchspace.common.lora_layers import LoRALayer
-from confopt.utils import reset_gm_score_attributes
 
 
 class LoRAToggler(OneShotComponent):
@@ -28,6 +28,12 @@ class LoRAToggler(OneShotComponent):
                     or (self.toggle_probability > np.random.random())
                 ):
                     module.toggle_lora()
-                    reset_gm_score_attributes(module)
+
+            unwrapped_model = (
+                self.searchspace.module
+                if isinstance(self.searchspace, DataParallel)
+                else self.searchspace
+            )
+            unwrapped_model.reset_gm_score_attributes()
 
         super().new_epoch()
