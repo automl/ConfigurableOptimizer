@@ -292,6 +292,16 @@ def reduce_bn_features(
 def configure_optimizer(
     optimizer_old: optim.Optimizer, optimizer_new: optim.Optimizer
 ) -> optim.Optimizer:
+    """Configures a new optimizer using state information from an old optimizer.
+    Code originates from github.com/xiangning-chen/DrNAS/blob/master/net2wider.py.
+
+    Parameters:
+    - optimizer_old (optim.Optimizer): Previously used optimizer.
+    - optimizer_new (optim.Optimizer): Freshly initialized optimizer.
+
+    Returns:
+    - optim.Optimizer: Configured optimizer_new.
+    """
     for i, p in enumerate(optimizer_new.param_groups[0]["params"]):
         if not hasattr(p, "raw_id"):
             optimizer_new.state[i] = optimizer_old.state_dict()["state"][i]
@@ -342,5 +352,8 @@ def configure_scheduler(
     scheduler_old: LRSchedulerType,
     scheduler_new: LRSchedulerType,
 ) -> LRSchedulerType:
+    """Configures a new LR-scheduler using state information from an old scheduler.
+    Code originates from github.com/xiangning-chen/DrNAS/blob/master/net2wider.py.
+    """
     scheduler_new.load_state_dict(scheduler_old.state_dict())
     return scheduler_new
