@@ -27,6 +27,7 @@ class ProfileConfig:
         lora_rank: int = 0,
         lora_warm_epochs: int = 0,
         lora_toggle_epochs: list[int] | None = None,
+        lora_toggle_probability: float | None = None,
         seed: int = 100,
         searchspace_str: str = "nb201",
         oles: bool = False,
@@ -41,7 +42,10 @@ class ProfileConfig:
         self._initialize_sampler_config()
         self._set_partial_connector(is_partial_connection)
         self._set_lora_configs(
-            lora_rank, lora_warm_epochs, toggle_epochs=lora_toggle_epochs
+            lora_rank,
+            lora_warm_epochs,
+            toggle_epochs=lora_toggle_epochs,
+            lora_toggle_probability=lora_toggle_probability,
         )
         self._set_dropout(dropout)
         self._set_perturb(perturbation, perturbator_sample_frequency)
@@ -56,6 +60,7 @@ class ProfileConfig:
         lora_warm_epochs: int = 0,
         lora_dropout: float = 0,
         lora_alpha: int = 1,
+        lora_toggle_probability: float | None = None,
         merge_weights: bool = True,
         toggle_epochs: list[int] | None = None,
     ) -> None:
@@ -67,6 +72,7 @@ class ProfileConfig:
         }
         self.lora_toggle_epochs = toggle_epochs
         self.lora_warm_epochs = lora_warm_epochs
+        self.lora_toggle_probability = lora_toggle_probability
 
     def _set_oles_configs(
         self,
@@ -119,6 +125,7 @@ class ProfileConfig:
             "lora_extra": {
                 "toggle_epochs": self.lora_toggle_epochs,
                 "warm_epochs": self.lora_warm_epochs,
+                "toggle_probability": self.lora_toggle_probability,
             },
             "sampler_type": self.sampler_type,
             "searchspace_str": self.searchspace_str,

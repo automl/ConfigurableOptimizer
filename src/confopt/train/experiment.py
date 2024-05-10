@@ -447,6 +447,7 @@ class Experiment:
             return
 
         toggle_epochs = lora_extra.get("toggle_epochs")
+        toggle_probability = lora_extra.get("toggle_probability")
         if toggle_epochs is not None:
             assert min(toggle_epochs) > lora_extra.get(
                 "warm_epochs"
@@ -454,6 +455,7 @@ class Experiment:
             self.lora_toggler = LoRAToggler(
                 searchspace=self.search_space,
                 toggle_epochs=toggle_epochs,
+                toggle_probability=toggle_probability,
             )
         else:
             self.lora_toggler = None
