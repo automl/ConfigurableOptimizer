@@ -297,14 +297,18 @@ class Network(nn.Module):
         s0 = s1 = self.stem(x)
         self.weights["normal"] = []
         self.weights["reduce"] = []
+
+        weights_normal = self.sample(self.alphas_normal)
+        weights_reduce = self.sample(self.alphas_reduce)
+
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
-                weights = self.sample(self.alphas_reduce)
+                weights = weights_reduce
                 self.retain_weight_grad(weights, "reduce")
                 if self.mask is not None:
                     weights = normalize_params(weights, self.mask[1])
             else:
-                weights = self.sample(self.alphas_normal)
+                weights = weights_normal
                 self.retain_weight_grad(weights, "normal")
                 if self.mask is not None:
                     weights = normalize_params(weights, self.mask[0])
@@ -322,9 +326,13 @@ class Network(nn.Module):
         s0 = s1 = self.stem(inputs)
         self.weights["normal"] = []
         self.weights["reduce"] = []
+
+        weights_normal = self.sample(self.alphas_normal)
+        weights_reduce = self.sample(self.alphas_reduce)
+
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
-                weights = self.sample(self.alphas_reduce)
+                weights = weights_reduce
                 self.retain_weight_grad(weights, "reduce")
                 if self.mask is not None:
                     weights = normalize_params(weights, self.mask[1])
@@ -338,7 +346,7 @@ class Network(nn.Module):
                     n += 1
                     weights2 = torch.cat([weights2, tw2], dim=0)
             else:
-                weights = self.sample(self.alphas_normal)
+                weights = weights_normal
                 self.retain_weight_grad(weights, "normal")
                 if self.mask is not None:
                     weights = normalize_params(weights, self.mask[0])
