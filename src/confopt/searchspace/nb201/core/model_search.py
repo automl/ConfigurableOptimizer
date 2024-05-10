@@ -416,10 +416,6 @@ def preserve_grads(m: nn.Module) -> None:
         return
 
     flag = 0
-    # for op in OLES_OPS:
-    #     if isinstance(m, op):
-    #         flag = 1
-    #         break
 
     if isinstance(m, tuple(OLES_OPS)):
         flag = 1
