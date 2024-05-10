@@ -299,37 +299,36 @@ def configure_optimizer(
         state_old = optimizer_old.state_dict()["state"][i]
         state_new = optimizer_new.state[i]
 
-        state_new["momentum_buffer"] = state_old["momentum_buffer"]
-        if p.t == "bn":
-            # BN layer
-            state_new["momentum_buffer"] = torch.cat(
-                [
-                    state_new["momentum_buffer"],
-                    state_new["momentum_buffer"][p.out_index].clone(),
-                ],
-                dim=0,
-            )
-            # clean to enable multiple call
-            del p.t, p.raw_id, p.out_index
-
-        elif p.t == "conv":
-            # conv layer
-            if hasattr(p, "in_index"):
+        if state_old.get("momentum_buffer", None) is not None:
+            state_new["momentum_buffer"] = state_old["momentum_buffer"]
+            if p.t == "bn":
+                # BN layer
                 state_new["momentum_buffer"] = torch.cat(
                     [
                         state_new["momentum_buffer"],
-                        state_new["momentum_buffer"][:, p.in_index, :, :].clone(),
-                    ],
-                    dim=1,
-                )
-            if hasattr(p, "out_index"):
-                state_new["momentum_buffer"] = torch.cat(
-                    [
-                        state_new["momentum_buffer"],
-                        state_new["momentum_buffer"][p.out_index, :, :, :].clone(),
+                        state_new["momentum_buffer"][p.out_index].clone(),
                     ],
                     dim=0,
                 )
+
+            elif p.t == "conv":
+                # conv layer
+                if hasattr(p, "in_index"):
+                    state_new["momentum_buffer"] = torch.cat(
+                        [
+                            state_new["momentum_buffer"],
+                            state_new["momentum_buffer"][:, p.in_index, :, :].clone(),
+                        ],
+                        dim=1,
+                    )
+                if hasattr(p, "out_index"):
+                    state_new["momentum_buffer"] = torch.cat(
+                        [
+                            state_new["momentum_buffer"],
+                            state_new["momentum_buffer"][p.out_index, :, :, :].clone(),
+                        ],
+                        dim=0,
+                    )
             # clean to enable multiple call
             del p.t, p.raw_id
             if hasattr(p, "in_index"):
