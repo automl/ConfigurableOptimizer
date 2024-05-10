@@ -2,6 +2,7 @@ import unittest
 
 import torch
 from torch import nn
+from torch import optim
 
 from confopt.utils.reduce_channels import (
     increase_bn_features,
@@ -12,6 +13,7 @@ from confopt.utils.reduce_channels import (
     increase_conv_channels,
     change_channel_size_conv,
     change_features_bn,
+    configure_optimizer,
 )
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -131,5 +133,42 @@ class TestReduceChannels(unittest.TestCase):
         increased, _ = change_features_bn(bn, k, device=DEVICE)
         assert increased.num_features > num_features
 
+    def test_configure_optimizer(self) -> None:
+        lr = 1e-3
+        out_channels = 64
+        net = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=out_channels, kernel_size=3),
+            nn.ReLU(),
+            nn.BatchNorm2d(num_features=out_channels),
+            nn.Flatten(),
+        ).to(DEVICE)
+        x = torch.randn(1, 3, 64, 64).to(DEVICE)
+        optimizer = optim.SGD(net.parameters(), lr=lr, momentum=0.9)
+        criterion = nn.CrossEntropyLoss()
+
+        pred = net(x)
+        target = torch.ones_like(pred)
+        loss = criterion(pred, target)
+        with torch.no_grad():
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        for layer in net:
+            if isinstance(layer, nn.Conv2d):
+                change_channel_size_conv(layer, k=0.5, device=DEVICE)
+            elif isinstance(layer, nn.BatchNorm2d):
+                change_features_bn(layer, k=0.5, device=DEVICE)
+        
+        new_optimizer = optim.SGD(net.parameters(), lr=lr, momentum=0.9)
+
+        configured_optim = configure_optimizer(optimizer, new_optimizer)
+
+        new_state_dict = configured_optim.state_dict()["state"]
+        old_state_dict = optimizer.state_dict()["state"]
+        assert new_state_dict[1] == old_state_dict[1]
+        assert new_state_dict[2] == old_state_dict[2]
+        assert new_state_dict[3] == old_state_dict[3]
+        assert not hasattr(new_state_dict[0], "raw_id")
 if __name__ == "__main__":
     unittest.main()
