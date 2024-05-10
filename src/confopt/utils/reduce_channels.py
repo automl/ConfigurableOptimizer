@@ -292,12 +292,12 @@ def reduce_bn_features(
 def configure_optimizer(
     optimizer_old: optim.Optimizer, optimizer_new: optim.Optimizer
 ) -> optim.Optimizer:
-    for p in optimizer_new.param_groups[0]["params"]:
+    for i, p in enumerate(optimizer_new.param_groups[0]["params"]):
         if not hasattr(p, "raw_id"):
-            optimizer_new.state[p] = optimizer_old.state[p]
+            optimizer_new.state[i] = optimizer_old.state_dict()["state"][i]
             continue
-        state_old = optimizer_old.state_dict()["state"][p.raw_id]
-        state_new = optimizer_new.state[p]
+        state_old = optimizer_old.state_dict()["state"][i]
+        state_new = optimizer_new.state[i]
 
         state_new["momentum_buffer"] = state_old["momentum_buffer"]
         if p.t == "bn":
