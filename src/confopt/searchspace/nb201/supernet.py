@@ -108,3 +108,8 @@ class NASBench201SearchSpace(SearchSpace):
 
     def get_mean_layer_alignment_score(self) -> tuple[float, float]:
         return self.model._get_mean_layer_alignment_score(), 0
+
+    def get_num_skip_ops(self) -> tuple[int, int]:
+        alphas_normal = self.model.arch_parameters
+        count_skip = lambda alphas: sum(alphas.argmax(dim=-1) == 1)
+        return count_skip(alphas_normal), -1

@@ -189,6 +189,19 @@ class ConfigurableTrainer:
                 # Add for all modules
                 self.logger.update_wandb_logs(gm_metrics)
 
+            # Count skip connections in this epoch
+            normal_cell_n_skip, reduce_cell_n_skip = (
+                network.get_num_skip_ops()
+                if self.use_data_parallel
+                else network.module.get_num_skip_ops()
+            )
+
+            n_skip_connections = {
+                "skip_connections/normal": normal_cell_n_skip,
+                "skip_connections/reduce": reduce_cell_n_skip,
+            }
+            self.logger.update_wandb_logs(n_skip_connections)
+
             # Log Layer Alignment scores
             self.logger.log(
                 f"[{epoch_str}] Layer Alignment score: "

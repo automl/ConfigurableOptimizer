@@ -59,3 +59,6 @@ class SearchSpace(nn.Module, ABC):
     def reset_gm_score_attributes(self) -> None:
         for module in self.modules():
             reset_gm_score_attributes(module)
+
+    def get_num_skip_ops(self) -> tuple[int, int]:
+        return -1, -1
