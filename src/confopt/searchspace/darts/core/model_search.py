@@ -7,7 +7,7 @@ from torch import nn
 import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
-from confopt.utils import AverageMeter, calc_layer_alignment_score, freeze
+from confopt.utils import AverageMeter, calc_layer_alignment_score
 from confopt.utils.normalize_params import normalize_params
 
 from .genotypes import BABY_PRIMITIVES, PRIMITIVES, DARTSGenotype
@@ -590,6 +590,7 @@ def preserve_grads(m: nn.Module) -> None:
         if param.requires_grad and param.grad is not None:
             g = param.grad.detach().cpu()
             m.pre_grads.append(g)
+            param.requires_grad_(False)
 
 
 # TODO: break function from OLES paper to have less branching.
@@ -632,7 +633,7 @@ def check_grads_cosine(m: nn.Module, oles: bool = False) -> None:  # noqa: C901
 
     if m.count == 20:
         if m.avg / m.count < 0.4 and oles:
-            freeze(m)
+            preserve_grads(m)
         m.count = 0
         m.avg = 0
     else:
