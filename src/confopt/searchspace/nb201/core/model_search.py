@@ -254,15 +254,17 @@ class NB201SearchModel(nn.Module):
             return self.edge_normalization_forward(inputs)
 
         self.weights["alphas"] = []
-        # alphas = self.sample(self.arch_parameters)
+        weights = self.sample(self.arch_parameters)
         # if self.mask is not None:
         #     alphas = normalize_params(alphas, self.mask)
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
             if isinstance(cell, SearchCell):
-                alphas = self.sample(self.arch_parameters)
+                # TODO fix layer alignment
+                alphas = weights
                 # alphas = torch.nn.functional.softmax(self.arch_parameters, dim=-1)
+
                 # Retain Grads for weights
                 if self.training:
                     if isinstance(alphas, list):
@@ -290,12 +292,13 @@ class NB201SearchModel(nn.Module):
         inputs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         self.weights["alphas"] = []
-        # alphas = self.sample(self.arch_parameters)
+        weights = self.sample(self.arch_parameters)
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
             if isinstance(cell, SearchCell):
-                alphas = self.sample(self.arch_parameters)
+                # TODO fix layer alignment
+                alphas = weights
                 betas = torch.empty((0,)).to(alphas[0].device)  # type: ignore
                 for v in range(1, self.max_nodes):
                     idx_nodes = []
