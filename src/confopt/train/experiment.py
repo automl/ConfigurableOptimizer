@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from collections import namedtuple
 from enum import Enum
+import json
 import random
 from typing import Callable
 import warnings
@@ -311,6 +312,11 @@ class Experiment:
             debug_mode=self.debug_mode,
             query_dataset=self.dataset_str.value,
             benchmark_api=self.benchmark_api,
+        )
+
+        config_str = json.dumps(config, indent=2, default=str)
+        self.logger.log(
+            f"Training the supernet with the following configuration: \n{config_str}"
         )
 
         trainer.train(
