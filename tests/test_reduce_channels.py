@@ -14,6 +14,7 @@ from confopt.utils.reduce_channels import (
     change_channel_size_conv,
     change_features_bn,
     configure_optimizer,
+    configure_scheduler
 )
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -170,5 +171,40 @@ class TestReduceChannels(unittest.TestCase):
         assert new_state_dict[2] == old_state_dict[2]
         assert new_state_dict[3] == old_state_dict[3]
         assert not hasattr(new_state_dict[0], "raw_id")
+
+    def test_configure_scheduler(self) -> None:
+        lr = 1e-3
+        out_channels = 64
+        net = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=out_channels, kernel_size=3),
+            nn.ReLU(),
+            nn.BatchNorm2d(num_features=out_channels),
+            nn.Flatten(),
+        ).to(DEVICE)
+        x = torch.randn(1, 3, 64, 64).to(DEVICE)
+        optimizer = optim.SGD(net.parameters(), lr=lr, momentum=0.9)
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100, eta_min=0)
+        criterion = nn.CrossEntropyLoss()
+
+        pred = net(x)
+        target = torch.ones_like(pred)
+        loss = criterion(pred, target)
+        with torch.no_grad():
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
+
+        for layer in net:
+            if isinstance(layer, nn.Conv2d):
+                change_channel_size_conv(layer, k=0.5, device=DEVICE)
+            elif isinstance(layer, nn.BatchNorm2d):
+                change_features_bn(layer, k=0.5, device=DEVICE)
+
+        new_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100, eta_min=0)
+        configured_scheduler = configure_scheduler(scheduler, new_scheduler)
+
+        assert configured_scheduler.state_dict()["last_epoch"] == 1
+
 if __name__ == "__main__":
     unittest.main()
