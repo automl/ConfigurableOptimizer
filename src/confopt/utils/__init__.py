@@ -88,11 +88,6 @@ def get_num_classes(dataset: str) -> int:
     return num_classes
 
 
-def freeze(m: torch.nn.Module) -> None:
-    for param in m.parameters():
-        param.requires_grad_(False)
-
-
 def clear_grad_cosine(m: torch.nn.Module) -> None:
     if not hasattr(m, "avg"):
         return
