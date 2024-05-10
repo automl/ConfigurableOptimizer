@@ -111,7 +111,7 @@ class NAS201SearchCell(nn.Module):
     def forward(
         self,
         inputs: torch.Tensor,
-        weightss: list[torch.Tensor] | None = None,
+        weightss: list[torch.Tensor],
         beta_weightss: list[torch.Tensor] | None = None,
     ) -> torch.Tensor:
         """Forward pass through the NAS201SearchCell.
@@ -132,9 +132,6 @@ class NAS201SearchCell(nn.Module):
             operations to input tensors based on the provided weights and beta weights
             (if edge normalization is required) for each edge.
         """
-        if weightss is None:
-            return self.discrete_model_forward(inputs)
-
         if beta_weightss is not None:
             return self.edge_normalization_forward(inputs, weightss, beta_weightss)
 
@@ -145,16 +142,6 @@ class NAS201SearchCell(nn.Module):
                 node_str = f"{i}<-{j}"
                 weights = weightss[self.edge2index[node_str]]
                 inter_nodes.append(self.edges[node_str](nodes[j], weights))
-            nodes.append(sum(inter_nodes))  # type: ignore
-        return nodes[-1]
-
-    def discrete_model_forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        nodes = [inputs]
-        for i in range(1, self.max_nodes):
-            inter_nodes = []
-            for j in range(i):
-                node_str = f"{i}<-{j}"
-                inter_nodes.append(self.edges[node_str](nodes[j]))
             nodes.append(sum(inter_nodes))  # type: ignore
         return nodes[-1]
 
@@ -176,15 +163,6 @@ class NAS201SearchCell(nn.Module):
                 )
             nodes.append(sum(inter_nodes))  # type: ignore
         return nodes[-1]
-
-    def _discretize(self, weightss: list[torch.Tensor]) -> None:
-        for i in range(1, self.max_nodes):
-            for j in range(i):
-                node_str = f"{i}<-{j}"
-                max_idx = torch.argmax(weightss[self.edge2index[node_str]], dim=-1)
-                self.edges[node_str] = (self.edges[node_str].ops)[  # type: ignore
-                    max_idx
-                ]
 
 
 class InferCell(nn.Module):

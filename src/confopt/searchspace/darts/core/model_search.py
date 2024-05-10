@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+import math
+
 import torch
 from torch import nn
 import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
-from confopt.utils import drop_path
+from confopt.utils import AverageMeter, calc_layer_alignment_score, freeze
 from confopt.utils.normalize_params import normalize_params
 
-from .model import NetworkCIFAR, NetworkImageNet
 from .genotypes import BABY_PRIMITIVES, PRIMITIVES, DARTSGenotype
-from .operations import OPS, FactorizedReduce, Identity, ReLUConvBN
+from .model import NetworkCIFAR, NetworkImageNet
+from .operations import OLES_OPS, OPS, FactorizedReduce, ReLUConvBN
 
 NUM_CIFAR_CLASSES = 10
 NUM_CIFAR100_CLASSES = 100
@@ -24,9 +26,6 @@ class MixedOp(nn.Module):
         self._ops = nn.ModuleList()
         for primitive in primitives:
             op = OPS[primitive](C, stride, False)
-            # TODO: is it okay to remove this?
-            # if "pool" in primitive:
-            #     op = nn.Sequential(op, nn.BatchNorm2d(C, affine=False))
             self._ops.append(op)
 
     def forward(self, x: torch.Tensor, weights: list[torch.Tensor]) -> torch.Tensor:
@@ -92,9 +91,8 @@ class Cell(nn.Module):
         self,
         s0: torch.Tensor,
         s1: torch.Tensor,
-        weights: list[torch.Tensor] | None = None,
+        weights: list[torch.Tensor],
         beta_weights: torch.Tensor | None = None,
-        drop_prob: float | None = 0.2,
     ) -> torch.Tensor:
         """Forward pass of the cell.
 
@@ -108,8 +106,6 @@ class Cell(nn.Module):
         Returns:
             torch.Tensor: state ouptut from the cell
         """
-        if weights is None:
-            return self.discrete_model_forward(s0, s1, drop_prob)
         if beta_weights is not None:
             return self.edge_normalization_forward(s0, s1, weights, beta_weights)
 
@@ -127,37 +123,6 @@ class Cell(nn.Module):
             states.append(s)
 
         return torch.cat(states[-self._multiplier :], dim=1)
-
-    def discrete_model_forward(
-        self,
-        s0: torch.Tensor,
-        s1: torch.Tensor,
-        drop_prob: float | None = None,
-    ) -> torch.Tensor:
-        if self._indices is None or self._concat is None:
-            raise ValueError(
-                "could not do forward pass for discrete darts search space"
-            )
-
-        s0 = self.preprocess0(s0)
-        s1 = self.preprocess1(s1)
-
-        states = [s0, s1]
-        for i in range(self._steps):
-            h1 = states[self._indices[2 * i]]
-            h2 = states[self._indices[2 * i + 1]]
-            op1 = self._ops[2 * i]
-            op2 = self._ops[2 * i + 1]
-            h1 = op1(h1)
-            h2 = op2(h2)
-            if self.training and drop_prob is not None and drop_prob > 0:
-                if not isinstance(op1, Identity):
-                    h1 = drop_path(h1, drop_prob)
-                if not isinstance(op2, Identity):
-                    h2 = drop_path(h2, drop_prob)
-            s = h1 + h2
-            states += [s]
-        return torch.cat([states[i] for i in self._concat], dim=1)
 
     def edge_normalization_forward(
         self,
@@ -180,41 +145,6 @@ class Cell(nn.Module):
             states.append(s)
 
         return torch.cat(states[-self._multiplier :], dim=1)
-
-    def _discretize(self, genotype: DARTSGenotype) -> None:
-        # TODO: create indices and concat
-        if self.reduction:
-            op_names, indices = zip(*genotype.reduce)
-            concat = genotype.reduce_concat
-        else:
-            op_names, indices = zip(*genotype.normal)
-            concat = genotype.normal_concat
-        C = self.preprocess1.op[1].out_channels
-        self._compile(C, op_names, indices, concat, self.reduction)
-
-        # for i, edge in enumerate(self._ops):
-        #     max_idx = torch.argmax(weights[i], dim=-1)
-        #     self._ops[i] = edge.ops[max_idx]  # type: ignore
-
-    def _compile(
-        self,
-        C: int,
-        op_names: list[str],
-        indices: list[int],
-        concat: range,
-        reduction: bool,
-    ) -> None:
-        assert len(op_names) == len(indices)
-        self._steps = len(op_names) // 2
-        self._concat = concat
-        self.multiplier = len(concat)
-
-        self._ops = nn.ModuleList()
-        for name, index in zip(op_names, indices):
-            stride = 2 if reduction and index < 2 else 1
-            op = OPS[name](C, stride, True)
-            self._ops += [op]
-        self._indices = indices
 
 
 class Network(nn.Module):
@@ -310,6 +240,7 @@ class Network(nn.Module):
 
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.classifier = nn.Linear(C_prev, num_classes)
+        self.weights: dict[str, list[torch.Tensor]] = {}
 
         self._initialize_parameters()
 
@@ -332,9 +263,7 @@ class Network(nn.Module):
         # Replace this function on the fly to change the sampling method
         return F.softmax(alphas, dim=-1)
 
-    def forward(
-        self, x: torch.Tensor, drop_prob: float | None = None
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the network model.
 
         Args:
@@ -347,12 +276,12 @@ class Network(nn.Module):
             - The output tensor after the forward pass.
             - The logits tensor produced by the model.
         """
-        if self.discretized:
-            return self.discrete_model_forward(x, drop_prob=drop_prob)
         if self.edge_normalization:
             return self.edge_normalization_forward(x)
 
         s0 = s1 = self.stem(x)
+        self.weights["normal"] = []
+        self.weights["reduce"] = []
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
                 weights = self.sample(self.alphas_reduce)
@@ -362,19 +291,17 @@ class Network(nn.Module):
                 weights = self.sample(self.alphas_normal)
                 if self.mask is not None:
                     weights = normalize_params(weights, self.mask[0])
-            s0, s1 = s1, cell(s0, s1, weights)
-        out = self.global_pooling(s1)
-        logits = self.classifier(out.view(out.size(0), -1))
-        return torch.squeeze(out, dim=(-1, -2)), logits
 
-    def discrete_model_forward(
-        self,
-        inputs: torch.Tensor,
-        drop_prob: float | None = 0.2,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        s0 = s1 = self.stem(inputs)
-        for _i, cell in enumerate(self.cells):
-            s0, s1 = s1, cell(s0, s1, drop_prob=drop_prob)
+            # Retain grads for calculating layer alignment score
+            if self.training:
+                if isinstance(weights, list):
+                    for weight in weights:
+                        weight.retain_grad()
+                else:
+                    assert isinstance(weights, torch.Tensor)
+                    weights.retain_grad()
+                self.weights["reduce" if cell.reduction else "normal"].append(weights)
+            s0, s1 = s1, cell(s0, s1, weights)
         out = self.global_pooling(s1)
         logits = self.classifier(out.view(out.size(0), -1))
         return torch.squeeze(out, dim=(-1, -2)), logits
@@ -386,6 +313,8 @@ class Network(nn.Module):
         # TODO: normalization of alphas
 
         s0 = s1 = self.stem(inputs)
+        self.weights["normal"] = []
+        self.weights["reduce"] = []
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
                 weights = self.sample(self.alphas_reduce)
@@ -413,6 +342,16 @@ class Network(nn.Module):
                     start = end
                     n += 1
                     weights2 = torch.cat([weights2, tw2], dim=0)
+
+            # Retain grads for calculating layer alignment score
+            if self.training:
+                if isinstance(weights, list):
+                    for weight in weights:
+                        weight.retain_grad()
+                else:
+                    assert isinstance(weights, torch.Tensor)
+                    weights.retain_grad()
+                self.weights["reduce" if cell.reduction else "normal"].append(weights)
             s0, s1 = s1, cell(s0, s1, weights, weights2)
 
         out = self.global_pooling(s1)
@@ -522,6 +461,35 @@ class Network(nn.Module):
         )
         return genotype
 
+    def get_arch_grads(self) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+        def get_grads(alphas_list: list[torch.Tensor]) -> list[torch.Tensor]:
+            grads = []
+            for alphas in alphas_list:
+                if isinstance(alphas, list):
+                    alphas_grads = [
+                        alpha.grad.data.clone().detach() for alpha in alphas
+                    ]
+                    grads.append(torch.stack(alphas_grads).detach().reshape(-1))
+                else:
+                    grads.append(alphas.grad.data.clone().detach().reshape(-1))
+
+            return grads
+
+        grads_normal = get_grads(self.weights["normal"])
+        grads_reduce = get_grads(self.weights["reduce"])
+        return grads_normal, grads_reduce
+
+    def _get_mean_layer_alignment_score(self) -> tuple[float, float]:
+        grads_normal, grads_reduce = self.get_arch_grads()
+        mean_score_normal = calc_layer_alignment_score(grads_normal)
+        mean_score_reduce = calc_layer_alignment_score(grads_reduce)
+
+        if math.isnan(mean_score_normal):
+            mean_score_normal = 0
+        if math.isnan(mean_score_reduce):
+            mean_score_reduce = 0
+        return mean_score_normal, mean_score_reduce
+
     def _prune(self, op_sparsity: float, wider: int | None = None) -> None:
         """Discretize architecture parameters to enforce sparsity.
 
@@ -558,12 +526,9 @@ class Network(nn.Module):
 
             self.mask.append(mask)
 
-    def _discretize(self) -> NetworkCIFAR | NetworkImageNet:
+    def discretize(self) -> NetworkCIFAR | NetworkImageNet:
         genotype = self.genotype()
-        if (
-            self._num_classes == NUM_CIFAR_CLASSES
-            or self._num_classes == NUM_CIFAR100_CLASSES
-        ):
+        if self._num_classes in {NUM_CIFAR_CLASSES, NUM_CIFAR100_CLASSES}:
             discrete_model = NetworkCIFAR(
                 C=self._C,
                 num_classes=self._num_classes,
@@ -583,24 +548,6 @@ class Network(nn.Module):
             raise ValueError(
                 "number of classes is not a valid number of any of the datasets"
             )
-#         discrete_model = Network(
-#             C=self._C,
-#             num_classes=self._num_classes,
-#             layers=self._layers,
-#             criterion=self._criterion,  # TODO: what is this
-#             steps=self._steps,
-#             multiplier=self._multiplier,
-#             stem_multiplier=self.stem[-1].num_features,  # type: ignore
-#             edge_normalization=False,
-#             discretized=True,
-#             is_baby_darts=self.is_baby_darts,
-#         )
-#         for cell in discrete_model.cells:
-#             if cell.reduction:
-#                 cell._discretize(genotype)  # type: ignore
-#             else:
-#                 cell._discretize(genotype)  # type: ignore
-#         discrete_model._arch_parameters = None  # type: ignore
 
         discrete_model.to(next(self.parameters()).device)
 
@@ -613,3 +560,80 @@ class Network(nn.Module):
             params -= set(self.alphas_reduce)
             params -= set(self.alphas_normal)
         return list(params)
+
+
+def preserve_grads(m: nn.Module) -> None:
+    if isinstance(
+        m,
+        (
+            OperationBlock,
+            OperationChoices,
+            Cell,
+            MixedOp,
+            Network,
+        ),
+    ):
+        return
+
+    flag = 0
+
+    if isinstance(m, tuple(OLES_OPS)):
+        flag = 1
+
+    if flag == 0:
+        return
+
+    if not hasattr(m, "pre_grads"):
+        m.pre_grads = []
+
+    for param in m.parameters():
+        if param.requires_grad and param.grad is not None:
+            g = param.grad.detach().cpu()
+            m.pre_grads.append(g)
+
+
+# TODO: break function from OLES paper to have less branching.
+def check_grads_cosine(m: nn.Module, oles: bool = False) -> None:  # noqa: C901
+    if (
+        isinstance(m, (OperationBlock, OperationChoices, Cell, MixedOp, Network))
+        or not isinstance(m, tuple(OLES_OPS))
+        or not hasattr(m, "pre_grads")
+        or not m.pre_grads
+    ):
+        return
+
+    i = 0
+    true_i = 0
+    temp = 0
+
+    for param in m.parameters():
+        if param.requires_grad and param.grad is not None:
+            g = param.grad.detach().cpu()
+            if len(g) != 0:
+                temp += torch.cosine_similarity(g, m.pre_grads[i], dim=0).mean()
+                true_i += 1
+            i += 1
+
+    m.pre_grads.clear()
+    if true_i == 0:
+        return
+    sim_avg = temp / true_i
+
+    if not hasattr(m, "avg"):
+        m.avg = 0
+    m.avg += sim_avg
+
+    if not hasattr(m, "running_sim"):
+        m.running_sim = AverageMeter()
+    m.running_sim.update(sim_avg)
+
+    if not hasattr(m, "count"):
+        m.count = 0
+
+    if m.count == 20:
+        if m.avg / m.count < 0.4 and oles:
+            freeze(m)
+        m.count = 0
+        m.avg = 0
+    else:
+        m.count += 1

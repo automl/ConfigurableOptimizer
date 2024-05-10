@@ -6,6 +6,10 @@ from __future__ import annotations
 import torch
 from torch import nn
 
+from confopt.oneshot.weightentangler import (
+    ConvolutionalWEModule,
+    WeightEntanglementSequential,
+)
 from confopt.searchspace.common import Conv2DLoRA
 import confopt.utils.reduce_channels as rc
 
@@ -123,7 +127,7 @@ SearchSpaceNames = {
 }
 
 
-class ReLUConvBN(nn.Module):
+class ReLUConvBN(ConvolutionalWEModule):
     """ReLU-Convolution-BatchNorm Block Class.
 
     Args:
@@ -158,7 +162,11 @@ class ReLUConvBN(nn.Module):
         track_running_stats: bool = True,
     ):
         super().__init__()
-        self.op = nn.Sequential(
+        self.kernel_size = (
+            kernel_size if isinstance(kernel_size, int) else kernel_size[0]
+        )
+        self.stride = stride
+        self.op = WeightEntanglementSequential(
             nn.ReLU(inplace=False),
             Conv2DLoRA(
                 C_in,
@@ -173,6 +181,11 @@ class ReLUConvBN(nn.Module):
                 C_out, affine=affine, track_running_stats=track_running_stats
             ),
         )
+
+        self.__post__init__()
+
+    def mark_entanglement_weights(self) -> None:
+        self.op[1].can_entangle_weight = True
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through the ReLUConvBN block.
@@ -209,8 +222,7 @@ class ReLUConvBN(nn.Module):
         self.op[1].activate_lora(r)
 
 
-
-class SepConv(nn.Module):
+class SepConv(ConvolutionalWEModule):
     """Separable Convolution-BatchNorm Block Class.
 
     Args:
@@ -245,6 +257,10 @@ class SepConv(nn.Module):
         track_running_stats: bool = True,
     ):
         super().__init__()
+        self.kernel_size = (
+            kernel_size if isinstance(kernel_size, int) else kernel_size[0]
+        )
+        self.stride = stride
         self.op = nn.Sequential(
             nn.ReLU(inplace=False),
             Conv2DLoRA(
@@ -262,6 +278,11 @@ class SepConv(nn.Module):
                 C_out, affine=affine, track_running_stats=track_running_stats
             ),
         )
+
+        self.__post__init__()
+
+    def mark_entanglement_weights(self) -> None:
+        self.op[1].can_entangle_weight = True
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through the SepConv block.
@@ -300,6 +321,7 @@ class SepConv(nn.Module):
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
         self.op[2].activate_lora(r)
+
 
 class DualSepConv(nn.Module):
     """Dual Separable Convolution-BatchNorm Block Class.
@@ -834,7 +856,9 @@ class FactorizedReduce(nn.Module):
                 new_C_in = int(max(1, self.convs[0].in_channels // k))
                 new_C_out = int(max(1, self.convs[0].out_channels // k))
                 self.convs[0], _ = rc.in_channel_wider(self.convs[0], new_C_in)
-                self.convs[0], index1 = rc.out_channel_wider(self.convs[0], new_C_out // 2)
+                self.convs[0], index1 = rc.out_channel_wider(
+                    self.convs[0], new_C_out // 2
+                )
                 self.convs[1], _ = rc.in_channel_wider(self.convs[1], new_C_in)
                 self.convs[1], index2 = rc.out_channel_wider(
                     self.convs[1], new_C_out - new_C_out // 2
@@ -850,7 +874,7 @@ class FactorizedReduce(nn.Module):
                 self.bn, _ = rc.bn_wider(self.bn, new_C_out, index=index)
 
             self.to(device=device)
-    
+
     def activate_lora(self, r: int) -> None:
         if self.stride == 2:
             for i in range(2):
@@ -871,3 +895,6 @@ class FactorizedReduce(nn.Module):
             This method constructs a human-readable string representation of the block.
         """
         return "C_in={C_in}, C_out={C_out}, stride={stride}".format(**self.__dict__)
+
+
+OLES_OPS = [Zero, Pooling, DualSepConv, SepConv, Identity, ReLUConvBN]

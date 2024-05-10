@@ -54,6 +54,13 @@ def increase_conv_channels(
             lora_dropout=conv2d_layer.lora_dropout_p,
             merge_weights=conv2d_layer.merge_weights,
         ).to(device)
+        if conv2d_layer.r > 0:
+            increased_conv2d.activate_lora(
+                r=conv2d_layer.r,
+                lora_alpha=conv2d_layer.lora_alpha,
+                lora_dropout_rate=conv2d_layer.lora_dropout_p,
+                merge_weights=conv2d_layer.merge_weights,
+            )
     else:
         increased_conv2d, _ = in_channel_wider(conv2d_layer, new_in_channels)
         increased_conv2d, out_index = out_channel_wider(
@@ -135,11 +142,14 @@ def reduce_conv_channels(
             dilation=conv2d_layer.conv.dilation,
             groups=new_groups,
             bias=conv2d_layer.conv.bias is not None,
-            r=conv2d_layer.r,
-            lora_alpha=conv2d_layer.lora_alpha,
-            lora_dropout=conv2d_layer.lora_dropout_p,
-            merge_weights=conv2d_layer.merge_weights,
         ).to(device)
+        if conv2d_layer.r > 0:
+            reduced_conv2d.activate_lora(
+                r=conv2d_layer.r,
+                lora_alpha=conv2d_layer.lora_alpha,
+                lora_dropout_rate=conv2d_layer.lora_dropout_p,
+                merge_weights=conv2d_layer.merge_weights,
+            )
 
         # Copy the weights and bias of conv2d layer and LoRA layers
         reduced_conv2d.conv.weight.data[
@@ -287,6 +297,13 @@ def reduce_bn_features(
         ].clone()
 
     return reduced_batchnorm
+
+
+def reduce_ops_channel_size(ops: list[nn.Module], k: int) -> list[nn.Module]:
+    for op in ops:
+        if not (isinstance(op, (nn.AvgPool2d, nn.MaxPool2d))):
+            op.change_channel_size(k, DEVICE)  # type: ignore
+    return ops
 
 
 def configure_optimizer(

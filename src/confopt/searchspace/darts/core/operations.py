@@ -3,9 +3,12 @@ from __future__ import annotations
 import torch
 from torch import nn
 
+from confopt.oneshot.weightentangler import (
+    ConvolutionalWEModule,
+    WeightEntanglementSequential,
+)
 from confopt.searchspace.common import Conv2DLoRA
 import confopt.utils.reduce_channels as rc
-
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 OPS = {
@@ -174,12 +177,13 @@ class Pooling(nn.Module):
         """
         self.op[1], _ = rc.change_features_bn(self.op[1], k, device=device)
 
-class DilConv(nn.Module):
+
+class DilConv(ConvolutionalWEModule):
     def __init__(
         self,
         C_in: int,
         C_out: int,
-        kernel_size: int,
+        kernel_size: int | tuple[int, int],
         stride: int,
         padding: int,
         dilation: int,
@@ -205,7 +209,11 @@ class DilConv(nn.Module):
             BatchNorm2d.
         """
         super().__init__()
-        self.op = nn.Sequential(
+        self.kernel_size = (
+            kernel_size if isinstance(kernel_size, int) else kernel_size[0]
+        )
+        self.stride = stride
+        self.op = WeightEntanglementSequential(
             nn.ReLU(inplace=False),
             Conv2DLoRA(
                 C_in,
@@ -220,6 +228,11 @@ class DilConv(nn.Module):
             Conv2DLoRA(C_in, C_out, kernel_size=1, padding=0, bias=False),
             nn.BatchNorm2d(C_out, affine=affine),
         )
+
+        self.__post__init__()
+
+    def mark_entanglement_weights(self) -> None:
+        self.op[1].can_entangle_weight = True
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Perform a forward pass through the Dilated Convolution operation.
@@ -258,12 +271,13 @@ class DilConv(nn.Module):
         self.op[1].activate_lora(r)
         self.op[2].activate_lora(r)
 
-class SepConv(nn.Module):
+
+class SepConv(ConvolutionalWEModule):
     def __init__(
         self,
         C_in: int,
         C_out: int,
-        kernel_size: int,
+        kernel_size: int | tuple[int, int],
         stride: int,
         padding: int,
         affine: bool = True,
@@ -289,7 +303,11 @@ class SepConv(nn.Module):
             neural network architectures.
         """
         super().__init__()
-        self.op = nn.Sequential(
+        self.kernel_size = (
+            kernel_size if isinstance(kernel_size, int) else kernel_size[0]
+        )
+        self.stride = stride
+        self.op = WeightEntanglementSequential(
             nn.ReLU(inplace=False),
             Conv2DLoRA(
                 C_in,
@@ -315,6 +333,12 @@ class SepConv(nn.Module):
             Conv2DLoRA(C_in, C_out, kernel_size=1, padding=0, bias=False),
             nn.BatchNorm2d(C_out, affine=affine),
         )
+
+        self.__post__init__()
+
+    def mark_entanglement_weights(self) -> None:
+        self.op[1].can_entangle_weight = True
+        self.op[5].can_entangle_weight = True
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Perform a forward pass through the Seperated Convolution operation.
@@ -366,6 +390,7 @@ class SepConv(nn.Module):
         self.op[2].activate_lora(r)
         self.op[5].activate_lora(r)
         self.op[6].activate_lora(r)
+
 
 class Identity(nn.Module):
     def __init__(self) -> None:
@@ -528,11 +553,14 @@ class FactorizedReduce(nn.Module):
             self.conv_1, index1 = rc.out_channel_wider(self.conv_1, new_C_out // 2)
             self.conv_2, _ = rc.in_channel_wider(self.conv_2, new_C_in)
             self.conv_2, index2 = rc.out_channel_wider(self.conv_2, new_C_out // 2)
-            self.bn, _ = rc.bn_wider(self.bn, new_C_out, index=torch.cat([index1, index2]))
-    
+            self.bn, _ = rc.bn_wider(
+                self.bn, new_C_out, index=torch.cat([index1, index2])
+            )
+
     def activate_lora(self, r: int) -> None:
         self.conv_1.activate_lora(r)
         self.conv_2.activate_lora(r)
+
 
 class Conv7x1Conv1x7BN(nn.Module):
     def __init__(
@@ -586,3 +614,6 @@ class Conv7x1Conv1x7BN(nn.Module):
             self.op[1] = rc.in_channel_wider(self.op[1], k, device)
             self.op[2] = rc.reduce_conv_channels(self.op[2], k, device)
             self.op[3] = rc.reduce_bn_features(self.op[3], k, device)
+
+
+OLES_OPS = [Zero, Pooling, Identity, SepConv, DilConv]

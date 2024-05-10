@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+import warnings
 
 import torch
 
@@ -10,6 +11,7 @@ ADVERSERIAL_DATA = (
     torch.randn(2, 3, 32, 32).to(DEVICE),
     torch.randint(0, 9, (2,)).to(DEVICE),
 )
+INIT_CHANNEL_NUM = 16
 
 
 class ProfileConfig:
@@ -21,18 +23,29 @@ class ProfileConfig:
         dropout: float | None = None,
         perturbation: str | None = None,
         perturbator_sample_frequency: str = "epoch",
+        entangle_op_weights: bool = False,
         lora_rank: int = 0,
         lora_warm_epochs: int = 0,
+        seed: int = 100,
+        searchspace_str: str = "nb201",
+        oles: bool = False,
+        calc_gm_score: bool = False,
     ) -> None:
         self.config_type = config_type
         self.epochs = epochs
         self.lora_warm_epochs = lora_warm_epochs
+        self.seed = seed
+        self.searchspace_str = searchspace_str
         self._initialize_trainer_config()
         self._initialize_sampler_config()
         self._set_partial_connector(is_partial_connection)
         self._set_lora_configs(lora_rank)
         self._set_dropout(dropout)
         self._set_perturb(perturbation, perturbator_sample_frequency)
+        self.entangle_op_weights = entangle_op_weights
+        self._set_oles_configs(oles, calc_gm_score)
+        PROFILE_TYPE = "BASE"
+        self.sampler_type = str.lower(PROFILE_TYPE)
 
     def _set_lora_configs(
         self,
@@ -47,6 +60,18 @@ class ProfileConfig:
             "lora_alpha": lora_alpha,
             "merge_weights": merge_weights,
         }
+
+    def _set_oles_configs(
+        self,
+        oles: bool = False,
+        calc_gm_score: bool = False,
+    ) -> None:
+        if oles and not calc_gm_score:
+            calc_gm_score = True
+            warnings.warn(
+                "OLES needs gm_score, please pass calc_gm_score as True.", stacklevel=2
+            )
+        self.oles_config = {"oles": oles, "calc_gm_score": calc_gm_score}
 
     def _set_perturb(
         self,
@@ -74,6 +99,9 @@ class ProfileConfig:
         assert (
             self.sampler_config is not None
         ), "atleast a sampler is needed to initialize the search space"
+        weight_type = (
+            "weight_entanglement" if self.entangle_op_weights else "weight_sharing"
+        )
         config = {
             "sampler": self.sampler_config,
             "perturbator": self.perturb_config,
@@ -81,7 +109,12 @@ class ProfileConfig:
             "dropout": self.dropout_config,
             "trainer": self.trainer_config,
             "lora": self.lora_config,
+            "sampler_type": self.sampler_type,
+            "searchspace_str": self.searchspace_str,
+            "weight_type": weight_type,
+            "oles": self.oles_config,
         }
+
         if hasattr(self, "searchspace_config") and self.searchspace_config is not None:
             config.update({"search_space": self.searchspace_config})
 
@@ -145,6 +178,7 @@ class ProfileConfig:
             "train_portion": 0.7,
             "use_data_parallel": True,
             "checkpointing_freq": 1,
+            "seed": self.seed,
         }
 
         self.trainer_config = trainer_config
@@ -213,10 +247,38 @@ class ProfileConfig:
             ), f"{config_key} not a valid configuration for the lora layers"
             self.lora_config[config_key] = kwargs[config_key]
 
+    def configure_oles_config(self, **kwargs) -> None:  # type: ignore
+        for config_key in kwargs:
+            assert (
+                config_key in self.oles_config
+            ), f"{config_key} not a valid configuration for the oles config"
+            self.oles_config[config_key] = kwargs[config_key]
+
     @abstractmethod
     def set_searchspace_config(self, config: dict) -> None:
-        self.searchspace_config = config
+        if not hasattr(self, "searchspace_config"):
+            self.searchspace_config = config
+        else:
+            self.searchspace_config.update(config)
 
     @abstractmethod
     def configure_extra_config(self, config: dict) -> None:
         self.extra_config = config
+
+    def get_name_wandb_run(self) -> str:
+        name_wandb_run = []
+        name_wandb_run.append(f"ss_{self.searchspace_str}")
+        if self.entangle_op_weights:
+            name_wandb_run.append("type_we")
+        else:
+            name_wandb_run.append("type_ws")
+        name_wandb_run.append(f"opt_{self.sampler_type}")
+        if self.lora_warm_epochs > 0:
+            name_wandb_run.append(f"lorarank_{self.lora_config.get('r')}")
+            name_wandb_run.append(f"lorawarmup_{self.lora_warm_epochs}")
+        name_wandb_run.append(f"epochs_{self.trainer_config.get('epochs')}")
+        name_wandb_run.append(f"seed_{self.seed}")
+        if self.oles_config.get("oles"):
+            name_wandb_run.append("with_oles")
+        name_wandb_run_str = "-".join(name_wandb_run)
+        return name_wandb_run_str

@@ -6,16 +6,19 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import math
 
 import torch
 from torch import nn
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
+from confopt.utils import AverageMeter, calc_layer_alignment_score, freeze
 from confopt.utils.normalize_params import normalize_params
 
 from .cells import NAS201SearchCell as SearchCell
 from .genotypes import Structure
-from .operations import NAS_BENCH_201, ResNetBasicblock
+from .model import NASBench201Model
+from .operations import NAS_BENCH_201, OLES_OPS, ResNetBasicblock
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -37,7 +40,6 @@ class NB201SearchModel(nn.Module):
         BatchNorm in cells. Defaults to False.
         edge_normalization (bool, optional): Whether to enable edge normalization for
         partial connection. Defaults to False.
-        discretized (int): shows if we have a supernet or a discretized search space
         with one operation on each edge
 
     Attributes:
@@ -67,7 +69,6 @@ class NB201SearchModel(nn.Module):
         affine: bool = False,
         track_running_stats: bool = False,
         edge_normalization: bool = False,
-        discretized: bool = False,
     ):
         super().__init__()
         self._C = C
@@ -77,7 +78,6 @@ class NB201SearchModel(nn.Module):
         self.affine = affine
         self.track_running_stats = track_running_stats
         self.edge_normalization = edge_normalization
-        self.discretized = discretized
         self.mask: None | torch.Tensor = None
         self.stem = nn.Sequential(
             nn.Conv2d(3, C, kernel_size=3, padding=1, bias=False),
@@ -128,6 +128,7 @@ class NB201SearchModel(nn.Module):
         self.beta_parameters = nn.Parameter(
             1e-3 * torch.randn(num_edge)  # type: ignore
         )
+        self.weights: dict[str, list[torch.Tensor]] = {}
 
     def get_weights(self) -> list[nn.Parameter]:
         """Get a list of learnable parameters in the model. (does not include alpha or
@@ -196,9 +197,7 @@ class NB201SearchModel(nn.Module):
         """
         string = self.extra_repr()
         for i, cell in enumerate(self.cells):
-            string += "\n {:02d}/{:02d} :: {:}".format(
-                i, len(self.cells), cell.extra_repr()
-            )
+            string += f"\n {i:02d}/{len(self.cells):02d} :: {cell.extra_repr()}"
         return string
 
     def extra_repr(self) -> str:
@@ -251,37 +250,32 @@ class NB201SearchModel(nn.Module):
             - The output tensor after the forward pass.
             - The logits tensor produced by the model.
         """
-        if self.discretized:
-            return self.discrete_model_forward(inputs)
-
         if self.edge_normalization:
             return self.edge_normalization_forward(inputs)
 
-        alphas = self.sample(self.arch_parameters)
-
-        if self.mask is not None:
-            alphas = normalize_params(alphas, self.mask)
+        self.weights["alphas"] = []
+        # alphas = self.sample(self.arch_parameters)
+        # if self.mask is not None:
+        #     alphas = normalize_params(alphas, self.mask)
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
             if isinstance(cell, SearchCell):
+                alphas = self.sample(self.arch_parameters)
+                # alphas = torch.nn.functional.softmax(self.arch_parameters, dim=-1)
+                if self.mask is not None:
+                    alphas = normalize_params(alphas, self.mask)
+                if self.training:
+                    if isinstance(alphas, list):
+                        for alpha in alphas:
+                            alpha.retain_grad()
+                    else:
+                        assert isinstance(alphas, torch.Tensor)
+                        alphas.retain_grad()
+                    self.weights["alphas"].append(alphas)
                 feature = cell(feature, alphas)
             else:
                 feature = cell(feature)
-
-        out = self.lastact(feature)
-        out = self.global_pooling(out)
-        out = out.view(out.size(0), -1)
-        logits = self.classifier(out)
-
-        return out, logits
-
-    def discrete_model_forward(
-        self, inputs: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        feature = self.stem(inputs)
-        for _i, cell in enumerate(self.cells):
-            feature = cell(feature)
 
         out = self.lastact(feature)
         out = self.global_pooling(out)
@@ -294,6 +288,7 @@ class NB201SearchModel(nn.Module):
         self,
         inputs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        self.weights["alphas"] = []
         alphas = self.sample(self.arch_parameters)
 
         if self.mask is not None:
@@ -313,6 +308,14 @@ class NB201SearchModel(nn.Module):
                     )
                     betas = torch.cat([betas, beta_node_v], dim=0)
 
+                if self.training:
+                    if isinstance(alphas, list):
+                        for alpha in alphas:
+                            alpha.retain_grad()
+                    else:
+                        assert isinstance(alphas, torch.Tensor)
+                        alphas.retain_grad()
+                    self.weights["alphas"].append(alphas)
                 feature = cell(feature, alphas, betas)
             else:
                 feature = cell(feature)
@@ -323,6 +326,26 @@ class NB201SearchModel(nn.Module):
         logits = self.classifier(out)
 
         return out, logits
+
+    def get_arch_grads(self) -> list[torch.Tensor]:
+        grads = []
+        for alphas in self.weights["alphas"]:
+            if isinstance(alphas, list):
+                alphas_grads = [alpha.grad.data.clone().detach() for alpha in alphas]
+                grads.append(torch.stack(alphas_grads).detach().reshape(-1))
+            else:
+                grads.append(alphas.grad.data.clone().detach().reshape(-1))
+
+        return grads
+
+    def _get_mean_layer_alignment_score(self) -> float:
+        grads = self.get_arch_grads()
+        mean_score = calc_layer_alignment_score(grads)
+
+        if math.isnan(mean_score):
+            mean_score = 0
+
+        return mean_score
 
     def _prune(self, op_sparsity: float, wider: int | None = None) -> None:
         """Masks architecture parameters to enforce sparsity.
@@ -360,24 +383,15 @@ class NB201SearchModel(nn.Module):
         if self.arch_parameters.data[~self.mask].grad:  # type: ignore
             self.arch_parameters.data[~self.mask].grad.zero_()  # type: ignore
 
-    def _discretize(self) -> NB201SearchModel:
-        discrete_model = NB201SearchModel(
+    def _discretize(self) -> NASBench201Model:
+        genotype = self.genotype()
+
+        discrete_model = NASBench201Model(
             C=self._C,
             N=self._layerN,
-            max_nodes=self.max_nodes,
+            genotype=genotype,
             num_classes=self.classifier.out_features,
-            steps=self._steps,
-            search_space=NAS_BENCH_201,
-            affine=self.affine,
-            track_running_stats=self.track_running_stats,
-            edge_normalization=False,
-            discretized=True,  # TODO: do we need this?
         ).to(next(self.parameters()).device)
-
-        for cell in discrete_model.cells:
-            if isinstance(cell, SearchCell):
-                cell._discretize(self.arch_parameters)  # type: ignore
-        discrete_model.arch_parameters = None
 
         return discrete_model
 
@@ -387,3 +401,91 @@ class NB201SearchModel(nn.Module):
         if self.arch_parameters is not None:
             params -= set(self.arch_parameters)
         return list(params)
+
+
+def preserve_grads(m: nn.Module) -> None:
+    if isinstance(
+        m,
+        (
+            OperationBlock,
+            OperationChoices,
+            SearchCell,
+            NB201SearchModel,
+        ),
+    ):
+        return
+
+    flag = 0
+    # for op in OLES_OPS:
+    #     if isinstance(m, op):
+    #         flag = 1
+    #         break
+
+    if isinstance(m, tuple(OLES_OPS)):
+        flag = 1
+
+    if flag == 0:
+        return
+
+    if not hasattr(m, "pre_grads"):
+        m.pre_grads = []
+
+    for param in m.parameters():
+        if param.requires_grad and param.grad is not None:
+            g = param.grad.detach().cpu()
+            m.pre_grads.append(g)
+
+
+# TODO: break function from OLES paper to have less branching.
+def check_grads_cosine(m: nn.Module, oles: bool = False) -> None:  # noqa: C901
+    if (
+        isinstance(
+            m,
+            (
+                OperationBlock,
+                OperationChoices,
+                SearchCell,
+                NB201SearchModel,
+            ),
+        )
+        or not isinstance(m, tuple(OLES_OPS))
+        or not hasattr(m, "pre_grads")
+        or not m.pre_grads
+    ):
+        return
+
+    i = 0
+    true_i = 0
+    temp = 0
+
+    for param in m.parameters():
+        if param.requires_grad and param.grad is not None:
+            g = param.grad.detach().cpu()
+            if len(g) != 0:
+                temp += torch.cosine_similarity(g, m.pre_grads[i], dim=0).mean()
+                true_i += 1
+            i += 1
+
+    m.pre_grads.clear()
+    if true_i == 0:
+        return
+    sim_avg = temp / true_i
+
+    if not hasattr(m, "avg"):
+        m.avg = 0
+    m.avg += sim_avg
+
+    if not hasattr(m, "running_sim"):
+        m.running_sim = AverageMeter()
+    m.running_sim.update(sim_avg)
+
+    if not hasattr(m, "count"):
+        m.count = 0
+
+    if m.count == 20:
+        if m.avg / m.count < 0.4 and oles:
+            freeze(m)
+        m.count = 0
+        m.avg = 0
+    else:
+        m.count += 1

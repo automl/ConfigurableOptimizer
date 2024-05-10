@@ -5,12 +5,14 @@ from collections import namedtuple
 from enum import Enum
 import random
 from typing import Callable
+import warnings
 
 import numpy as np
 import torch
 from torch.backends import cudnn
 import wandb
 
+from confopt.benchmarks import NB201Benchmark, NB301Benchmark
 from confopt.dataset import (
     CIFAR10Data,
     CIFAR100Data,
@@ -26,6 +28,7 @@ from confopt.oneshot.archsampler import (
 from confopt.oneshot.dropout import Dropout
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import SDARTSPerturbator
+from confopt.oneshot.weightentangler import WeightEntangler
 from confopt.profiles import (
     DiscreteProfile,
     GDASProfile,
@@ -33,6 +36,7 @@ from confopt.profiles import (
 )
 from confopt.searchspace import (
     BabyDARTSSearchSpace,
+    DARTSGenotype,  # noqa: F401
     DARTSImageNetModel,
     DARTSModel,
     DARTSSearchSpace,
@@ -40,6 +44,7 @@ from confopt.searchspace import (
     NASBench1Shot1SearchSpace,
     NASBench201Model,
     NASBench201SearchSpace,
+    RobustDARTSSearchSpace,
     SearchSpace,
     TransNASBench101SearchSpace,
 )
@@ -62,6 +67,7 @@ class SearchSpaceType(Enum):
     NB1SHOT1 = "nb1shot1"
     TNB101 = "tnb101"
     BABYDARTS = "baby_darts"
+    RobustDARTS = "robust_darts"
 
 
 class ModelType(Enum):
@@ -148,8 +154,10 @@ class Experiment:
         start_epoch: int = 0,
         load_saved_model: bool = False,
         load_best_model: bool = False,
+        use_benchmark: bool = True,
     ) -> ConfigurableTrainer:
         config = profile.get_config()
+        run_name = profile.get_name_wandb_run()
 
         assert hasattr(profile, "sampler_type")
         self.sampler_str = SamplerType(profile.sampler_type)
@@ -157,12 +165,24 @@ class Experiment:
         self.is_partial_connection = profile.is_partial_connection
         self.dropout = profile.dropout
         self.edge_normalization = profile.is_partial_connection
+        self.entangle_op_weights = profile.entangle_op_weights
+        oles_config = config.get("oles")
+        if oles_config:
+            oles = oles_config.get("oles")
+            calc_gm_score = oles_config.get("calc_gm_score")
+        else:
+            oles = False
+            calc_gm_score = False
         assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
         return self.runner(
             config,
             start_epoch,
             load_saved_model,
             load_best_model,
+            use_benchmark,
+            run_name,
+            oles,
+            calc_gm_score,
         )
 
     def runner(
@@ -171,6 +191,10 @@ class Experiment:
         start_epoch: int = 0,
         load_saved_model: bool = False,
         load_best_model: bool = False,
+        use_benchmark: bool = True,
+        run_name: str = "supernet_run",
+        oles: bool = False,
+        calc_gm_score: bool = False,
     ) -> ConfigurableTrainer:
         assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
 
@@ -207,9 +231,11 @@ class Experiment:
             self.sampler_str,
             self.perturbator_str,
             config=config,
+            use_benchmark=use_benchmark,
         )
         if self.is_wandb_log:
             wandb.init(  # type: ignore
+                name=run_name,
                 project=(
                     config.get("project_name", "Configurable_Optimizer")
                     if config is not None
@@ -221,43 +247,47 @@ class Experiment:
         Arguments = namedtuple(  # type: ignore
             "Configure", " ".join(config["trainer"].keys())  # type: ignore
         )
-        arg_config = Arguments(**config["trainer"])  # type: ignore
+        trainer_arguments = Arguments(**config["trainer"])  # type: ignore
 
         criterion = self._get_criterion(
-            criterion_str=arg_config.criterion  # type: ignore
+            criterion_str=trainer_arguments.criterion  # type: ignore
         )
 
         data = self._get_dataset(self.dataset_str)(
             root="datasets",
-            cutout=arg_config.cutout,  # type: ignore
-            train_portion=arg_config.train_portion,  # type: ignore
+            cutout=trainer_arguments.cutout,  # type: ignore
+            train_portion=trainer_arguments.train_portion,  # type: ignore
         )
 
         model = self.search_space
         # model =
 
-        w_optimizer = self._get_optimizer(arg_config.optim)(  # type: ignore
+        w_optimizer = self._get_optimizer(trainer_arguments.optim)(  # type: ignore
             model.model_weight_parameters(),
-            arg_config.lr,  # type: ignore
+            trainer_arguments.lr,  # type: ignore
             **config["trainer"].get("optim_config", {}),  # type: ignore
         )
 
         w_scheduler = self._get_scheduler(
-            scheduler_str=arg_config.scheduler,  # type: ignore
+            scheduler_str=trainer_arguments.scheduler,  # type: ignore
             optimizer=w_optimizer,
-            num_epochs=arg_config.epochs,  # type: ignore
-            eta_min=arg_config.learning_rate_min,  # type: ignore
+            num_epochs=trainer_arguments.epochs,  # type: ignore
+            eta_min=trainer_arguments.learning_rate_min,  # type: ignore
             config=config["trainer"].get("scheduler_config", {}),  # type: ignore
         )
 
         if self.edge_normalization and hasattr(model, "beta_parameters"):
-            arch_optimizer = self._get_optimizer(arg_config.arch_optim)(  # type: ignore
+            arch_optimizer = self._get_optimizer(
+                trainer_arguments.arch_optim  # type: ignore
+            )(
                 [*model.arch_parameters, *model.beta_parameters],
                 lr=config["trainer"].get("arch_lr", 0.001),  # type: ignore
                 **config["trainer"].get("arch_optim_config", {}),  # type: ignore
             )
         else:
-            arch_optimizer = self._get_optimizer(arg_config.arch_optim)(  # type: ignore
+            arch_optimizer = self._get_optimizer(
+                trainer_arguments.arch_optim  # type: ignore
+            )(
                 model.arch_parameters,
                 lr=config["trainer"].get("arch_lr", 0.001),  # type: ignore
                 **config["trainer"].get("arch_optim_config", {}),  # type: ignore
@@ -271,23 +301,26 @@ class Experiment:
             scheduler=w_scheduler,
             criterion=criterion,
             logger=self.logger,
-            batch_size=arg_config.batch_size,  # type: ignore
-            use_data_parallel=arg_config.use_data_parallel,  # type: ignore
+            batch_size=trainer_arguments.batch_size,  # type: ignore
+            use_data_parallel=trainer_arguments.use_data_parallel,  # type: ignore
             load_saved_model=load_saved_model,
             load_best_model=load_best_model,
             start_epoch=start_epoch,
-            checkpointing_freq=arg_config.checkpointing_freq,  # type: ignore
-            epochs=arg_config.epochs,  # type: ignore
+            checkpointing_freq=trainer_arguments.checkpointing_freq,  # type: ignore
+            epochs=trainer_arguments.epochs,  # type: ignore
             debug_mode=self.debug_mode,
+            query_dataset=self.dataset_str.value,
+            benchmark_api=self.benchmark_api,
         )
 
         trainer.train(
             profile=self.profile,  # type: ignore
-            epochs=arg_config.epochs,  # type: ignore
             is_wandb_log=self.is_wandb_log,
             lora_warm_epochs=config["trainer"].get(  # type: ignore
                 "lora_warm_epochs", 0
             ),
+            oles=oles,
+            calc_gm_score=calc_gm_score,
         )
 
         return trainer
@@ -298,16 +331,33 @@ class Experiment:
         sampler_enum: SamplerType,
         perturbator_enum: PerturbatorType,
         config: dict | None = None,
+        use_benchmark: bool = True,
     ) -> None:
         if config is None:
             config = {}  # type : ignore
         self.set_search_space(search_space_enum, config.get("search_space", {}))
         self.set_sampler(sampler_enum, config.get("sampler", {}))
-
         self.set_perturbator(perturbator_enum, config.get("perturbator", {}))
-
         self.set_partial_connector(config.get("partial_connector", {}))
         self.set_dropout(config.get("dropout", {}))
+
+        if use_benchmark:
+            if (
+                search_space_enum == SearchSpaceType.RobustDARTS
+                and config.get("search_space", {}).get("space") == "s4"
+            ):
+                warnings.warn(
+                    "Argument use_benchmark was set to True with s4 space of"
+                    + " RobustDARTSSearchSpace. Consider setting it to False",
+                    stacklevel=1,
+                )
+                self.benchmark_api = None
+            else:
+                self.set_benchmark_api(search_space_enum, config.get("benchmark", {}))
+        else:
+            self.benchmark_api = None
+
+        self.set_weight_entangler()
         self.set_profile(config)
 
     def set_search_space(
@@ -325,6 +375,24 @@ class Experiment:
             self.search_space = TransNASBench101SearchSpace(**config)
         elif search_space == SearchSpaceType.BABYDARTS:
             self.search_space = BabyDARTSSearchSpace(**config)
+        elif search_space == SearchSpaceType.RobustDARTS:
+            self.search_space = RobustDARTSSearchSpace(**config)
+
+    def set_benchmark_api(
+        self,
+        search_space: SearchSpaceType,
+        config: dict,
+    ) -> None:
+        if search_space == SearchSpaceType.NB201:
+            self.benchmark_api = NB201Benchmark()
+        elif (
+            search_space == SearchSpaceType.DARTS
+            or search_space == SearchSpaceType.RobustDARTS
+        ):
+            self.benchmark_api = NB301Benchmark(**config)
+        else:
+            print(f"Benchmark does not exist for the {search_space.value} searchspace")
+            self.benchmark_api = None
 
     def set_sampler(
         self,
@@ -368,6 +436,9 @@ class Experiment:
         else:
             self.dropout = None
 
+    def set_weight_entangler(self) -> None:
+        self.weight_entangler = WeightEntangler() if self.entangle_op_weights else None
+
     def set_profile(self, config: dict) -> None:
         assert self.sampler is not None
 
@@ -377,6 +448,7 @@ class Experiment:
             partial_connector=self.partial_connector,
             perturbation=self.perturbator,
             dropout=self.dropout,
+            weight_entangler=self.weight_entangler,
             lora_configs=config.get("lora"),
         )
 
@@ -415,7 +487,7 @@ class Experiment:
         num_epochs: int,
         eta_min: float = 0.0,
         config: dict | None = None,
-    ) -> Callable | None:
+    ) -> torch.optim.lr_scheduler.LRScheduler | None:
         if config is None:
             config = {}
         scheduler = SchedulerType(scheduler_str)
@@ -442,7 +514,7 @@ class Experiment:
         load_best_model: bool = False,
         use_supernet_checkpoint: bool = False,
     ) -> DiscreteTrainer:
-        config = profile.get_trainer_config()
+        train_config = profile.get_trainer_config()
         searchspace_config = profile.get_searchspace_config(
             self.search_space_str.value, self.dataset_str.value
         )
@@ -450,7 +522,7 @@ class Experiment:
 
         return self.run_discrete_model(
             searchspace_config=searchspace_config,
-            arg_config=config,
+            train_config=train_config,
             start_epoch=start_epoch,
             load_saved_model=load_saved_model,
             load_best_model=load_best_model,
@@ -495,7 +567,7 @@ class Experiment:
                 model = self.search_space.discretize()
                 return model  # type: ignore
             raise ValueError("need to be a supernet to be able to get the discrete net")
-        raise ValueError("cannot have the ")
+        raise Exception("Need a searchspace to be able to fetch a discrete model")
 
     # logger load_genotype function handles for both supernet and discrete model
     def get_genotype_str_from_checkpoint(
@@ -516,19 +588,9 @@ class Experiment:
 
         raise ValueError("is not a valid checkpoint.")
 
-    def get_genotype_str_from_profile(
-        self,
-        arg_config: dict,
-    ) -> str:
-        genotype_str = arg_config.get("genotype")
-        if genotype_str is None:
-            raise LookupError("genotype does not exist in profile")
-        return genotype_str
-
     def get_discrete_model(
         self,
         searchspace_config: dict,
-        arg_config: dict | None = None,
         start_epoch: int = 0,
         load_saved_model: bool = False,
         load_best_model: bool = False,
@@ -557,23 +619,21 @@ class Experiment:
         ) == 0 and hasattr(self, "search_space"):
             genotype_str = self.search_space.get_genotype().tostr()  # type: ignore
 
-        elif arg_config:
-            genotype_str = self.get_genotype_str_from_profile(arg_config)
-
-        if genotype_str is None:
+        elif genotype_str is None:
             raise ValueError("genotype cannot be empty")
+
         model = self.get_discrete_model_from_genotype_str(
             self.search_space_str.value,
-            genotype_str,
+            genotype_str,  # type: ignore
             searchspace_config,
         )
-        return model, genotype_str
+        return model, genotype_str  # type: ignore
 
     # refactor the name to train
     def run_discrete_model(
         self,
         searchspace_config: dict,
-        arg_config: dict | None = None,
+        train_config: dict | None = None,
         start_epoch: int = 0,
         load_saved_model: bool = False,
         load_best_model: bool = False,
@@ -620,11 +680,9 @@ class Experiment:
         # C) From a discerete checkpoint, load the model.
         # D) pass a genotype from the prompt to build a discrete model.
         # E) just use the default genotype which is set in the discrete_profile.
-        # TODO: have a function that would get a genotype and create a model out of it.
-        # searchspace_config =
+
         model, genotype_str = self.get_discrete_model(
             searchspace_config=searchspace_config,
-            arg_config=arg_config,
             start_epoch=start_epoch,
             load_saved_model=load_saved_model,
             load_best_model=load_best_model,
@@ -645,33 +703,32 @@ class Experiment:
         self.logger.save_genotype(genotype_str)
 
         Arguments = namedtuple(  # type: ignore
-            "Configure", " ".join(arg_config.keys())  # type: ignore
+            "Configure", " ".join(train_config.keys())  # type: ignore
         )
-        config = arg_config
-        arg_config = Arguments(**arg_config)  # type: ignore
+        trainer_arguments = Arguments(**train_config)  # type: ignore
 
         data = self._get_dataset(self.dataset_str)(
             root="datasets",
-            cutout=arg_config.cutout,  # type: ignore
-            train_portion=arg_config.train_portion,  # type: ignore
+            cutout=trainer_arguments.cutout,  # type: ignore
+            train_portion=trainer_arguments.train_portion,  # type: ignore
         )
 
-        w_optimizer = self._get_optimizer(arg_config.optim)(  # type: ignore
+        w_optimizer = self._get_optimizer(trainer_arguments.optim)(  # type: ignore
             model.parameters(),
-            arg_config.lr,  # type: ignore
-            **arg_config.optim_config,  # type: ignore
+            trainer_arguments.lr,  # type: ignore
+            **trainer_arguments.optim_config,  # type: ignore
         )
 
         w_scheduler = self._get_scheduler(
-            scheduler_str=arg_config.scheduler,  # type: ignore
+            scheduler_str=trainer_arguments.scheduler,  # type: ignore
             optimizer=w_optimizer,
-            num_epochs=arg_config.epochs,  # type: ignore
-            eta_min=arg_config.learning_rate_min,  # type: ignore
-            config=config.get("scheduler_config", {}),  # type: ignore
+            num_epochs=trainer_arguments.epochs,  # type: ignore
+            eta_min=trainer_arguments.learning_rate_min,  # type: ignore
+            config=train_config.get("scheduler_config", {}),  # type: ignore
         )
 
         criterion = self._get_criterion(
-            criterion_str=arg_config.criterion  # type: ignore
+            criterion_str=trainer_arguments.criterion  # type: ignore
         )
 
         trainer = DiscreteTrainer(
@@ -681,19 +738,19 @@ class Experiment:
             scheduler=w_scheduler,
             criterion=criterion,
             logger=self.logger,
-            batch_size=arg_config.batch_size,  # type: ignore
-            use_data_parallel=arg_config.use_data_parallel,  # type: ignore
-            print_freq=arg_config.print_freq,  # type: ignore
-            drop_path_prob=arg_config.drop_path_prob,  # type: ignore
+            batch_size=trainer_arguments.batch_size,  # type: ignore
+            use_data_parallel=trainer_arguments.use_data_parallel,  # type: ignore
+            print_freq=trainer_arguments.print_freq,  # type: ignore
+            drop_path_prob=trainer_arguments.drop_path_prob,  # type: ignore
             load_saved_model=load_saved_model,
             load_best_model=load_best_model,
             start_epoch=start_epoch,
-            checkpointing_freq=arg_config.checkpointing_freq,  # type: ignore
-            epochs=arg_config.epochs,  # type: ignore
+            checkpointing_freq=trainer_arguments.checkpointing_freq,  # type: ignore
+            epochs=trainer_arguments.epochs,  # type: ignore
         )
 
         trainer.train(
-            epochs=arg_config.epochs,  # type: ignore
+            epochs=trainer_arguments.epochs,  # type: ignore
             is_wandb_log=self.is_wandb_log,
         )
 
@@ -774,18 +831,35 @@ if __name__ == "__main__":
         type=str,
     )
 
+    parser.add_argument(
+        "--oles",
+        action="store_true",
+        default=False,
+        help="freezes weights if it passes the threshold",
+    )
+
+    parser.add_argument(
+        "--calc_gm_score",
+        action="store_true",
+        default=False,
+        help="calculates gm scores during training the supernet",
+    )
+
     args = parser.parse_args()
     IS_DEBUG_MODE = True
     is_wandb_log = IS_DEBUG_MODE is False
 
     searchspace = SearchSpaceType(args.searchspace)
     dataset = DatasetType(args.dataset)
+    args.epochs = 3
 
     profile = GDASProfile(
         epochs=args.epochs,
         is_partial_connection=args.is_partial_connector,
         perturbation=args.perturbator,
         dropout=args.dropout,
+        oles=args.oles,
+        calc_gm_score=args.calc_gm_score,
     )
 
     config = profile.get_config()

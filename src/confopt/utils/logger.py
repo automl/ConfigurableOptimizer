@@ -77,6 +77,8 @@ class Logger:
         else:
             self.set_up_new_run()
 
+        self._wandb_logs = {}  # type: ignore
+
     def set_up_new_run(self) -> None:
         runtime = get_runtime()
         # runtime = time.strftime("%Y-%d-%h-%H:%M:%S", time.gmtime(time.time()))
@@ -262,7 +264,7 @@ class Logger:
 
         self.log(msg)
 
-    def wandb_log_metrics(
+    def add_wandb_log_metrics(
         self,
         title: str,
         metrics: NamedTuple,
@@ -276,6 +278,19 @@ class Logger:
             f"{title}/acc_top5": metrics.acc_top5,  # type: ignore
         }
         if totaltime is not None:
-            log_metrics.update({f"{title}/time": f"{totaltime:.1f}"})
+            log_metrics.update({f"{title}/time": totaltime})
 
-        wandb.log(log_metrics)  # type: ignore
+        self._wandb_logs.update(log_metrics)
+
+    def push_wandb_logs(self) -> None:
+        assert self._wandb_logs is not None, "Cannot log empty metric"
+        wandb.log(self._wandb_logs)  # type: ignore
+
+    def update_wandb_logs(self, logs: dict) -> None:
+        self._wandb_logs.update(logs)
+
+    def get_wandb_logs(self) -> dict:
+        return self._wandb_logs
+
+    def reset_wandb_logs(self) -> None:
+        self._wandb_logs = {}
