@@ -94,6 +94,12 @@ class ReLUConvBN(nn.Module):
     def activate_lora(self, r: int) -> None:
         self.ops[1].activate_lora(r)
 
+    def deactivate_lora(self) -> None:
+        self.ops[1].deactivate_lora()
+
+    def toggle_lora(self) -> None:
+        self.ops[1].toggle_lora()
+
     def extra_repr(self) -> str:
         return "C_in={C_in}, C_out={C_out}, stride={stride}".format(**self.__dict__)
 
@@ -206,6 +212,24 @@ class FactorizedReduce(nn.Module):
                 self.convs[i].activate_lora(r)
         elif self.stride == 1:
             self.conv.activate_lora(r)
+        else:
+            raise ValueError(f"Invalid stride : {self.stride}")
+
+    def deactivate_lora(self) -> None:
+        if self.stride == 2:
+            for i in range(2):
+                self.convs[i].deactivate_lora()
+        elif self.stride == 1:
+            self.conv.deactivate_lora()
+        else:
+            raise ValueError(f"Invalid stride : {self.stride}")
+
+    def toggle_lora(self) -> None:
+        if self.stride == 2:
+            for i in range(2):
+                self.convs[i].toggle_lora()
+        elif self.stride == 1:
+            self.conv.toggle_lora()
         else:
             raise ValueError(f"Invalid stride : {self.stride}")
 

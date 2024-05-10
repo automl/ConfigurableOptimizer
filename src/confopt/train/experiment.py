@@ -26,6 +26,7 @@ from confopt.oneshot.archsampler import (
     SNASSampler,
 )
 from confopt.oneshot.dropout import Dropout
+from confopt.oneshot.lora_toggler import LoRAToggler
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import SDARTSPerturbator
 from confopt.oneshot.pruner.pruner import Pruner
@@ -359,6 +360,7 @@ class Experiment:
         else:
             self.benchmark_api = None
 
+        self.set_lora_toggler(config.get("lora", {}), config.get("lora_extra", {}))
         self.set_weight_entangler()
         self.set_profile(config)
 
@@ -448,6 +450,25 @@ class Experiment:
         else:
             self.pruner = None
 
+    def set_lora_toggler(self, lora_config: dict, lora_extra: dict) -> None:
+        if lora_config.get("r", 0) == 0:
+            self.lora_toggler = None
+            return
+
+        toggle_epochs = lora_extra.get("toggle_epochs")
+        toggle_probability = lora_extra.get("toggle_probability")
+        if toggle_epochs is not None:
+            assert min(toggle_epochs) > lora_extra.get(
+                "warm_epochs"
+            ), "The first toggle epoch should be after the warmup epochs"
+            self.lora_toggler = LoRAToggler(
+                searchspace=self.search_space,
+                toggle_epochs=toggle_epochs,
+                toggle_probability=toggle_probability,
+            )
+        else:
+            self.lora_toggler = None
+
     def set_profile(self, config: dict) -> None:
         assert self.sampler is not None
 
@@ -458,6 +479,7 @@ class Experiment:
             perturbation=self.perturbator,
             dropout=self.dropout,
             weight_entangler=self.weight_entangler,
+            lora_toggler=self.lora_toggler,
             lora_configs=config.get("lora"),
             pruner=self.pruner,
         )

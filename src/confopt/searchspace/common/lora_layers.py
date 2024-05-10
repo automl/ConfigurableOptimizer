@@ -38,11 +38,21 @@ class LoRALayer:
 
     def activate_lora(
         self,
-        r: int,
+        r: int = 1,
         lora_alpha: int = 1,
         lora_dropout_rate: float = 0,
         merge_weights: bool = True,
     ) -> None:
+        if hasattr(
+            self, "_original_r"
+        ):  # if it's being activated again after deactivation
+            self.r = self._original_r
+            self.conv.weight.requires_grad = False  # type: ignore
+            self.lora_A.requires_grad = True  # type: ignore
+            self.lora_B.requires_grad = True  # type: ignore
+            del self._original_r
+            return
+
         assert self.r == 0, "rank can only be changed once"
         self.r = r
         self.lora_alpha = lora_alpha
@@ -53,6 +63,26 @@ class LoRALayer:
         else:
             self.lora_dropout = lambda x: x
         self._initialize_AB()
+
+    def deactivate_lora(self) -> None:
+        if hasattr(self, "lora_A") and hasattr(self, "lora_B"):
+            self._original_r = self.r
+            self.r = 0
+            self.conv.weight.requires_grad = True  # type: ignore
+            self.lora_A.requires_grad = False
+            self.lora_B.requires_grad = False
+
+            if self.conv.bias is not None:  # type: ignore
+                self.conv.bias.requires_grad = True  # type: ignore
+
+    def toggle_lora(self) -> None:
+        assert hasattr(self, "lora_A"), "LoRA components are not initialized"
+        assert hasattr(self, "lora_B"), "LoRA components are not initialized"
+
+        if self.r > 0:
+            self.deactivate_lora()
+        else:
+            self.activate_lora()
 
 
 class ConvLoRA(nn.Module, LoRALayer):

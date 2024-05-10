@@ -15,20 +15,14 @@ class TestLoRA(unittest.TestCase):
         in_channels = 3
         out_channels = 16
         kernel_size = (3, 3)
-        r = 8
-        lora_conv2d = Conv2DLoRA(in_channels, out_channels, kernel_size, r)
+        lora_conv2d = Conv2DLoRA(in_channels, out_channels, kernel_size)
 
         assert lora_conv2d.conv.weight.shape == torch.Size(
             [out_channels, in_channels, *kernel_size]
         )
 
-        assert lora_conv2d.lora_A.shape == torch.Size(
-            [r * kernel_size[0], in_channels * kernel_size[0]]
-        )
-
-        assert lora_conv2d.lora_B.shape == torch.Size(
-            [out_channels * kernel_size[0], r * kernel_size[0]]
-        )
+        assert not hasattr(lora_conv2d, "lora_A")
+        assert not hasattr(lora_conv2d, "lora_B")
 
     def test_activate_lora(self) -> None:
         in_channels = 3

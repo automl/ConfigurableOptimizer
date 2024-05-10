@@ -26,6 +26,8 @@ class ProfileConfig:
         entangle_op_weights: bool = False,
         lora_rank: int = 0,
         lora_warm_epochs: int = 0,
+        lora_toggle_epochs: list[int] | None = None,
+        lora_toggle_probability: float | None = None,
         seed: int = 100,
         searchspace_str: str = "nb201",
         oles: bool = False,
@@ -41,7 +43,12 @@ class ProfileConfig:
         self._initialize_trainer_config()
         self._initialize_sampler_config()
         self._set_partial_connector(is_partial_connection)
-        self._set_lora_configs(lora_rank)
+        self._set_lora_configs(
+            lora_rank,
+            lora_warm_epochs,
+            toggle_epochs=lora_toggle_epochs,
+            lora_toggle_probability=lora_toggle_probability,
+        )
         self._set_dropout(dropout)
         self._set_perturb(perturbation, perturbator_sample_frequency)
         self.entangle_op_weights = entangle_op_weights
@@ -70,9 +77,12 @@ class ProfileConfig:
     def _set_lora_configs(
         self,
         lora_rank: int = 0,
+        lora_warm_epochs: int = 0,
         lora_dropout: float = 0,
         lora_alpha: int = 1,
+        lora_toggle_probability: float | None = None,
         merge_weights: bool = True,
+        toggle_epochs: list[int] | None = None,
     ) -> None:
         self.lora_config = {
             "r": lora_rank,
@@ -80,6 +90,9 @@ class ProfileConfig:
             "lora_alpha": lora_alpha,
             "merge_weights": merge_weights,
         }
+        self.lora_toggle_epochs = toggle_epochs
+        self.lora_warm_epochs = lora_warm_epochs
+        self.lora_toggle_probability = lora_toggle_probability
 
     def _set_oles_configs(
         self,
@@ -129,6 +142,11 @@ class ProfileConfig:
             "dropout": self.dropout_config,
             "trainer": self.trainer_config,
             "lora": self.lora_config,
+            "lora_extra": {
+                "toggle_epochs": self.lora_toggle_epochs,
+                "warm_epochs": self.lora_warm_epochs,
+                "toggle_probability": self.lora_toggle_probability,
+            },
             "sampler_type": self.sampler_type,
             "searchspace_str": self.searchspace_str,
             "weight_type": weight_type,
