@@ -191,9 +191,9 @@ class ConfigurableTrainer:
 
             # Count skip connections in this epoch
             normal_cell_n_skip, reduce_cell_n_skip = (
-                network.get_num_skip_ops()
+                network.module.get_num_skip_ops()
                 if self.use_data_parallel
-                else network.module.get_num_skip_ops()
+                else network.get_num_skip_ops()
             )
 
             n_skip_connections = {

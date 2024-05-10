@@ -134,6 +134,6 @@ class DARTSSearchSpace(SearchSpace):
                 module.running_sim.reset()
 
     def get_num_skip_ops(self) -> tuple[int, int]:
-        alphas_normal, alphas_reduce = self.model.arch_parameters
+        alphas_normal, alphas_reduce = self.model.arch_parameters()
         count_skip = lambda alphas: sum(alphas.argmax(dim=-1) == 3)
         return count_skip(alphas_normal), count_skip(alphas_reduce)
