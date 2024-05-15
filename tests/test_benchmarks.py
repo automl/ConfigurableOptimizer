@@ -111,6 +111,7 @@ class TestBenchmarks(unittest.TestCase):
         self.assertEqual(query_result[1], valid_result)
         self.assertEqual(query_result[2], test_result)
 
+    @pytest.mark.benchmark  # type: ignore
     def test_nb201_benchmark_fail(self) -> None:
         from confopt.benchmarks import NB201Benchmark
         api = NB201Benchmark()
@@ -141,6 +142,7 @@ class TestBenchmarks(unittest.TestCase):
 
         self.assertAlmostEqual(query_result[-1], test_nb301_acc, 4)
 
+    @pytest.mark.benchmark  # type: ignore
     def test_nb301_benchmark_fail_genotype(self) -> None:
         from confopt.benchmarks import NB301Benchmark
         api = NB301Benchmark()

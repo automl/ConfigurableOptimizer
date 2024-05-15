@@ -109,6 +109,7 @@ log_cli = false
 log_level = "DEBUG"
 xfail_strict = true
 addopts = "--durations=10 -vv"
+markers = [ "benchmark" ]
 
 
 [tool.coverage.run]
