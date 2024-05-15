@@ -12,7 +12,6 @@ import torch
 from torch.backends import cudnn
 import wandb
 
-from confopt.benchmarks import NB201Benchmark, NB301Benchmark
 from confopt.dataset import (
     CIFAR10Data,
     CIFAR100Data,
@@ -371,11 +370,15 @@ class Experiment:
         config: dict,
     ) -> None:
         if search_space == SearchSpaceType.NB201:
+            from confopt.benchmarks import NB201Benchmark
+
             self.benchmark_api = NB201Benchmark()
         elif (
             search_space == SearchSpaceType.DARTS
             or search_space == SearchSpaceType.RobustDARTS
         ):
+            from confopt.benchmarks import NB301Benchmark
+
             self.benchmark_api = NB301Benchmark(**config)
         else:
             print(f"Benchmark does not exist for the {search_space.value} searchspace")

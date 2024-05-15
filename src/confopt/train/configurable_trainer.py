@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from collections import namedtuple
 import time
+from typing import Any
 
 from fvcore.common.checkpoint import Checkpointer, PeriodicCheckpointer
 import torch
 from torch import nn
 from typing_extensions import TypeAlias
 
-from confopt.benchmarks import BenchmarkBase
 from confopt.dataset import AbstractData
 from confopt.searchspace import SearchSpace
 from confopt.utils import AverageMeter, Logger, calc_accuracy, clear_grad_cosine
@@ -46,7 +46,7 @@ class ConfigurableTrainer:
         epochs: int = 100,
         debug_mode: bool = False,
         query_dataset: str = "cifar10",
-        benchmark_api: BenchmarkBase | None = None,
+        benchmark_api: Any | None = None,
     ) -> None:
         self.model = model
         self.model_optimizer = model_optimizer

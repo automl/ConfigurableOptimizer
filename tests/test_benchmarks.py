@@ -4,7 +4,7 @@ import unittest
 
 import pytest
 
-from confopt.benchmarks import NB201Benchmark, NB301Benchmark
+
 
 from confopt.searchspace.darts.core.genotypes import Genotype as NB301Genotype
 from confopt.searchspace.nb201.core.genotypes import Structure as NB201Genotype
@@ -83,6 +83,7 @@ test_nb301_fail_acc = 88.165985
 class TestBenchmarks(unittest.TestCase):
     @pytest.mark.benchmark  # type: ignore
     def test_nb201_benchmark(self) -> None:
+        from confopt.benchmarks import NB201Benchmark
         api = NB201Benchmark()
 
         # check cifar 10
@@ -111,6 +112,7 @@ class TestBenchmarks(unittest.TestCase):
         self.assertEqual(query_result[2], test_result)
 
     def test_nb201_benchmark_fail(self) -> None:
+        from confopt.benchmarks import NB201Benchmark
         api = NB201Benchmark()
 
         # check cifar 10
@@ -133,12 +135,14 @@ class TestBenchmarks(unittest.TestCase):
 
     @pytest.mark.benchmark  # type: ignore
     def test_nb301_benchmark(self) -> None:
+        from confopt.benchmarks import NB301Benchmark
         api = NB301Benchmark()
         query_result = api.query(nb301_genotype, with_noise=False)
 
         self.assertAlmostEqual(query_result[-1], test_nb301_acc, 4)
 
     def test_nb301_benchmark_fail_genotype(self) -> None:
+        from confopt.benchmarks import NB301Benchmark
         api = NB301Benchmark()
         query_result = api.query(nb301_genotype_fail, with_noise=False)
 
