@@ -12,7 +12,12 @@ import torch
 from torch import nn
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
-from confopt.utils import AverageMeter, calc_layer_alignment_score, freeze
+from confopt.utils import (
+    AverageMeter,
+    calc_layer_alignment_score,
+    freeze,
+    preserve_gradients_in_module,
+)
 from confopt.utils.normalize_params import normalize_params
 
 from .cells import NAS201SearchCell as SearchCell
@@ -392,36 +397,14 @@ class NB201SearchModel(nn.Module):
 
 
 def preserve_grads(m: nn.Module) -> None:
-    if isinstance(
-        m,
-        (
-            OperationBlock,
-            OperationChoices,
-            SearchCell,
-            NB201SearchModel,
-        ),
-    ):
-        return
+    ignored_modules = (
+        OperationBlock,
+        OperationChoices,
+        SearchCell,
+        NB201SearchModel,
+    )
 
-    flag = 0
-    # for op in OLES_OPS:
-    #     if isinstance(m, op):
-    #         flag = 1
-    #         break
-
-    if isinstance(m, tuple(OLES_OPS)):
-        flag = 1
-
-    if flag == 0:
-        return
-
-    if not hasattr(m, "pre_grads"):
-        m.pre_grads = []
-
-    for param in m.parameters():
-        if param.requires_grad and param.grad is not None:
-            g = param.grad.detach().cpu()
-            m.pre_grads.append(g)
+    preserve_gradients_in_module(m, ignored_modules, OLES_OPS)
 
 
 # TODO: break function from OLES paper to have less branching.

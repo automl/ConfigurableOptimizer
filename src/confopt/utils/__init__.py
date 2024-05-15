@@ -93,6 +93,29 @@ def freeze(m: torch.nn.Module) -> None:
         param.requires_grad_(False)
 
 
+def preserve_gradients_in_module(
+    m: torch.nn.Module,
+    ignored_modules: tuple[torch.nn.Module],
+    OLES_OPS: list[torch.nn.Module],
+) -> None:
+    if isinstance(m, ignored_modules):
+        return
+
+    flag = 0
+    if isinstance(m, tuple(OLES_OPS)):
+        flag = 1
+    if flag == 0:
+        return
+
+    if not hasattr(m, "pre_grads"):
+        m.pre_grads = []
+
+    for param in m.parameters():
+        if param.requires_grad and param.grad is not None:
+            g = param.grad.detach().cpu()
+            m.pre_grads.append(g)
+
+
 def clear_grad_cosine(m: torch.nn.Module) -> None:
     if not hasattr(m, "avg"):
         return

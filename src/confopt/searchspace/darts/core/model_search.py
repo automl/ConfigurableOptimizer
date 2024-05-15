@@ -8,7 +8,12 @@ from torch import nn
 import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
-from confopt.utils import AverageMeter, calc_layer_alignment_score, freeze
+from confopt.utils import (
+    AverageMeter,
+    calc_layer_alignment_score,
+    freeze,
+    preserve_gradients_in_module,
+)
 from confopt.utils.normalize_params import normalize_params
 
 from .genotypes import BABY_PRIMITIVES, PRIMITIVES, DARTSGenotype
@@ -556,33 +561,15 @@ class Network(nn.Module):
 
 
 def preserve_grads(m: nn.Module) -> None:
-    if isinstance(
-        m,
-        (
-            OperationBlock,
-            OperationChoices,
-            Cell,
-            MixedOp,
-            Network,
-        ),
-    ):
-        return
+    ignored_modules = (
+        OperationBlock,
+        OperationChoices,
+        Cell,
+        MixedOp,
+        Network,
+    )
 
-    flag = 0
-
-    if isinstance(m, tuple(OLES_OPS)):
-        flag = 1
-
-    if flag == 0:
-        return
-
-    if not hasattr(m, "pre_grads"):
-        m.pre_grads = []
-
-    for param in m.parameters():
-        if param.requires_grad and param.grad is not None:
-            g = param.grad.detach().cpu()
-            m.pre_grads.append(g)
+    preserve_gradients_in_module(m, ignored_modules, OLES_OPS)
 
 
 # TODO: break function from OLES paper to have less branching.
