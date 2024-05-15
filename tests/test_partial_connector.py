@@ -10,6 +10,13 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 
 class TestPartialConnector(unittest.TestCase):
+    def forward_method(
+        self, x: torch.Tensor, ops: list[nn.Module], alphas: list[torch.Tensor]
+    ) -> torch.Tensor:
+        states = [op(x) * alpha for op, alpha in zip(ops, alphas)]
+
+        return sum(states)
+
     def test_forward_pass(self) -> None:
         x = torch.randn(2, 16, 8, 8).to(DEVICE)
         arch_parameters = nn.Parameter(1e-3 * torch.randn(1, 2)).to(DEVICE)
@@ -21,7 +28,7 @@ class TestPartialConnector(unittest.TestCase):
             ]
         )
         partial_connector = PartialConnector(k=4)
-        out = partial_connector(x, alphas[0], ops=ops)
+        out = partial_connector(x, alphas[0], ops=ops, forward_method=self.forward_method)
         print("hello")
 
         assert out.shape == x.shape
