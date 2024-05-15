@@ -3,7 +3,10 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from confopt.oneshot.weightentangler import ConvolutionalWEModule
+from confopt.oneshot.weightentangler import (
+    ConvolutionalWEModule,
+    WeightEntanglementSequential,
+)
 from confopt.searchspace.common import Conv2DLoRA
 import confopt.utils.reduce_channels as rc
 
@@ -113,6 +116,12 @@ class ReLUConvBN(nn.Module):
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
 
+    def deactivate_lora(self) -> None:
+        self.op[1].deactivate_lora()
+
+    def toggle_lora(self) -> None:
+        self.op[1].toggle_lora()
+
 
 class Pooling(nn.Module):
     def __init__(
@@ -210,7 +219,7 @@ class DilConv(ConvolutionalWEModule):
             kernel_size if isinstance(kernel_size, int) else kernel_size[0]
         )
         self.stride = stride
-        self.op = nn.Sequential(
+        self.op = WeightEntanglementSequential(
             nn.ReLU(inplace=False),
             Conv2DLoRA(
                 C_in,
@@ -259,6 +268,14 @@ class DilConv(ConvolutionalWEModule):
         self.op[1].activate_lora(r)
         self.op[2].activate_lora(r)
 
+    def deactivate_lora(self) -> None:
+        self.op[1].deactivate_lora()
+        self.op[2].deactivate_lora()
+
+    def toggle_lora(self) -> None:
+        self.op[1].toggle_lora()
+        self.op[2].toggle_lora()
+
 
 class SepConv(ConvolutionalWEModule):
     def __init__(
@@ -295,7 +312,7 @@ class SepConv(ConvolutionalWEModule):
             kernel_size if isinstance(kernel_size, int) else kernel_size[0]
         )
         self.stride = stride
-        self.op = nn.Sequential(
+        self.op = WeightEntanglementSequential(
             nn.ReLU(inplace=False),
             Conv2DLoRA(
                 C_in,
@@ -360,6 +377,18 @@ class SepConv(ConvolutionalWEModule):
         self.op[2].activate_lora(r)
         self.op[5].activate_lora(r)
         self.op[6].activate_lora(r)
+
+    def deactivate_lora(self) -> None:
+        self.op[1].activate_lora()
+        self.op[2].activate_lora()
+        self.op[5].activate_lora()
+        self.op[6].activate_lora()
+
+    def toggle_lora(self) -> None:
+        self.op[1].toggle_lora()
+        self.op[2].toggle_lora()
+        self.op[5].toggle_lora()
+        self.op[6].toggle_lora()
 
 
 class Identity(nn.Module):
@@ -519,6 +548,10 @@ class FactorizedReduce(nn.Module):
     def activate_lora(self, r: int) -> None:
         self.conv_1.activate_lora(r)
         self.conv_2.activate_lora(r)
+
+    def deactivate_lora(self) -> None:
+        self.conv_1.deactivate_lora()
+        self.conv_2.deactivate_lora()
 
 
 class Conv7x1Conv1x7BN(nn.Module):

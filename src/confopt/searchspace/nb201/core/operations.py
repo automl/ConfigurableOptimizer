@@ -6,7 +6,10 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from confopt.oneshot.weightentangler import ConvolutionalWEModule
+from confopt.oneshot.weightentangler import (
+    ConvolutionalWEModule,
+    WeightEntanglementSequential,
+)
 from confopt.searchspace.common import Conv2DLoRA
 import confopt.utils.reduce_channels as rc
 
@@ -163,7 +166,7 @@ class ReLUConvBN(ConvolutionalWEModule):
             kernel_size if isinstance(kernel_size, int) else kernel_size[0]
         )
         self.stride = stride
-        self.op = nn.Sequential(
+        self.op = WeightEntanglementSequential(
             nn.ReLU(inplace=False),
             Conv2DLoRA(
                 C_in,
@@ -217,6 +220,12 @@ class ReLUConvBN(ConvolutionalWEModule):
 
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
+
+    def deactivate_lora(self) -> None:
+        self.op[1].deactivate_lora()
+
+    def toggle_lora(self) -> None:
+        self.op[1].toggle_lora()
 
 
 class SepConv(ConvolutionalWEModule):
@@ -318,6 +327,14 @@ class SepConv(ConvolutionalWEModule):
         self.op[1].activate_lora(r)
         self.op[2].activate_lora(r)
 
+    def deactivate_lora(self) -> None:
+        self.op[1].deactivate_lora()
+        self.op[2].deactivate_lora()
+
+    def toggle_lora(self) -> None:
+        self.op[1].toggle_lora()
+        self.op[2].toggle_lora()
+
 
 class DualSepConv(nn.Module):
     """Dual Separable Convolution-BatchNorm Block Class.
@@ -411,6 +428,14 @@ class DualSepConv(nn.Module):
     def activate_lora(self, r: int) -> None:
         self.op_a.activate_lora(r)
         self.op_b.activate_lora(r)
+
+    def deactivate_lora(self) -> None:
+        self.op_a.deactivate_lora()
+        self.op_b.deactivate_lora()
+
+    def toggle_lora(self) -> None:
+        self.op_a.toggle_lora()
+        self.op_b.toggle_lora()
 
 
 class ResNetBasicblock(nn.Module):
@@ -855,6 +880,24 @@ class FactorizedReduce(nn.Module):
         else:
             raise ValueError(f"Invalid stride: {self.stride}")
 
+    def deactivate_lora(self) -> None:
+        if self.stride == 2:
+            for i in range(2):
+                self.convs[i].deactivate_lora()
+        elif self.stride == 1:
+            self.conv.deactivate_lora()
+        else:
+            raise ValueError(f"Invalid stride: {self.stride}")
+
+    def toggle_lora(self) -> None:
+        if self.stride == 2:
+            for i in range(2):
+                self.convs[i].toggle_lora()
+        elif self.stride == 1:
+            self.conv.toggle_lora()
+        else:
+            raise ValueError(f"Invalid stride: {self.stride}")
+
     def extra_repr(self) -> str:
         """Return an informative string representation of the Factorized Reduce block.
 
@@ -868,4 +911,4 @@ class FactorizedReduce(nn.Module):
         return "C_in={C_in}, C_out={C_out}, stride={stride}".format(**self.__dict__)
 
 
-OLES_OPS = [Zero, Pooling, ReLUConvBN, DualSepConv, SepConv, Identity]
+OLES_OPS = [Zero, Pooling, DualSepConv, SepConv, Identity, ReLUConvBN]

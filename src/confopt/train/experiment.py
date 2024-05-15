@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from collections import namedtuple
 from enum import Enum
+import json
 import random
 from typing import Callable
 import warnings
@@ -25,8 +26,10 @@ from confopt.oneshot.archsampler import (
     SNASSampler,
 )
 from confopt.oneshot.dropout import Dropout
+from confopt.oneshot.lora_toggler import LoRAToggler
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import SDARTSPerturbator
+from confopt.oneshot.pruner.pruner import Pruner
 from confopt.oneshot.weightentangler import WeightEntangler
 from confopt.profiles import (
     DiscreteProfile,
@@ -165,6 +168,13 @@ class Experiment:
         self.dropout = profile.dropout
         self.edge_normalization = profile.is_partial_connection
         self.entangle_op_weights = profile.entangle_op_weights
+        oles_config = config.get("oles")
+        if oles_config:
+            oles = oles_config.get("oles")
+            calc_gm_score = oles_config.get("calc_gm_score")
+        else:
+            oles = False
+            calc_gm_score = False
         assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
         return self.runner(
             config,
@@ -173,6 +183,8 @@ class Experiment:
             load_best_model,
             use_benchmark,
             run_name,
+            oles,
+            calc_gm_score,
         )
 
     def runner(
@@ -183,6 +195,8 @@ class Experiment:
         load_best_model: bool = False,
         use_benchmark: bool = True,
         run_name: str = "supernet_run",
+        oles: bool = False,
+        calc_gm_score: bool = False,
     ) -> ConfigurableTrainer:
         assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
 
@@ -301,12 +315,19 @@ class Experiment:
             benchmark_api=self.benchmark_api,
         )
 
+        config_str = json.dumps(config, indent=2, default=str)
+        self.logger.log(
+            f"Training the supernet with the following configuration: \n{config_str}"
+        )
+
         trainer.train(
             profile=self.profile,  # type: ignore
             is_wandb_log=self.is_wandb_log,
             lora_warm_epochs=config["trainer"].get(  # type: ignore
                 "lora_warm_epochs", 0
             ),
+            oles=oles,
+            calc_gm_score=calc_gm_score,
         )
 
         return trainer
@@ -326,6 +347,7 @@ class Experiment:
         self.set_perturbator(perturbator_enum, config.get("perturbator", {}))
         self.set_partial_connector(config.get("partial_connector", {}))
         self.set_dropout(config.get("dropout", {}))
+        self.set_pruner(config.get("pruner", {}))
 
         if use_benchmark:
             if (
@@ -343,6 +365,7 @@ class Experiment:
         else:
             self.benchmark_api = None
 
+        self.set_lora_toggler(config.get("lora", {}), config.get("lora_extra", {}))
         self.set_weight_entangler()
         self.set_profile(config)
 
@@ -373,10 +396,7 @@ class Experiment:
             from confopt.benchmarks import NB201Benchmark
 
             self.benchmark_api = NB201Benchmark()
-        elif (
-            search_space == SearchSpaceType.DARTS
-            or search_space == SearchSpaceType.RobustDARTS
-        ):
+        elif search_space in (SearchSpaceType.DARTS, SearchSpaceType.RobustDARTS):
             from confopt.benchmarks import NB301Benchmark
 
             self.benchmark_api = NB301Benchmark(**config)
@@ -429,6 +449,35 @@ class Experiment:
     def set_weight_entangler(self) -> None:
         self.weight_entangler = WeightEntangler() if self.entangle_op_weights else None
 
+    def set_pruner(self, config: dict) -> None:
+        if config is not None:
+            self.pruner = Pruner(
+                searchspace=self.search_space,
+                prune_epochs=config.get("prune_epochs", []),
+                prune_num_keeps=config.get("prune_num_keeps", []),
+            )
+        else:
+            self.pruner = None
+
+    def set_lora_toggler(self, lora_config: dict, lora_extra: dict) -> None:
+        if lora_config.get("r", 0) == 0:
+            self.lora_toggler = None
+            return
+
+        toggle_epochs = lora_extra.get("toggle_epochs")
+        toggle_probability = lora_extra.get("toggle_probability")
+        if toggle_epochs is not None:
+            assert min(toggle_epochs) > lora_extra.get(
+                "warm_epochs"
+            ), "The first toggle epoch should be after the warmup epochs"
+            self.lora_toggler = LoRAToggler(
+                searchspace=self.search_space,
+                toggle_epochs=toggle_epochs,
+                toggle_probability=toggle_probability,
+            )
+        else:
+            self.lora_toggler = None
+
     def set_profile(self, config: dict) -> None:
         assert self.sampler is not None
 
@@ -439,7 +488,9 @@ class Experiment:
             perturbation=self.perturbator,
             dropout=self.dropout,
             weight_entangler=self.weight_entangler,
+            lora_toggler=self.lora_toggler,
             lora_configs=config.get("lora"),
+            pruner=self.pruner,
         )
 
     def _get_dataset(self, dataset: DatasetType) -> Callable | None:
@@ -531,15 +582,9 @@ class Experiment:
             discrete_model = NASBench201Model(**searchspace_config)
         elif search_space_str == ModelType.DARTS.value:
             searchspace_config["genotype"] = eval(genotype_str)
-            if (
-                self.dataset_str.value == "cifar10"
-                or self.dataset_str.value == "cifar100"
-            ):
+            if self.dataset_str.value in ("cifar10", "cifar100"):
                 discrete_model = DARTSModel(**searchspace_config)
-            elif (
-                self.dataset_str.value == "imgnet16"
-                or self.dataset_str.value == "imgnet16_120"
-            ):
+            elif self.dataset_str.value in ("imgnet16", "imgnet16_120"):
                 discrete_model = DARTSImageNetModel(**searchspace_config)
             else:
                 raise ValueError("undefined discrete model for this dataset.")
@@ -821,6 +866,20 @@ if __name__ == "__main__":
         type=str,
     )
 
+    parser.add_argument(
+        "--oles",
+        action="store_true",
+        default=False,
+        help="freezes weights if it passes the threshold",
+    )
+
+    parser.add_argument(
+        "--calc_gm_score",
+        action="store_true",
+        default=False,
+        help="calculates gm scores during training the supernet",
+    )
+
     args = parser.parse_args()
     IS_DEBUG_MODE = True
     is_wandb_log = IS_DEBUG_MODE is False
@@ -834,6 +893,8 @@ if __name__ == "__main__":
         is_partial_connection=args.is_partial_connector,
         perturbation=args.perturbator,
         dropout=args.dropout,
+        oles=args.oles,
+        calc_gm_score=args.calc_gm_score,
     )
 
     config = profile.get_config()

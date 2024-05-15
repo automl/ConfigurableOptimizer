@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+import warnings
 
 import torch
 
@@ -25,8 +26,14 @@ class ProfileConfig:
         entangle_op_weights: bool = False,
         lora_rank: int = 0,
         lora_warm_epochs: int = 0,
+        lora_toggle_epochs: list[int] | None = None,
+        lora_toggle_probability: float | None = None,
         seed: int = 100,
         searchspace_str: str = "nb201",
+        oles: bool = False,
+        calc_gm_score: bool = False,
+        prune_epochs: list[int] | None = None,
+        prune_num_keeps: list[int] | None = None,
     ) -> None:
         self.config_type = config_type
         self.epochs = epochs
@@ -36,19 +43,46 @@ class ProfileConfig:
         self._initialize_trainer_config()
         self._initialize_sampler_config()
         self._set_partial_connector(is_partial_connection)
-        self._set_lora_configs(lora_rank)
+        self._set_lora_configs(
+            lora_rank,
+            lora_warm_epochs,
+            toggle_epochs=lora_toggle_epochs,
+            lora_toggle_probability=lora_toggle_probability,
+        )
         self._set_dropout(dropout)
         self._set_perturb(perturbation, perturbator_sample_frequency)
         self.entangle_op_weights = entangle_op_weights
+        self._set_oles_configs(oles, calc_gm_score)
+        self._set_pruner_configs(prune_epochs, prune_num_keeps)
         PROFILE_TYPE = "BASE"
         self.sampler_type = str.lower(PROFILE_TYPE)
+
+    def _set_pruner_configs(
+        self,
+        prune_epochs: list[int] | None = None,
+        prune_num_keeps: list[int] | None = None,
+    ) -> None:
+        if prune_epochs is not None:
+            assert (
+                prune_num_keeps is not None
+            ), "Please provide epochs numkeeps to prune with"
+            assert len(prune_num_keeps) == len(
+                prune_epochs
+            ), "Length of both prune_epochs and prune_num_keeps must be same"
+            self.pruner_config = {
+                "prune_epochs": prune_epochs,
+                "prune_num_keeps": prune_num_keeps,
+            }
 
     def _set_lora_configs(
         self,
         lora_rank: int = 0,
+        lora_warm_epochs: int = 0,
         lora_dropout: float = 0,
         lora_alpha: int = 1,
+        lora_toggle_probability: float | None = None,
         merge_weights: bool = True,
+        toggle_epochs: list[int] | None = None,
     ) -> None:
         self.lora_config = {
             "r": lora_rank,
@@ -56,6 +90,21 @@ class ProfileConfig:
             "lora_alpha": lora_alpha,
             "merge_weights": merge_weights,
         }
+        self.lora_toggle_epochs = toggle_epochs
+        self.lora_warm_epochs = lora_warm_epochs
+        self.lora_toggle_probability = lora_toggle_probability
+
+    def _set_oles_configs(
+        self,
+        oles: bool = False,
+        calc_gm_score: bool = False,
+    ) -> None:
+        if oles and not calc_gm_score:
+            calc_gm_score = True
+            warnings.warn(
+                "OLES needs gm_score, please pass calc_gm_score as True.", stacklevel=2
+            )
+        self.oles_config = {"oles": oles, "calc_gm_score": calc_gm_score}
 
     def _set_perturb(
         self,
@@ -93,10 +142,19 @@ class ProfileConfig:
             "dropout": self.dropout_config,
             "trainer": self.trainer_config,
             "lora": self.lora_config,
+            "lora_extra": {
+                "toggle_epochs": self.lora_toggle_epochs,
+                "warm_epochs": self.lora_warm_epochs,
+                "toggle_probability": self.lora_toggle_probability,
+            },
             "sampler_type": self.sampler_type,
             "searchspace_str": self.searchspace_str,
             "weight_type": weight_type,
+            "oles": self.oles_config,
         }
+
+        if hasattr(self, "pruner_config"):
+            config.update({"pruner": self.pruner_config})
 
         if hasattr(self, "searchspace_config") and self.searchspace_config is not None:
             config.update({"search_space": self.searchspace_config})
@@ -230,6 +288,13 @@ class ProfileConfig:
             ), f"{config_key} not a valid configuration for the lora layers"
             self.lora_config[config_key] = kwargs[config_key]
 
+    def configure_oles_config(self, **kwargs) -> None:  # type: ignore
+        for config_key in kwargs:
+            assert (
+                config_key in self.oles_config
+            ), f"{config_key} not a valid configuration for the oles config"
+            self.oles_config[config_key] = kwargs[config_key]
+
     @abstractmethod
     def set_searchspace_config(self, config: dict) -> None:
         if not hasattr(self, "searchspace_config"):
@@ -254,5 +319,7 @@ class ProfileConfig:
             name_wandb_run.append(f"lorawarmup_{self.lora_warm_epochs}")
         name_wandb_run.append(f"epochs_{self.trainer_config.get('epochs')}")
         name_wandb_run.append(f"seed_{self.seed}")
+        if self.oles_config.get("oles"):
+            name_wandb_run.append("with_oles")
         name_wandb_run_str = "-".join(name_wandb_run)
         return name_wandb_run_str

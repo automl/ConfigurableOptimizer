@@ -6,18 +6,19 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import math
 
 import torch
 from torch import nn
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
-from confopt.utils import freeze
+from confopt.utils import AverageMeter, calc_layer_alignment_score, freeze
 from confopt.utils.normalize_params import normalize_params
 
 from .cells import NAS201SearchCell as SearchCell
 from .genotypes import Structure
-from .operations import NAS_BENCH_201, OLES_OPS, ResNetBasicblock
 from .model import NASBench201Model
+from .operations import NAS_BENCH_201, OLES_OPS, ResNetBasicblock
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -127,6 +128,7 @@ class NB201SearchModel(nn.Module):
         self.beta_parameters = nn.Parameter(
             1e-3 * torch.randn(num_edge)  # type: ignore
         )
+        self.weights: dict[str, list[torch.Tensor]] = {}
 
     def get_weights(self) -> list[nn.Parameter]:
         """Get a list of learnable parameters in the model. (does not include alpha or
@@ -195,9 +197,7 @@ class NB201SearchModel(nn.Module):
         """
         string = self.extra_repr()
         for i, cell in enumerate(self.cells):
-            string += "\n {:02d}/{:02d} :: {:}".format(
-                i, len(self.cells), cell.extra_repr()
-            )
+            string += f"\n {i:02d}/{len(self.cells):02d} :: {cell.extra_repr()}"
         return string
 
     def extra_repr(self) -> str:
@@ -253,14 +253,29 @@ class NB201SearchModel(nn.Module):
         if self.edge_normalization:
             return self.edge_normalization_forward(inputs)
 
-        alphas = self.sample(self.arch_parameters)
-
-        if self.mask is not None:
-            alphas = normalize_params(alphas, self.mask)
+        self.weights["alphas"] = []
+        weights = self.sample(self.arch_parameters)
+        # if self.mask is not None:
+        #     alphas = normalize_params(alphas, self.mask)
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
             if isinstance(cell, SearchCell):
+                # TODO fix layer alignment
+                alphas = weights
+                # alphas = torch.nn.functional.softmax(self.arch_parameters, dim=-1)
+
+                # Retain Grads for weights
+                if self.training:
+                    if isinstance(alphas, list):
+                        for alpha in alphas:
+                            alpha.retain_grad()
+                    else:
+                        assert isinstance(alphas, torch.Tensor)
+                        alphas.retain_grad()
+                    self.weights["alphas"].append(alphas)
+                if self.mask is not None:
+                    alphas = normalize_params(alphas, self.mask)
                 feature = cell(feature, alphas)
             else:
                 feature = cell(feature)
@@ -276,14 +291,14 @@ class NB201SearchModel(nn.Module):
         self,
         inputs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        alphas = self.sample(self.arch_parameters)
-
-        if self.mask is not None:
-            alphas = normalize_params(alphas, self.mask)
+        self.weights["alphas"] = []
+        weights = self.sample(self.arch_parameters)
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
             if isinstance(cell, SearchCell):
+                # TODO fix layer alignment
+                alphas = weights
                 betas = torch.empty((0,)).to(alphas[0].device)  # type: ignore
                 for v in range(1, self.max_nodes):
                     idx_nodes = []
@@ -294,7 +309,18 @@ class NB201SearchModel(nn.Module):
                         self.beta_parameters[idx_nodes], dim=-1
                     )
                     betas = torch.cat([betas, beta_node_v], dim=0)
+                # Retain Grads for weights
+                if self.training:
+                    if isinstance(alphas, list):
+                        for alpha in alphas:
+                            alpha.retain_grad()
+                    else:
+                        assert isinstance(alphas, torch.Tensor)
+                        alphas.retain_grad()
+                    self.weights["alphas"].append(alphas)
 
+                if self.mask is not None:
+                    alphas = normalize_params(alphas, self.mask)
                 feature = cell(feature, alphas, betas)
             else:
                 feature = cell(feature)
@@ -306,38 +332,41 @@ class NB201SearchModel(nn.Module):
 
         return out, logits
 
-    def _prune(self, op_sparsity: float, wider: int | None = None) -> None:
+    def get_arch_grads(self) -> list[torch.Tensor]:
+        grads = []
+        for alphas in self.weights["alphas"]:
+            if isinstance(alphas, list):
+                alphas_grads = [alpha.grad.data.clone().detach() for alpha in alphas]
+                grads.append(torch.stack(alphas_grads).detach().reshape(-1))
+            else:
+                grads.append(alphas.grad.data.clone().detach().reshape(-1))
+
+        return grads
+
+    def _get_mean_layer_alignment_score(self) -> float:
+        grads = self.get_arch_grads()
+        mean_score = calc_layer_alignment_score(grads)
+
+        if math.isnan(mean_score):
+            mean_score = 0
+
+        return mean_score
+
+    def prune(self, num_keep: int) -> None:
         """Masks architecture parameters to enforce sparsity.
 
         Args:
-            op_sparsity (float): The desired sparsity level, represented as a
-            fraction of operations to keep.
-            wider (int): If provided, this parameter determines how much wider the
-            search space should be by multiplying the number of channels by this factor.
-
-        Note:
-            This method enforces sparsity in the architecture parameters by zeroing out
-            a fraction of the smallest values, as specified by the `op_sparsity`
-            parameter.
-            It modifies the architecture parameters in-place to achieve the desired
-            sparsity.
+            num_keep (int): Number of operations to keep.
         """
-        if self.arch_parameters is None:
-            ValueError("cannot prune discretized search space")
-        # self.edge_normalization = False TODO: we could have partial connections and
-        # prune
-        for _name, module in self.named_modules():
-            if isinstance(module, (OperationBlock, OperationChoices)):
-                module.change_op_channel_size(wider)
-
         sorted_arch_params, _ = torch.sort(
             self.arch_parameters.data, dim=1, descending=True  # type: ignore
         )
-        top_k = int(op_sparsity * len(self.op_names))
-        thresholds = sorted_arch_params[:, :top_k]
+        top_k = num_keep
+        thresholds = sorted_arch_params[:, top_k - 1].unsqueeze(1)
         self.mask = self.arch_parameters.data >= thresholds  # type: ignore
 
         self.arch_parameters.data *= self.mask.float()  # type: ignore
+        self.arch_parameters.data[self.mask].requires_grad = True  # type: ignore
         self.arch_parameters.data[~self.mask].requires_grad = False  # type: ignore
         if self.arch_parameters.data[~self.mask].grad:  # type: ignore
             self.arch_parameters.data[~self.mask].grad.zero_()  # type: ignore
@@ -396,7 +425,7 @@ def preserve_grads(m: nn.Module) -> None:
 
 
 # TODO: break function from OLES paper to have less branching.
-def check_grads_cosine(m: nn.Module) -> None:
+def check_grads_cosine(m: nn.Module, oles: bool = False) -> None:  # noqa: C901
     if (
         isinstance(
             m,
@@ -425,19 +454,24 @@ def check_grads_cosine(m: nn.Module) -> None:
                 true_i += 1
             i += 1
 
-    if true_i != 0:
-        sim_avg = temp / true_i
     m.pre_grads.clear()
+    if true_i == 0:
+        return
+    sim_avg = temp / true_i
 
     if not hasattr(m, "avg"):
         m.avg = 0
     m.avg += sim_avg
 
+    if not hasattr(m, "running_sim"):
+        m.running_sim = AverageMeter()
+    m.running_sim.update(sim_avg)
+
     if not hasattr(m, "count"):
         m.count = 0
 
     if m.count == 20:
-        if m.avg / m.count < 0.4:
+        if m.avg / m.count < 0.4 and oles:
             freeze(m)
         m.count = 0
         m.avg = 0

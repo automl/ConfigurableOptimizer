@@ -4,8 +4,10 @@ import torch
 
 from confopt.oneshot.archsampler import BaseSampler, DARTSSampler, GDASSampler
 from confopt.oneshot.dropout import Dropout
+from confopt.oneshot.lora_toggler import LoRAToggler
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import BasePerturbator
+from confopt.oneshot.pruner import Pruner
 from confopt.oneshot.weightentangler import WeightEntangler
 from confopt.searchspace import DARTSSearchSpace
 from confopt.searchspace.common import (
@@ -26,6 +28,8 @@ class Profile:
         dropout: Dropout | None = None,
         weight_entangler: WeightEntangler | None = None,
         lora_configs: dict | None = None,
+        pruner: Pruner | None = None,
+        lora_toggler: LoRAToggler | None = None,
     ) -> None:
         self.sampler = sampler
         self.edge_normalization = edge_normalization
@@ -34,6 +38,8 @@ class Profile:
         self.dropout = dropout
         self.weight_entangler = weight_entangler
         self.lora_configs = lora_configs
+        self.pruner = pruner
+        self.lora_toggler = lora_toggler
 
         self.is_argmax_sampler = False
         if isinstance(self.sampler, GDASSampler):
@@ -60,6 +66,12 @@ class Profile:
 
         if self.dropout:
             search_space.components.append(self.dropout)
+
+        if self.pruner:
+            search_space.components.append(self.pruner)
+        
+        if self.lora_toggler:
+            search_space.components.append(self.lora_toggler)
 
     def perturb_parameter(self, search_space: SearchSpace) -> None:
         if self.perturbation is not None:
@@ -105,6 +117,22 @@ class Profile:
                         lora_dropout_rate=lora_dropout,
                         merge_weights=merge_weights,
                     )
+
+    def deactivate_lora(
+        self,
+        searchspace: SearchSpace,
+    ) -> None:
+        for _, module in searchspace.named_modules(remove_duplicate=False):
+            if isinstance(module, LoRALayer):
+                module.deactivate_lora()
+
+    def toggle_lora(
+        self,
+        searchspace: SearchSpace,
+    ) -> None:
+        for _, module in searchspace.named_modules(remove_duplicate=True):
+            if isinstance(module, LoRALayer):
+                module.toggle_lora()
 
     def get_parent_and_attribute(self, module_name: str) -> tuple[str, str]:
         split_index = module_name.rfind(".")

@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn  # noqa: PLR0402
 
 from confopt.oneshot.base_component import OneShotComponent
+from confopt.utils import reset_gm_score_attributes
 
 
 class SearchSpace(nn.Module, ABC):
@@ -54,3 +55,10 @@ class SearchSpace(nn.Module, ABC):
     def new_step(self) -> None:
         for component in self.components:
             component.new_step()
+
+    def reset_gm_score_attributes(self) -> None:
+        for module in self.modules():
+            reset_gm_score_attributes(module)
+
+    def get_num_skip_ops(self) -> tuple[int, int]:
+        return -1, -1

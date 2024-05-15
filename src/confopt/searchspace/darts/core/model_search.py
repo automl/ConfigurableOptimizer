@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import math
+from typing import Literal
+
 import torch
 from torch import nn
 import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
-from confopt.utils import freeze
+from confopt.utils import AverageMeter, calc_layer_alignment_score, freeze
 from confopt.utils.normalize_params import normalize_params
 
 from .genotypes import BABY_PRIMITIVES, PRIMITIVES, DARTSGenotype
 from .model import NetworkCIFAR, NetworkImageNet
-from .operations import OLES_OPS, OPS, FactorizedReduce, Identity, ReLUConvBN
+from .operations import OLES_OPS, OPS, FactorizedReduce, ReLUConvBN
+
 NUM_CIFAR_CLASSES = 10
 NUM_CIFAR100_CLASSES = 100
 NUM_IMAGENET_CLASSES = 120
@@ -237,6 +241,7 @@ class Network(nn.Module):
 
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.classifier = nn.Linear(C_prev, num_classes)
+        self.weights: dict[str, list[torch.Tensor]] = {}
 
         self._initialize_parameters()
 
@@ -259,6 +264,20 @@ class Network(nn.Module):
         # Replace this function on the fly to change the sampling method
         return F.softmax(alphas, dim=-1)
 
+    def retain_weight_grad(
+        self, weights: torch.Tensor, weight_type: Literal["reduce", "normal"]
+    ) -> None:
+        # Retain grads for calculating layer alignment score
+        assert weight_type in ["reduce", "normal"]
+        if self.training:
+            if isinstance(weights, list):
+                for weight in weights:
+                    weight.retain_grad()
+            else:
+                assert isinstance(weights, torch.Tensor)
+                weights.retain_grad()
+        self.weights[weight_type].append(weights)
+
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the network model.
 
@@ -276,13 +295,21 @@ class Network(nn.Module):
             return self.edge_normalization_forward(x)
 
         s0 = s1 = self.stem(x)
+        self.weights["normal"] = []
+        self.weights["reduce"] = []
+
+        weights_normal = self.sample(self.alphas_normal)
+        weights_reduce = self.sample(self.alphas_reduce)
+
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
-                weights = self.sample(self.alphas_reduce)
+                weights = weights_reduce
+                self.retain_weight_grad(weights, "reduce")
                 if self.mask is not None:
                     weights = normalize_params(weights, self.mask[1])
             else:
-                weights = self.sample(self.alphas_normal)
+                weights = weights_normal
+                self.retain_weight_grad(weights, "normal")
                 if self.mask is not None:
                     weights = normalize_params(weights, self.mask[0])
             s0, s1 = s1, cell(s0, s1, weights)
@@ -297,9 +324,16 @@ class Network(nn.Module):
         # TODO: normalization of alphas
 
         s0 = s1 = self.stem(inputs)
+        self.weights["normal"] = []
+        self.weights["reduce"] = []
+
+        weights_normal = self.sample(self.alphas_normal)
+        weights_reduce = self.sample(self.alphas_reduce)
+
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
-                weights = self.sample(self.alphas_reduce)
+                weights = weights_reduce
+                self.retain_weight_grad(weights, "reduce")
                 if self.mask is not None:
                     weights = normalize_params(weights, self.mask[1])
                 n = 3
@@ -312,7 +346,8 @@ class Network(nn.Module):
                     n += 1
                     weights2 = torch.cat([weights2, tw2], dim=0)
             else:
-                weights = self.sample(self.alphas_normal)
+                weights = weights_normal
+                self.retain_weight_grad(weights, "normal")
                 if self.mask is not None:
                     weights = normalize_params(weights, self.mask[0])
                 n = 3
@@ -433,48 +468,60 @@ class Network(nn.Module):
         )
         return genotype
 
-    def _prune(self, op_sparsity: float, wider: int | None = None) -> None:
+    def get_arch_grads(self) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+        def get_grads(alphas_list: list[torch.Tensor]) -> list[torch.Tensor]:
+            grads = []
+            for alphas in alphas_list:
+                if isinstance(alphas, list):
+                    alphas_grads = [
+                        alpha.grad.data.clone().detach() for alpha in alphas
+                    ]
+                    grads.append(torch.stack(alphas_grads).detach().reshape(-1))
+                else:
+                    grads.append(alphas.grad.data.clone().detach().reshape(-1))
+
+            return grads
+
+        grads_normal = get_grads(self.weights["normal"])
+        grads_reduce = get_grads(self.weights["reduce"])
+        return grads_normal, grads_reduce
+
+    def _get_mean_layer_alignment_score(self) -> tuple[float, float]:
+        grads_normal, grads_reduce = self.get_arch_grads()
+        mean_score_normal = calc_layer_alignment_score(grads_normal)
+        mean_score_reduce = calc_layer_alignment_score(grads_reduce)
+
+        if math.isnan(mean_score_normal):
+            mean_score_normal = 0
+        if math.isnan(mean_score_reduce):
+            mean_score_reduce = 0
+        return mean_score_normal, mean_score_reduce
+
+    def prune(self, num_keep: int) -> None:
         """Discretize architecture parameters to enforce sparsity.
 
         Args:
-            op_sparsity (float): The desired sparsity level, represented as a
-            fraction of operations to keep.
-            wider (int): If provided, this parameter determines how much wider the
-            search space should be by multiplying the number of channels by this factor.
-
-        Note:
-            This method enforces sparsity in the architecture parameters by zeroing out
-            a fraction of the smallest values, as specified by the `op_sparsity`
-            parameter.
-            It modifies the architecture parameters in-place to achieve the desired
-            sparsity.
+            num_keep (float): Number of operations to keep.
         """
-        # TODO: should be removed from prune function to a seperate function
-        # TODO: write wider function for ops
         self.mask = []
-        for _name, module in self.named_modules():
-            if isinstance(module, (OperationBlock, OperationChoices)):
-                module.change_op_channel_size(wider)
 
-        top_k = int(op_sparsity * len(self.primitives))
+        top_k = num_keep
         for p in self._arch_parameters:
             sorted_arch_params, _ = torch.sort(p.data, dim=1, descending=True)
-            thresholds = sorted_arch_params[:, :top_k]
+            thresholds = sorted_arch_params[:, top_k - 1].unsqueeze(1)
             mask = p.data >= thresholds
 
             p.data *= mask.float()
+            p.data[mask].requires_grad = True
             p.data[~mask].requires_grad = False
             if p.data[~mask].grad:
                 p.data[~mask].grad.zero_()
 
             self.mask.append(mask)
 
-    def _discretize(self) -> NetworkCIFAR | NetworkImageNet:
+    def discretize(self) -> NetworkCIFAR | NetworkImageNet:
         genotype = self.genotype()
-        if (
-            self._num_classes == NUM_CIFAR_CLASSES
-            or self._num_classes == NUM_CIFAR100_CLASSES
-        ):
+        if self._num_classes in {NUM_CIFAR_CLASSES, NUM_CIFAR100_CLASSES}:
             discrete_model = NetworkCIFAR(
                 C=self._C,
                 num_classes=self._num_classes,
@@ -539,7 +586,7 @@ def preserve_grads(m: nn.Module) -> None:
 
 
 # TODO: break function from OLES paper to have less branching.
-def check_grads_cosine(m: nn.Module) -> None:
+def check_grads_cosine(m: nn.Module, oles: bool = False) -> None:  # noqa: C901
     if (
         isinstance(m, (OperationBlock, OperationChoices, Cell, MixedOp, Network))
         or not isinstance(m, tuple(OLES_OPS))
@@ -560,19 +607,24 @@ def check_grads_cosine(m: nn.Module) -> None:
                 true_i += 1
             i += 1
 
-    if true_i != 0:
-        sim_avg = temp / true_i
     m.pre_grads.clear()
+    if true_i == 0:
+        return
+    sim_avg = temp / true_i
 
     if not hasattr(m, "avg"):
         m.avg = 0
     m.avg += sim_avg
 
+    if not hasattr(m, "running_sim"):
+        m.running_sim = AverageMeter()
+    m.running_sim.update(sim_avg)
+
     if not hasattr(m, "count"):
         m.count = 0
 
     if m.count == 20:
-        if m.avg / m.count < 0.4:
+        if m.avg / m.count < 0.4 and oles:
             freeze(m)
         m.count = 0
         m.avg = 0
