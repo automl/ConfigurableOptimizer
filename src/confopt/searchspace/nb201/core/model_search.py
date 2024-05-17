@@ -239,6 +239,39 @@ class NB201SearchModel(nn.Module):
         # Replace this function on the fly to change the sampling method
         return torch.nn.functional.softmax(alphas, dim=-1)
 
+    def remove_pruned_alphas(self, weights: torch.Tensor) -> torch.Tensor:
+        assert (
+            self.mask is not None
+        ), "This function requires a prior call to prune function"
+        weights = weights[self.mask]
+        weights = weights.reshape(self.mask.shape[0], self.mask[0].sum())
+
+        return weights
+
+    def restore_pruned_alpha_shape(self, weights: torch.Tensor) -> torch.Tensor:
+        assert (
+            self.mask is not None
+        ), "This function requires a prior call to prune function"
+        if isinstance(weights, list):
+            weights = torch.stack(weights)
+        weights_full = torch.zeros_like(self.arch_parameters)
+        weights_full[self.mask] = weights.view(-1)
+        weights = weights_full
+        return weights
+
+    def sample_with_mask(self) -> torch.Tensor:
+        weights_to_sample = self.arch_parameters
+
+        if self.mask is not None:
+            weights_to_sample = self.remove_pruned_alphas(weights_to_sample)
+
+        weights = self.sample(weights_to_sample)
+
+        if self.mask is not None:
+            weights = self.restore_pruned_alpha_shape(weights)
+
+        return weights
+
     def forward(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the model.
 
@@ -254,17 +287,14 @@ class NB201SearchModel(nn.Module):
             return self.edge_normalization_forward(inputs)
 
         self.weights["alphas"] = []
-        weights = self.sample(self.arch_parameters)
-        # if self.mask is not None:
-        #     alphas = normalize_params(alphas, self.mask)
+
+        weights = self.sample_with_mask()
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
             if isinstance(cell, SearchCell):
                 # TODO fix layer alignment
                 alphas = weights
-                # alphas = torch.nn.functional.softmax(self.arch_parameters, dim=-1)
-
                 # Retain Grads for weights
                 if self.training:
                     if isinstance(alphas, list):
@@ -292,7 +322,7 @@ class NB201SearchModel(nn.Module):
         inputs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         self.weights["alphas"] = []
-        weights = self.sample(self.arch_parameters)
+        weights = self.sample_with_mask()
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
@@ -358,18 +388,22 @@ class NB201SearchModel(nn.Module):
         Args:
             num_keep (int): Number of operations to keep.
         """
+        data_to_sort = self.arch_parameters.data.clone()  # type: ignore
+        if self.mask is not None:
+            last_mask = self.mask
+            temp = float("-inf") * torch.ones_like(data_to_sort)
+            data_to_sort[~last_mask] = temp[~last_mask]
+
         sorted_arch_params, _ = torch.sort(
-            self.arch_parameters.data, dim=1, descending=True  # type: ignore
+            data_to_sort, dim=1, descending=True  # type: ignore
         )
         top_k = num_keep
         thresholds = sorted_arch_params[:, top_k - 1].unsqueeze(1)
-        self.mask = self.arch_parameters.data >= thresholds  # type: ignore
+        self.mask = data_to_sort >= thresholds  # type: ignore
 
-        self.arch_parameters.data *= self.mask.float()  # type: ignore
-        self.arch_parameters.data[self.mask].requires_grad = True  # type: ignore
-        self.arch_parameters.data[~self.mask].requires_grad = False  # type: ignore
-        if self.arch_parameters.data[~self.mask].grad:  # type: ignore
-            self.arch_parameters.data[~self.mask].grad.zero_()  # type: ignore
+        for cell in self.cells:
+            if isinstance(cell, SearchCell):
+                cell.prune_ops(self.mask)
 
     def _discretize(self) -> NASBench201Model:
         genotype = self.genotype()
