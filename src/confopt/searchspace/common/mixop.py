@@ -6,6 +6,7 @@ from torch import nn
 from confopt.oneshot.dropout import Dropout
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.weightentangler import WeightEntangler
+from confopt.utils import freeze
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 __all__ = ["OperationChoices"]
@@ -21,7 +22,12 @@ class OperationChoices(nn.Module):
         assert len(alphas) == len(
             self.ops
         ), "Number of operations and architectural weights do not match"
-        states = [op(x) * alpha for op, alpha in zip(self.ops, alphas)]
+        states = []
+        for op, alpha in zip(self.ops, alphas):
+            if op.is_pruned:
+                continue
+            states.append(op(x) * alpha)
+
         return sum(states)  # type: ignore
 
     def change_op_channel_size(self, wider: int | None = None) -> None:
@@ -31,6 +37,13 @@ class OperationChoices(nn.Module):
         for op in self.ops:
             if not (isinstance(op, (nn.AvgPool2d, nn.MaxPool2d))):
                 op.change_channel_size(k=1 / wider, device=DEVICE)  # type: ignore
+
+    def set_ops_to_prune(self, mask: list[torch.Tensor]) -> None:
+        assert len(mask) == len(self.ops)
+        for op, mask_val in zip(self.ops, mask):
+            if not torch.is_nonzero(mask_val):
+                freeze(op)
+                op.is_pruned = True
 
 
 class OperationBlock(nn.Module):
@@ -68,14 +81,23 @@ class OperationBlock(nn.Module):
         if self.weight_entangler is not None:
             return self.weight_entangler.forward(x, ops, alphas)
 
+        states = []
         if self.is_argmax_sampler:
             argmax = torch.argmax(alphas)
-            states = [
-                alphas[i] * op(x) if i == argmax else alphas[i]
-                for i, op in enumerate(ops)
-            ]
+
+            for i, op in enumerate(ops):
+                if hasattr(op, "is_pruned") and op.is_pruned:
+                    continue
+
+                if i == argmax:
+                    states.append(alphas[i] * op(x))
+                else:
+                    states.append(alphas[i])
         else:
-            states = [op(x) * alpha for op, alpha in zip(ops, alphas)]
+            for op, alpha in zip(ops, alphas):
+                if hasattr(op, "is_pruned") and op.is_pruned:
+                    continue
+                states.append(op(x) * alpha)
 
         return sum(states)
 
@@ -101,3 +123,10 @@ class OperationBlock(nn.Module):
         for op in self.ops:
             if not (isinstance(op, (nn.AvgPool2d, nn.MaxPool2d))):
                 op.change_channel_size(k=1 / wider, device=self.device)  # type: ignore
+
+    def set_ops_to_prune(self, mask: list[torch.Tensor]) -> None:
+        assert len(mask) == len(self.ops)
+        for op, mask_val in zip(self.ops, mask):
+            if not torch.is_nonzero(mask_val):
+                freeze(op)
+                op.is_pruned = True
