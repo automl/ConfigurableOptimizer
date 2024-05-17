@@ -96,13 +96,13 @@ def freeze(m: torch.nn.Module) -> None:
 def preserve_gradients_in_module(
     m: torch.nn.Module,
     ignored_modules: tuple[torch.nn.Module],
-    OLES_OPS: list[torch.nn.Module],
+    oles_ops: list[torch.nn.Module],
 ) -> None:
     if isinstance(m, ignored_modules):
         return
 
     flag = 0
-    if isinstance(m, tuple(OLES_OPS)):
+    if isinstance(m, tuple(oles_ops)):
         flag = 1
     if flag == 0:
         return
