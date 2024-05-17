@@ -101,10 +101,7 @@ def preserve_gradients_in_module(
     if isinstance(m, ignored_modules):
         return
 
-    flag = 0
-    if isinstance(m, tuple(oles_ops)):
-        flag = 1
-    if flag == 0:
+    if not isinstance(m, tuple(oles_ops)):
         return
 
     if not hasattr(m, "pre_grads"):
