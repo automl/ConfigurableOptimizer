@@ -24,7 +24,7 @@ class OperationChoices(nn.Module):
         ), "Number of operations and architectural weights do not match"
         states = []
         for op, alpha in zip(self.ops, alphas):
-            if op.is_pruned:
+            if hasattr(op, "is_pruned") and op.is_pruned:
                 continue
             states.append(op(x) * alpha)
 
