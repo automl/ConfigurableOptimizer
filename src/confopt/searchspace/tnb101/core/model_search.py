@@ -118,6 +118,42 @@ class TNB101SearchModel(nn.Module):
         # Replace this function on the fly to change the sampling method
         return torch.nn.functional.softmax(alphas, dim=-1)
 
+    def remove_pruned_alphas(self, weights: torch.Tensor) -> torch.Tensor:
+        assert (
+            self.mask is not None
+        ), "This function requires a prior call to prune function"
+
+        weights = weights[self.mask]
+        weights = weights.reshape(self.mask.shape[0], self.mask[0].sum())
+
+        return weights
+
+    def restore_pruned_alpha_shape(self, weights: torch.Tensor) -> torch.Tensor:
+        assert (
+            self.mask is not None
+        ), "This function requires a prior call to prune function"
+        if isinstance(weights, list):
+            weights = torch.stack(weights)
+
+        weights_full = torch.zeros_like(self._arch_parameters)
+        weights_full[self.mask] = weights.view(-1)
+        weights = weights_full
+
+        return weights
+
+    def sample_with_mask(self) -> torch.Tensor:
+        weights_to_sample = self._arch_parameters
+
+        if self.mask is not None:
+            weights_to_sample = self.remove_pruned_alphas(weights_to_sample)
+
+        weights = self.sample(weights_to_sample)
+
+        if self.mask is not None:
+            weights = self.restore_pruned_alpha_shape(weights)
+
+        return weights
+
     def forward(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         if self._arch_parameters is None:
             return self.discrete_model_forward(inputs)
@@ -125,7 +161,8 @@ class TNB101SearchModel(nn.Module):
         if self.edge_normalization:
             return self.edge_normalization_forward(inputs)
 
-        alphas = self.sample(self._arch_parameters)
+        # alphas = self.sample(self._arch_parameters)
+        alphas = self.sample_with_mask()
 
         if self.mask is not None:
             alphas = normalize_params(alphas, self.mask)
@@ -160,7 +197,8 @@ class TNB101SearchModel(nn.Module):
         self,
         inputs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        alphas = self.sample(self._arch_parameters)
+        # alphas = self.sample(self._arch_parameters)
+        alphas = self.sample_with_mask()
 
         if self.mask is not None:
             alphas = normalize_params(alphas, self.mask)
@@ -235,11 +273,8 @@ class TNB101SearchModel(nn.Module):
         thresholds = sorted_arch_params[:, top_k - 1].unsqueeze(1)
         self.mask = self._arch_parameters >= thresholds
 
-        self._arch_parameters.data *= self.mask.float()  # type: ignore
-        self._arch_parameters.data[self.mask].requires_grad = True  # type: ignore
-        self._arch_parameters.data[~self.mask].requires_grad = False  # type: ignore
-        if self._arch_parameters.data[~self.mask].grad:  # type: ignore
-            self._arch_parameters.data[~self.mask].grad.zero_()  # type: ignore
+        for cell in self.cells:
+            cell.prune_ops(self.mask)
 
     def _discretize(self) -> TNB101SearchModel:
         dicrete_model = TNB101SearchModel(
@@ -389,3 +424,10 @@ class TNB101SearchCell(nn.Module):
                 self.edges[node_str] = (self.edges[node_str].ops)[  # type: ignore
                     max_idx
                 ]
+
+    def prune_ops(self, mask: torch.Tensor) -> None:
+        for i in range(1, self.max_nodes):
+            for j in range(i):
+                node_str = f"{i}<-{j}"
+                edge_mask = mask[self.edge2index[node_str]]
+                self.edges[node_str].set_ops_to_prune(edge_mask)
