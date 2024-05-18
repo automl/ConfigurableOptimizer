@@ -9,32 +9,50 @@ from confopt.searchspace import (
     DARTSSearchSpace,
     NASBench1Shot1SearchSpace,
     NASBench201SearchSpace,
-    TransNASBench101SearchSpace,
     RobustDARTSSearchSpace,
+    TransNASBench101SearchSpace,
 )
 from confopt.searchspace.common.base_search import SearchSpace
 from confopt.searchspace.common.lora_layers import LoRALayer
 from confopt.searchspace.darts.core.model_search import Cell as DARTSSearchCell
 from confopt.searchspace.darts.core.operations import (
+    FactorizedReduce,
     Identity,
     SepConv,
     Zero,
-    FactorizedReduce,
 )
 from confopt.searchspace.nb1shot1.core.model_search import (
     Cell as NasBench1Shot1SearchCell,
 )
 from confopt.searchspace.nb201.core import NAS201SearchCell
 from confopt.searchspace.nb201.core.operations import ReLUConvBN, ResNetBasicblock
-from confopt.searchspace.tnb101.core.model_search import TNB101SearchCell
-from confopt.searchspace.robust_darts.core.operations import NoiseOp
-from confopt.searchspace.robust_darts.core.spaces import spaces_dict
 from confopt.searchspace.robust_darts.core.model_search import (
     Cell as RobustDARTSSearchCell,
 )
+from confopt.searchspace.robust_darts.core.operations import NoiseOp
+from confopt.searchspace.robust_darts.core.spaces import spaces_dict
+from confopt.searchspace.tnb101.core.model_search import TNB101SearchCell
 from utils import get_modules_of_type  # type: ignore
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+
+def _check_pruned_alphas(pruned_alphas: list[torch.Tensor], num_keep: int) -> None:
+    for alpha in pruned_alphas:
+        assert torch.count_nonzero(alpha) == len(alpha) * num_keep
+        assert torch.equal(
+            torch.count_nonzero(alpha, dim=-1),
+            num_keep * torch.ones(len(alpha)).to(DEVICE),
+        )
+
+
+def _check_prune_mask(masks: list[torch.Tensor], num_keep: int) -> None:
+    for mask in masks:
+        assert torch.count_nonzero(mask) == len(mask) * num_keep
+        assert torch.equal(
+            torch.count_nonzero(mask, dim=-1),
+            num_keep * torch.ones(len(mask)).to(DEVICE),
+        )
 
 
 def _test_deactivate_lora(search_space: SearchSpace) -> None:
@@ -45,7 +63,7 @@ def _test_deactivate_lora(search_space: SearchSpace) -> None:
     for _, module in search_space.named_modules(remove_duplicate=False):
         if isinstance(module, LoRALayer):
             assert module.r == 4
-            assert module.conv.weight.requires_grad == False
+            assert module.conv.weight.requires_grad is False
 
     for _, module in search_space.named_modules(remove_duplicate=False):
         if isinstance(module, LoRALayer):
@@ -54,11 +72,12 @@ def _test_deactivate_lora(search_space: SearchSpace) -> None:
     for _, module in search_space.named_modules(remove_duplicate=False):
         if isinstance(module, LoRALayer):
             assert module.r == 0
-            assert hasattr(module, "_original_r") and module._original_r == 4
-            assert module.conv.weight.requires_grad == True
+            assert hasattr(module, "_original_r")
+            assert module._original_r == 4
+            assert module.conv.weight.requires_grad is True
 
 
-def _test_toggle_lora(search_space: SearchSpace) -> None:
+def _test_toggle_lora(search_space: SearchSpace) -> None:  # noqa: C901
     for _, module in search_space.named_modules(remove_duplicate=False):
         if isinstance(module, LoRALayer):
             module.activate_lora(r=4)
@@ -66,7 +85,7 @@ def _test_toggle_lora(search_space: SearchSpace) -> None:
     for _, module in search_space.named_modules(remove_duplicate=False):
         if isinstance(module, LoRALayer):
             assert module.r == 4
-            assert module.conv.weight.requires_grad == False
+            assert module.conv.weight.requires_grad is False
 
     for _, module in search_space.named_modules(remove_duplicate=False):
         if isinstance(module, LoRALayer):
@@ -75,8 +94,9 @@ def _test_toggle_lora(search_space: SearchSpace) -> None:
     for _, module in search_space.named_modules(remove_duplicate=False):
         if isinstance(module, LoRALayer):
             assert module.r == 0
-            assert hasattr(module, "_original_r") and module._original_r == 4
-            assert module.conv.weight.requires_grad == True
+            assert hasattr(module, "_original_r")
+            assert module._original_r == 4
+            assert module.conv.weight.requires_grad is True
 
     for _, module in search_space.named_modules(remove_duplicate=True):
         if isinstance(module, LoRALayer):
@@ -86,7 +106,7 @@ def _test_toggle_lora(search_space: SearchSpace) -> None:
         if isinstance(module, LoRALayer):
             assert module.r == 4
             assert not hasattr(module, "_original_r")
-            assert module.conv.weight.requires_grad == False
+            assert module.conv.weight.requires_grad is False
 
 
 class TestBabyDARTS(unittest.TestCase):
@@ -150,12 +170,8 @@ class TestBabyDARTS(unittest.TestCase):
         search_space = BabyDARTSSearchSpace(edge_normalization=True)
         x = torch.randn(2, 3, 64, 64).to(DEVICE)
         search_space.prune(num_keep=1)
-        arch_params = search_space.arch_parameters
-        for p in arch_params:
-            assert torch.count_nonzero(p) == len(p)
-            assert torch.equal(
-                torch.count_nonzero(p, dim=-1), torch.ones(len(p)).to(DEVICE)
-            )
+        masks = search_space.model.mask
+        _check_prune_mask(masks, num_keep=1)
 
         out = search_space(x)
 
@@ -290,18 +306,41 @@ class TestNASBench201SearchSpace(unittest.TestCase):
 
     def test_prune(self) -> None:
         search_space = NASBench201SearchSpace(edge_normalization=True)
+        arch_params = search_space.arch_parameters
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
         num_ops = 5
         for num_keep in range(1, num_ops - 1):
             proxy_search_space = copy.deepcopy(search_space)
             proxy_search_space.prune(num_keep)
-            arch_params = proxy_search_space.arch_parameters[0]
-            assert torch.count_nonzero(arch_params) == num_keep * len(arch_params)
-            assert torch.equal(
-                torch.count_nonzero(arch_params, dim=-1),
-                num_keep * torch.ones(len(arch_params)).to(DEVICE),
-            )
+            mask = proxy_search_space.model.mask
+            _check_prune_mask([mask], num_keep)
+
+            # Check pruned alphas
+            pruned_alphas = proxy_search_space.model.sample_with_mask()
+            _check_pruned_alphas([pruned_alphas], num_keep)
+
+            # Check that arch params are untampered with
+            proxy_arch_params = proxy_search_space.arch_parameters
+            for p, p_ in zip(arch_params, proxy_arch_params):
+                assert (p == p_).all()
+
+            # Check that operations are freezed
             out = proxy_search_space(x)
+            for cell in proxy_search_space.model.cells:
+                if isinstance(cell, NAS201SearchCell):
+                    for k in range(1, cell.max_nodes):
+                        for j in range(k):
+                            node_str = f"{k}<-{j}"
+                            operation_block = cell.edges[node_str]
+                            edge_mask = mask[cell.edge2index[node_str]]
+                            zero_indices = torch.nonzero(edge_mask == 0).flatten()
+                            for i in zero_indices:
+                                params = [
+                                    p.requires_grad
+                                    for p in operation_block.ops[i].parameters()
+                                ]
+                                if len(params) != 0:
+                                    assert not all(params)
 
             assert isinstance(out, tuple)
             assert len(out) == 2
@@ -415,17 +454,36 @@ class TestDARTSSearchSpace(unittest.TestCase):
         search_space = DARTSSearchSpace(edge_normalization=True)
         x = torch.randn(2, 3, 64, 64).to(DEVICE)
         num_ops = 8
+        arch_params = search_space.arch_parameters
         for num_keep in range(1, num_ops - 1):
             proxy_search_space = copy.deepcopy(search_space)
             proxy_search_space.prune(num_keep)
-            arch_params = proxy_search_space.arch_parameters
-            for p in arch_params:
-                print()
-                assert torch.count_nonzero(p) == len(p) * num_keep
-                assert torch.equal(
-                    torch.count_nonzero(p, dim=-1),
-                    num_keep * torch.ones(len(p)).to(DEVICE),
-                )
+
+            # Check mask shapes
+            masks = proxy_search_space.model.mask
+            _check_prune_mask(masks, num_keep)
+
+            # Check pruned alphas
+            pruned_alphas = proxy_search_space.model.sample_with_mask()
+            _check_pruned_alphas(pruned_alphas, num_keep)
+
+            # Check that arch params are untampered with
+            proxy_arch_params = proxy_search_space.arch_parameters
+            for p, p_ in zip(arch_params, proxy_arch_params):
+                assert (p == p_).all()
+
+            # Check that operations are freezed
+            for cell in proxy_search_space.model.cells:
+                mask = masks[1] if cell.reduction else masks[0]
+                for operation_block, edge_mask in zip(cell._ops, mask):
+                    zero_indices = torch.nonzero(edge_mask == 0).flatten()
+                    for i in zero_indices:
+                        print(i, operation_block.ops[i])
+                        params = [
+                            p.requires_grad for p in operation_block.ops[i].parameters()
+                        ]
+                        if len(params) != 0:
+                            assert not all(params)
 
             out = proxy_search_space(x)
 
@@ -649,17 +707,38 @@ class TestTransNASBench101SearchSpace(unittest.TestCase):
 
     def test_prune(self) -> None:
         search_space = TransNASBench101SearchSpace(edge_normalization=True)
+        arch_params = search_space.arch_parameters
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
         num_ops = 4
         for num_keep in range(1, num_ops - 1):
             proxy_search_space = copy.deepcopy(search_space)
             proxy_search_space.prune(num_keep)
-            arch_params = proxy_search_space.arch_parameters[0]
-            assert torch.count_nonzero(arch_params) == num_keep * len(arch_params)
-            assert torch.equal(
-                torch.count_nonzero(arch_params, dim=-1),
-                num_keep * torch.ones(len(arch_params)).to(DEVICE),
-            )
+
+            mask = proxy_search_space.model.mask
+            _check_prune_mask([mask], num_keep)
+
+            pruned_alphas = proxy_search_space.model.sample_with_mask()
+            _check_pruned_alphas([pruned_alphas], num_keep)
+
+            proxy_arch_params = proxy_search_space.arch_parameters
+            for p, p_ in zip(arch_params, proxy_arch_params):
+                assert (p == p_).all()
+
+            for cell in proxy_search_space.model.cells:
+                for k in range(1, cell.max_nodes):
+                    for j in range(k):
+                        node_str = f"{k}<-{j}"
+                        operation_block = cell.edges[node_str]
+                        edge_mask = mask[cell.edge2index[node_str]]
+                        zero_indices = torch.nonzero(edge_mask == 0).flatten()
+                        for i in zero_indices:
+                            params = [
+                                p.requires_grad
+                                for p in operation_block.ops[i].parameters()
+                            ]
+                            if len(params) != 0:
+                                assert not all(params)
+
             out = proxy_search_space(x)
 
             assert isinstance(out, tuple)
