@@ -8,7 +8,12 @@ from torch import nn
 import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
-from confopt.utils import AverageMeter, calc_layer_alignment_score, freeze
+from confopt.utils import (
+    AverageMeter,
+    calc_layer_alignment_score,
+    freeze,
+    set_ops_to_prune,
+)
 from confopt.utils.normalize_params import normalize_params
 
 from .genotypes import BABY_PRIMITIVES, PRIMITIVES, DARTSGenotype
@@ -150,7 +155,7 @@ class Cell(nn.Module):
     def prune_ops(self, mask: torch.Tensor) -> None:
         assert len(self._ops) == mask.shape[0]
         for edge, edge_mask in zip(self._ops, mask):
-            edge.set_ops_to_prune(edge_mask)
+            set_ops_to_prune(edge, edge_mask)
 
 
 class Network(nn.Module):
@@ -291,14 +296,13 @@ class Network(nn.Module):
             self.mask is not None
         ), "This function requires a prior call to prune function"
 
-        weights_normal = weights_normal[self.mask[0]]
-        weights_reduce = weights_reduce[self.mask[1]]
-        weights_normal = weights_normal.reshape(
-            self.mask[0].shape[0], self.mask[0][0].sum()
-        )
-        weights_reduce = weights_reduce.reshape(
-            self.mask[1].shape[0], self.mask[1][0].sum()
-        )
+        def _prune_alpha(weight: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+            weight = weight[mask]
+            weight = weight.reshape(mask.shape[0], mask[0].sum())
+            return weight
+
+        weights_normal = _prune_alpha(weights_normal, self.mask[0])
+        weights_reduce = _prune_alpha(weights_reduce, self.mask[1])
 
         return weights_normal, weights_reduce
 
@@ -309,12 +313,23 @@ class Network(nn.Module):
             self.mask is not None
         ), "This function requires a prior call to prune function"
 
-        weights_normal_full = torch.zeros_like(self.alphas_normal)
-        weights_reduce_full = torch.zeros_like(self.alphas_reduce)
-        weights_normal_full[self.mask[0]] = weights_normal.view(-1)
-        weights_reduce_full[self.mask[1]] = weights_reduce.view(-1)
-        weights_normal = weights_normal_full
-        weights_reduce = weights_reduce_full
+        def _restore_weight_shape(
+            weight: list[torch.Tensor] | torch.Tensor,
+            reference_weight: torch.Tensor,
+            mask: torch.Tensor,
+        ) -> torch.Tensor:
+            if isinstance(weight, list):
+                weight = torch.stack(weight)
+            weight_full = torch.zeros_like(reference_weight)
+            weight_full[mask] = weight.view(-1)
+            return weight_full
+
+        weights_normal = _restore_weight_shape(
+            weights_normal, self.alphas_normal, self.mask[0]
+        )
+        weights_reduce = _restore_weight_shape(
+            weights_reduce, self.alphas_reduce, self.mask[1]
+        )
 
         return weights_normal, weights_reduce
 
