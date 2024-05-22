@@ -6,7 +6,6 @@ from torch import nn
 from confopt.oneshot.dropout import Dropout
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.weightentangler import WeightEntangler
-from confopt.utils import freeze
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 __all__ = ["OperationChoices"]
@@ -37,13 +36,6 @@ class OperationChoices(nn.Module):
         for op in self.ops:
             if not (isinstance(op, (nn.AvgPool2d, nn.MaxPool2d))):
                 op.change_channel_size(k=1 / wider, device=DEVICE)  # type: ignore
-
-    def set_ops_to_prune(self, mask: list[torch.Tensor]) -> None:
-        assert len(mask) == len(self.ops)
-        for op, mask_val in zip(self.ops, mask):
-            if not torch.is_nonzero(mask_val):
-                freeze(op)
-                op.is_pruned = True
 
 
 class OperationBlock(nn.Module):
@@ -123,10 +115,3 @@ class OperationBlock(nn.Module):
         for op in self.ops:
             if not (isinstance(op, (nn.AvgPool2d, nn.MaxPool2d))):
                 op.change_channel_size(k=1 / wider, device=self.device)  # type: ignore
-
-    def set_ops_to_prune(self, mask: list[torch.Tensor]) -> None:
-        assert len(mask) == len(self.ops)
-        for op, mask_val in zip(self.ops, mask):
-            if not torch.is_nonzero(mask_val):
-                freeze(op)
-                op.is_pruned = True
