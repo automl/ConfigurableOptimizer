@@ -6,6 +6,7 @@ import torch
 from torch import nn
 
 from confopt.searchspace.common import OperationChoices
+from confopt.utils import set_ops_to_prune
 from confopt.utils.normalize_params import normalize_params
 
 from . import operations as ops
@@ -266,12 +267,16 @@ class TNB101SearchModel(nn.Module):
         Args:
             num_keep (float): Number of operations to keep.
         """
-        sorted_arch_params, _ = torch.sort(
-            self._arch_parameters, dim=1, descending=True
-        )
+        data_to_sort = self._arch_parameters.clone()
+        if self.mask is not None:
+            last_mask = self.mask
+            temp = float("-inf") * torch.ones_like(data_to_sort)
+            data_to_sort[~last_mask] = temp[~last_mask]
+
+        sorted_arch_params, _ = torch.sort(data_to_sort, dim=1, descending=True)
         top_k = num_keep
         thresholds = sorted_arch_params[:, top_k - 1].unsqueeze(1)
-        self.mask = self._arch_parameters >= thresholds
+        self.mask = data_to_sort >= thresholds
 
         for cell in self.cells:
             cell.prune_ops(self.mask)
@@ -430,4 +435,4 @@ class TNB101SearchCell(nn.Module):
             for j in range(i):
                 node_str = f"{i}<-{j}"
                 edge_mask = mask[self.edge2index[node_str]]
-                self.edges[node_str].set_ops_to_prune(edge_mask)
+                set_ops_to_prune(self.edges[node_str], edge_mask)
