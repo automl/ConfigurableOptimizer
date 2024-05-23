@@ -156,7 +156,7 @@ class Experiment:
         start_epoch: int = 0,
         load_saved_model: bool = False,
         load_best_model: bool = False,
-        use_benchmark: bool = True,
+        use_benchmark: bool = False,
     ) -> ConfigurableTrainer:
         config = profile.get_config()
         run_name = profile.get_name_wandb_run()
@@ -193,7 +193,7 @@ class Experiment:
         start_epoch: int = 0,
         load_saved_model: bool = False,
         load_best_model: bool = False,
-        use_benchmark: bool = True,
+        use_benchmark: bool = False,
         run_name: str = "supernet_run",
         oles: bool = False,
         calc_gm_score: bool = False,
@@ -338,7 +338,7 @@ class Experiment:
         sampler_enum: SamplerType,
         perturbator_enum: PerturbatorType,
         config: dict | None = None,
-        use_benchmark: bool = True,
+        use_benchmark: bool = False,
     ) -> None:
         if config is None:
             config = {}  # type : ignore
