@@ -47,6 +47,7 @@ class LoRALayer:
             self, "_original_r"
         ):  # if it's being activated again after deactivation
             self.r = self._original_r
+            self.unmerge_lora_weights()
             self.conv.weight.requires_grad = False  # type: ignore
             self.lora_A.requires_grad = True  # type: ignore
             self.lora_B.requires_grad = True  # type: ignore
@@ -67,6 +68,7 @@ class LoRALayer:
     def deactivate_lora(self) -> None:
         if hasattr(self, "lora_A") and hasattr(self, "lora_B"):
             self._original_r = self.r
+            self.merge_lora_weights()
             self.r = 0
             self.conv.weight.requires_grad = True  # type: ignore
             self.lora_A.requires_grad = False
@@ -83,6 +85,22 @@ class LoRALayer:
             self.deactivate_lora()
         else:
             self.activate_lora()
+
+    def merge_lora_weights(self) -> None:
+        if self.r > 0:
+            # Merge the weights and mark it
+            self.conv.weight.data += (self.lora_B @ self.lora_A).view(  # type: ignore
+                self.conv.weight.shape  # type: ignore
+            ) * self.scaling  # type: ignore
+        self.merged = True
+
+    def unmerge_lora_weights(self) -> None:
+        if self.r > 0:
+            # Make sure that the weights are not merged
+            self.conv.weight.data -= (self.lora_B @ self.lora_A).view(  # type: ignore
+                self.conv.weight.shape  # type: ignore
+            ) * self.scaling  # type: ignore
+        self.merged = False
 
 
 class ConvLoRA(nn.Module, LoRALayer):
@@ -164,20 +182,10 @@ class ConvLoRA(nn.Module, LoRALayer):
         super().train(mode)
         if mode:
             if self.merge_weights and self.merged:
-                if self.r > 0:
-                    # Make sure that the weights are not merged
-                    self.conv.weight.data -= (self.lora_B @ self.lora_A).view(
-                        self.conv.weight.shape
-                    ) * self.scaling
-                self.merged = False
+                self.unmerge_lora_weights()
         else:
             if self.merge_weights and not self.merged:  # noqa: PLR5501
-                if self.r > 0:
-                    # Merge the weights and mark it
-                    self.conv.weight.data += (self.lora_B @ self.lora_A).view(
-                        self.conv.weight.shape
-                    ) * self.scaling
-                self.merged = True
+                self.merge_lora_weights()
 
     def forward(
         self, x: torch.Tensor, weight: torch.Tensor = None, bias: torch.Tensor = None

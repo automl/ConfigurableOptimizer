@@ -44,12 +44,83 @@ class TestLoRA(unittest.TestCase):
             [out_channels * kernel_size[0], r * kernel_size[0]]
         )
 
+    def test_deactivate_lora(self) -> None:
+        in_channels = 3
+        out_channels = 16
+        kernel_size = (3, 3)
+        r = 8
+        lora_conv2d = Conv2DLoRA(in_channels, out_channels, kernel_size)
+
+        lora_conv2d.activate_lora(r=r)
+
+        assert hasattr(lora_conv2d, "lora_A")
+        assert hasattr(lora_conv2d, "lora_B")
+
+        weight_before = lora_conv2d.conv.weight.clone()
+        lora_conv2d.deactivate_lora()
+        weight_after = lora_conv2d.conv.weight.clone()
+
+        assert torch.all(
+            torch.eq(
+                weight_before
+                + (lora_conv2d.lora_B @ lora_conv2d.lora_A).view(weight_before.shape),
+                weight_after,
+            )
+        )
+
+    def test_toggle_lora(self) -> None:
+        in_channels = 3
+        out_channels = 16
+        kernel_size = (3, 3)
+        r = 8
+        lora_conv2d = Conv2DLoRA(in_channels, out_channels, kernel_size)
+
+        assert not hasattr(lora_conv2d, "lora_A")
+        assert not hasattr(lora_conv2d, "lora_B")
+
+        weight_before_activation = lora_conv2d.conv.weight.clone()
+        lora_conv2d.activate_lora()  # Activating
+        weight_after_activation = lora_conv2d.conv.weight.clone()
+        assert lora_conv2d.conv.weight.requires_grad == False
+        assert torch.all(
+            torch.eq(weight_before_activation, weight_after_activation)
+        )
+
+        weight_before_first_toggle = lora_conv2d.conv.weight.clone()
+        lora_conv2d.toggle_lora()  # Deactivating
+        weight_after_first_toggle = lora_conv2d.conv.weight.clone()
+        assert lora_conv2d.conv.weight.requires_grad == True
+        assert torch.all(
+            torch.eq(
+                weight_before_first_toggle
+                + (lora_conv2d.lora_B @ lora_conv2d.lora_A).view(
+                    weight_before_first_toggle.shape
+                ),
+                weight_after_first_toggle,
+            )
+        )
+
+        weight_before_second_toggle = lora_conv2d.conv.weight.clone()
+        lora_conv2d.toggle_lora()  # Activating again
+        weight_after_second_toggle = lora_conv2d.conv.weight.clone()
+        assert lora_conv2d.conv.weight.requires_grad == False
+        assert torch.all(
+            torch.eq(
+                weight_before_second_toggle
+                - (lora_conv2d.lora_B @ lora_conv2d.lora_A).view(
+                    weight_before_second_toggle.shape
+                ),
+                weight_after_second_toggle,
+            )
+        )
+
     def test_reset_parameters(self) -> None:
         in_channels = 3
         out_channels = 16
         kernel_size = (3, 3)
         r = 8
-        lora_conv2d = Conv2DLoRA(in_channels, out_channels, kernel_size, r)
+        lora_conv2d = Conv2DLoRA(in_channels, out_channels, kernel_size)
+        lora_conv2d.activate_lora(r=r)
         lora_conv2d.lora_A.data = torch.randn_like(lora_conv2d.lora_A.data)
         lora_conv2d.lora_B.data = torch.randn_like(lora_conv2d.lora_B.data)
 
@@ -68,7 +139,8 @@ class TestLoRA(unittest.TestCase):
         out_channels = 12
         kernel_size = (3, 3)
         r = 8
-        lora_conv2d = Conv2DLoRA(in_channels, out_channels, kernel_size, r).to(DEVICE)
+        lora_conv2d = Conv2DLoRA(in_channels, out_channels, kernel_size).to(DEVICE)
+        lora_conv2d.activate_lora(r=r)
 
         lora_conv2d.lora_A.data = torch.randn_like(lora_conv2d.lora_A.data)
         lora_conv2d.lora_B.data = torch.randn_like(lora_conv2d.lora_B.data)
