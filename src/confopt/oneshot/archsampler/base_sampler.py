@@ -13,6 +13,7 @@ class BaseSampler(OneShotComponent):
         self,
         arch_parameters: list[torch.Tensor],
         sample_frequency: Literal["epoch", "step"],
+        post_sample_fn: Literal["default", "sigmoid"] = "default",
     ) -> None:
         super().__init__()
         self.arch_parameters = arch_parameters
@@ -23,6 +24,7 @@ class BaseSampler(OneShotComponent):
             "step",
         ], "sample_frequency must be either 'epoch' or 'step'"
         self.sample_frequency = sample_frequency
+        self.post_sample_fn = post_sample_fn
 
     @abstractmethod
     def sample_alphas(

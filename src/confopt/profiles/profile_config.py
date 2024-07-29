@@ -23,6 +23,7 @@ class ProfileConfig:
         dropout: float | None = None,
         perturbation: str | None = None,
         perturbator_sample_frequency: str = "epoch",
+        sampler_post_sample_fn: str = "default",
         entangle_op_weights: bool = False,
         lora_rank: int = 0,
         lora_warm_epochs: int = 0,
@@ -40,6 +41,7 @@ class ProfileConfig:
         self.lora_warm_epochs = lora_warm_epochs
         self.seed = seed
         self.searchspace_str = searchspace_str
+        self.sampler_post_sample_fn = sampler_post_sample_fn
         self._initialize_trainer_config()
         self._initialize_sampler_config()
         self._set_partial_connector(is_partial_connection)
