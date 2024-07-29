@@ -122,6 +122,15 @@ class TestDartsProfile(unittest.TestCase):
         with self.assertRaises(AssertionError):
             profile.configure_sampler(invalid_config="step")
 
+    def test_sampler_post_fn(self) -> None:
+        profile = DartsProfile(epochs=1)
+        assert profile.sampler_config["post_sample_fn"] == "default"
+        sampler_config = {"post_sample_fn": "sigmoid"}
+        profile.configure_sampler(**sampler_config)
+        assert (
+            profile.sampler_config["post_sample_fn"] == sampler_config["post_sample_fn"]
+        )
+
 
 class TestDRNASProfile(unittest.TestCase):
     def test_initialization(self) -> None:
@@ -172,6 +181,15 @@ class TestDRNASProfile(unittest.TestCase):
 
         with self.assertRaises(AssertionError):
             profile.configure_sampler(invalid_config="step")
+
+    def test_sampler_post_fn(self) -> None:
+        profile = DRNASProfile(epochs=1)
+        assert profile.sampler_config["post_sample_fn"] == "default"
+        sampler_config = {"post_sample_fn": "sigmoid"}
+        profile.configure_sampler(**sampler_config)
+        assert (
+            profile.sampler_config["post_sample_fn"] == sampler_config["post_sample_fn"]
+        )
 
 
 class TestGDASProfile(unittest.TestCase):
