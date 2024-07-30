@@ -15,12 +15,12 @@ class GDASSampler(BaseSampler):
         tau_min: float = 0.1,
         tau_max: float = 10,
         total_epochs: int = 250,
-        post_sample_fn: Literal["default"] = "default",
+        arch_combine_fn: Literal["default"] = "default",
     ) -> None:
         super().__init__(
             arch_parameters=arch_parameters,
             sample_frequency=sample_frequency,
-            post_sample_fn=post_sample_fn,
+            arch_combine_fn=arch_combine_fn,
         )
 
         self.tau_min = torch.Tensor([tau_min])

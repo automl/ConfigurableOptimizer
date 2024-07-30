@@ -18,7 +18,7 @@ class DartsProfile(ProfileConfig, ABC):
         dropout: float | None = None,
         perturbation: str | None = None,
         sampler_sample_frequency: str = "step",
-        sampler_post_sample_fn: str = "default",
+        sampler_arch_combine_fn: str = "default",
         perturbator_sample_frequency: str = "epoch",
         partial_connector_config: dict | None = None,
         perturbator_config: dict | None = None,
@@ -43,7 +43,7 @@ class DartsProfile(ProfileConfig, ABC):
             dropout,
             perturbation,
             perturbator_sample_frequency,
-            sampler_post_sample_fn,
+            sampler_arch_combine_fn,
             entangle_op_weights,
             lora_rank,
             lora_warm_epochs,
@@ -67,7 +67,7 @@ class DartsProfile(ProfileConfig, ABC):
     def _initialize_sampler_config(self) -> None:
         darts_config = {
             "sample_frequency": self.sampler_sample_frequency,
-            "post_sample_fn": self.sampler_post_sample_fn,
+            "arch_combine_fn": self.sampler_arch_combine_fn,
         }
         self.sampler_config = darts_config  # type: ignore
 
@@ -80,7 +80,7 @@ class GDASProfile(ProfileConfig, ABC):
         dropout: float | None = None,
         perturbation: str | None = None,
         sampler_sample_frequency: str = "step",
-        sampler_post_sample_fn: str = "default",
+        sampler_arch_combine_fn: str = "default",
         perturbator_sample_frequency: str = "epoch",
         tau_min: float = 0.1,
         tau_max: float = 10,
@@ -109,7 +109,7 @@ class GDASProfile(ProfileConfig, ABC):
             dropout,
             perturbation,
             perturbator_sample_frequency,
-            sampler_post_sample_fn,
+            sampler_arch_combine_fn,
             entangle_op_weights,
             lora_rank,
             lora_warm_epochs,
@@ -133,7 +133,7 @@ class GDASProfile(ProfileConfig, ABC):
     def _initialize_sampler_config(self) -> None:
         gdas_config = {
             "sample_frequency": self.sampler_sample_frequency,
-            "post_sample_fn": self.sampler_post_sample_fn,
+            "arch_combine_fn": self.sampler_arch_combine_fn,
             "tau_min": self.tau_min,
             "tau_max": self.tau_max,
         }
@@ -148,7 +148,7 @@ class SNASProfile(ProfileConfig, ABC):
         dropout: float | None = None,
         perturbation: str | None = None,
         sampler_sample_frequency: str = "step",
-        sampler_post_sample_fn: str = "default",
+        sampler_arch_combine_fn: str = "default",
         perturbator_sample_frequency: str = "epoch",
         temp_init: float = 1.0,
         temp_min: float = 0.33,
@@ -181,7 +181,7 @@ class SNASProfile(ProfileConfig, ABC):
             dropout,
             perturbation,
             perturbator_sample_frequency,
-            sampler_post_sample_fn,
+            sampler_arch_combine_fn,
             entangle_op_weights,
             lora_rank,
             lora_warm_epochs,
@@ -205,7 +205,7 @@ class SNASProfile(ProfileConfig, ABC):
     def _initialize_sampler_config(self) -> None:
         snas_config = {
             "sample_frequency": self.sampler_sample_frequency,
-            "post_sample_fn": self.sampler_post_sample_fn,
+            "arch_combine_fn": self.sampler_arch_combine_fn,
             "temp_init": self.temp_init,
             "temp_min": self.temp_min,
             "temp_annealing": self.temp_annealing,
@@ -223,7 +223,7 @@ class DRNASProfile(ProfileConfig, ABC):
         perturbation: str | None = None,
         sampler_sample_frequency: str = "step",
         perturbator_sample_frequency: str = "epoch",
-        sampler_post_sample_fn: str = "default",
+        sampler_arch_combine_fn: str = "default",
         partial_connector_config: dict | None = None,
         perturbator_config: dict | None = None,
         entangle_op_weights: bool = False,
@@ -247,7 +247,7 @@ class DRNASProfile(ProfileConfig, ABC):
             dropout,
             perturbation,
             perturbator_sample_frequency,
-            sampler_post_sample_fn,
+            sampler_arch_combine_fn,
             entangle_op_weights,
             lora_rank,
             lora_warm_epochs,
@@ -271,7 +271,7 @@ class DRNASProfile(ProfileConfig, ABC):
     def _initialize_sampler_config(self) -> None:
         drnas_config = {
             "sample_frequency": self.sampler_sample_frequency,
-            "post_sample_fn": self.sampler_post_sample_fn,
+            "arch_combine_fn": self.sampler_arch_combine_fn,
         }
         self.sampler_config = drnas_config  # type: ignore
 

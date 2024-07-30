@@ -13,12 +13,12 @@ class DRNASSampler(BaseSampler):
         self,
         arch_parameters: list[torch.Tensor],
         sample_frequency: Literal["epoch", "step"] = "step",
-        post_sample_fn: Literal["default", "sigmoid"] = "default",
+        arch_combine_fn: Literal["default", "sigmoid"] = "default",
     ) -> None:
         super().__init__(
             arch_parameters=arch_parameters,
             sample_frequency=sample_frequency,
-            post_sample_fn=post_sample_fn,
+            arch_combine_fn=arch_combine_fn,
         )
 
     def sample_alphas(self, arch_parameters: torch.Tensor) -> list[torch.Tensor]:
@@ -31,7 +31,7 @@ class DRNASSampler(BaseSampler):
         beta = F.elu(alpha) + 1
         weights = torch.distributions.dirichlet.Dirichlet(beta).rsample()
 
-        if self.post_sample_fn == "sigmoid":
+        if self.arch_combine_fn == "sigmoid":
             weights = torch.nn.functional.sigmoid(weights)
 
         return weights  # type: ignore

@@ -124,11 +124,11 @@ class TestDartsProfile(unittest.TestCase):
 
     def test_sampler_post_fn(self) -> None:
         profile = DartsProfile(epochs=1)
-        assert profile.sampler_config["post_sample_fn"] == "default"
-        sampler_config = {"post_sample_fn": "sigmoid"}
+        assert profile.sampler_config["arch_combine_fn"] == "default"
+        sampler_config = {"arch_combine_fn": "sigmoid"}
         profile.configure_sampler(**sampler_config)
         assert (
-            profile.sampler_config["post_sample_fn"] == sampler_config["post_sample_fn"]
+            profile.sampler_config["arch_combine_fn"] == sampler_config["arch_combine_fn"]
         )
 
 
@@ -184,11 +184,11 @@ class TestDRNASProfile(unittest.TestCase):
 
     def test_sampler_post_fn(self) -> None:
         profile = DRNASProfile(epochs=1)
-        assert profile.sampler_config["post_sample_fn"] == "default"
-        sampler_config = {"post_sample_fn": "sigmoid"}
+        assert profile.sampler_config["arch_combine_fn"] == "default"
+        sampler_config = {"arch_combine_fn": "sigmoid"}
         profile.configure_sampler(**sampler_config)
         assert (
-            profile.sampler_config["post_sample_fn"] == sampler_config["post_sample_fn"]
+            profile.sampler_config["arch_combine_fn"] == sampler_config["arch_combine_fn"]
         )
 
 
