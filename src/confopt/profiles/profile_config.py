@@ -217,7 +217,7 @@ class ProfileConfig:
             "cutout": -1,
             "cutout_length": 16,
             "train_portion": 0.7,
-            "use_ddp": True,
+            "use_ddp": False,
             "checkpointing_freq": 1,
             "seed": self.seed,
         }
