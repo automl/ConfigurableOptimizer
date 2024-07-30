@@ -279,6 +279,7 @@ class DiscreteProfile:
             "lr": 0.025,
             "epochs": 100,
             "optim": "sgd",
+            "scheduler": "cosine_annealing_lr",
             "optim_config": {
                 "momentum": 0.9,
                 "nesterov": 0,

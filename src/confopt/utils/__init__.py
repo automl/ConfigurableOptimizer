@@ -8,6 +8,14 @@ from .checkpoints import (
     copy_checkpoint,
     save_checkpoint,
 )
+from .distributed import (
+    cleanup,
+    get_device,
+    get_local_rank,
+    get_rank,
+    get_world_size,
+    init_distributed,
+)
 from .logger import Logger, prepare_logger
 from .normalize_params import normalize_params
 from .time import get_runtime, get_time_as_string
@@ -53,10 +61,6 @@ def calc_accuracy(
         correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
-
-
-def get_device(model: torch.nn.Module) -> torch.device:
-    return next(model.parameters()).device
 
 
 def drop_path(x: torch.Tensor, drop_prob: float) -> torch.Tensor:
@@ -156,11 +160,22 @@ def set_ops_to_prune(model: torch.nn.Module, mask: torch.Tensor) -> None:
             op.is_pruned = True
 
 
+def unwrap_model(model: torch.nn.Module) -> torch.nn.Module:
+    if isinstance(model, torch.nn.DataParallel):
+        return model.module
+    return model
+
+
 __all__ = [
     "calc_accuracy",
     "save_checkpoint",
     "load_checkpoint",
     "copy_checkpoint",
+    "init_distributed",
+    "cleanup",
+    "get_local_rank",
+    "get_rank",
+    "get_world_size",
     "get_machine_info",
     "get_time_as_string",
     "get_runtime",

@@ -7,11 +7,18 @@ from typing import Any
 from fvcore.common.checkpoint import Checkpointer, PeriodicCheckpointer
 import torch
 from torch import nn
+from torch.nn.parallel import DistributedDataParallel
 from typing_extensions import TypeAlias
 
 from confopt.dataset import AbstractData
 from confopt.searchspace import SearchSpace
-from confopt.utils import AverageMeter, Logger, calc_accuracy, clear_grad_cosine
+from confopt.utils import (
+    AverageMeter,
+    Logger,
+    calc_accuracy,
+    clear_grad_cosine,
+    get_device,
+)
 
 from .searchprofile import Profile
 
@@ -36,7 +43,7 @@ class ConfigurableTrainer:
         criterion: CriterionType,
         logger: Logger,
         batch_size: int,
-        use_data_parallel: bool = False,
+        use_ddp: bool = False,
         print_freq: int = 20,
         drop_path_prob: float = 0.1,
         load_saved_model: bool = False,
@@ -53,12 +60,10 @@ class ConfigurableTrainer:
         self.arch_optimizer = arch_optimizer
         self.scheduler = scheduler
         self.data = data
-        self.device = (
-            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        )
+        self.device = get_device()
         self.logger = logger
         self.criterion = criterion
-        self.use_data_parallel = use_data_parallel
+        self.use_ddp = use_ddp
         self.print_freq = print_freq
         self.batch_size = batch_size
         self.drop_path_prob = drop_path_prob
@@ -86,8 +91,8 @@ class ConfigurableTrainer:
         else:
             self._init_empty_model_state_info()
 
-        if self.use_data_parallel:
-            network, criterion = self._load_onto_data_parallel(
+        if self.use_ddp:
+            network, criterion = self._load_onto_distributed_data_parallel(
                 self.model, self.criterion
             )
         else:
@@ -134,7 +139,7 @@ class ConfigurableTrainer:
             # Reset WandB Log dictionary
             self.logger.reset_wandb_logs()
 
-            base_metrics, arch_metrics = self.train_func(
+            base_metrics, arch_metrics = self._train(
                 profile,
                 train_loader,
                 val_loader,
@@ -180,7 +185,7 @@ class ConfigurableTrainer:
 
             # Log GM scores
             if calc_gm_score:
-                if self.use_data_parallel:
+                if self.use_ddp:
                     gm_score = network.module.calc_avg_gm_score()
                 else:
                     gm_score = network.calc_avg_gm_score()
@@ -196,7 +201,7 @@ class ConfigurableTrainer:
             # Count skip connections in this epoch
             normal_cell_n_skip, reduce_cell_n_skip = (
                 network.module.get_num_skip_ops()
-                if self.use_data_parallel
+                if self.use_ddp
                 else network.get_num_skip_ops()
             )
 
@@ -272,7 +277,7 @@ class ConfigurableTrainer:
 
             # Reset GM Scores
             if calc_gm_score:
-                if self.use_data_parallel:
+                if self.use_ddp:
                     network.module.reset_gm_scores()
                 else:
                     network.reset_gm_scores()
@@ -281,12 +286,12 @@ class ConfigurableTrainer:
             epoch_time.update(time.time() - start_time)
             start_time = time.time()
 
-    def train_func(  # noqa: PLR0912, PLR0915, C901
+    def _train(  # noqa: PLR0912, PLR0915, C901
         self,
         profile: Profile,
         train_loader: DataLoaderType,
         valid_loader: DataLoaderType,
-        network: SearchSpace | torch.nn.DataParallel,
+        network: SearchSpace | DistributedDataParallel,
         criterion: CriterionType,
         w_optimizer: OptimizerType,
         arch_optimizer: OptimizerType,
@@ -337,7 +342,7 @@ class ConfigurableTrainer:
                 arch_loss.backward()
                 arch_optimizer.step()
 
-                if self.use_data_parallel:
+                if self.use_ddp:
                     profile.perturb_parameter(network.module)
                 else:
                     profile.perturb_parameter(network)
@@ -354,7 +359,7 @@ class ConfigurableTrainer:
 
             # calculate gm_score
             if calc_gm_score:
-                if self.use_data_parallel:
+                if self.use_ddp:
                     network.module.check_grads_cosine(oles)  # type: ignore
                 else:
                     network.check_grads_cosine(oles)  # type: ignore
@@ -367,7 +372,7 @@ class ConfigurableTrainer:
             base_loss = criterion(logits, base_targets)
             base_loss.backward()
 
-            network_module = network.module if self.use_data_parallel else network
+            network_module = network.module if self.use_ddp else network
             if hasattr(network_module, "get_mean_layer_alignment_score"):
                 (
                     score_normal,
@@ -376,7 +381,7 @@ class ConfigurableTrainer:
                 layer_alignment_scores[0].update(val=score_normal)  # type: ignore
                 layer_alignment_scores[1].update(val=score_reduce)  # type: ignore
 
-            if self.use_data_parallel:
+            if self.use_ddp:
                 torch.nn.utils.clip_grad_norm_(
                     network.module.model_weight_parameters(), 5
                 )
@@ -387,7 +392,7 @@ class ConfigurableTrainer:
 
             # save grads of operations
             if calc_gm_score:
-                if self.use_data_parallel:
+                if self.use_ddp:
                     network.module.preserve_grads()  # type: ignore
                 else:
                     network.preserve_grads()  # type: ignore
@@ -436,7 +441,7 @@ class ConfigurableTrainer:
     def valid_func(
         self,
         valid_loader: DataLoaderType,
-        network: SearchSpace | torch.nn.DataParallel,
+        network: SearchSpace | DistributedDataParallel,
         criterion: CriterionType,
     ) -> TrainingMetrics:
         arch_losses, arch_top1, arch_top5 = (
@@ -473,14 +478,13 @@ class ConfigurableTrainer:
 
         return TrainingMetrics(arch_losses.avg, arch_top1.avg, arch_top5.avg)
 
-    def _load_onto_data_parallel(
+    def _load_onto_distributed_data_parallel(
         self, network: nn.Module, criterion: CriterionType
     ) -> tuple[nn.Module, CriterionType]:
         if torch.cuda.is_available():
-            network, criterion = (
-                torch.nn.DataParallel(self.model).cuda(),
-                criterion.cuda(),
-            )
+            torch.cuda.set_device(self.device)
+            network = DistributedDataParallel(self.model.cuda())
+            criterion = criterion.cuda()
 
         return network, criterion
 
@@ -603,13 +607,13 @@ class ConfigurableTrainer:
         top5_meter.update(base_prec5.item(), inputs.size(0))
 
     def _component_new_step_or_epoch(
-        self, model: SearchSpace | torch.nn.DataParallel, calling_frequency: str
+        self, model: SearchSpace | DistributedDataParallel, calling_frequency: str
     ) -> None:
         assert calling_frequency in [
             "epoch",
             "step",
         ], "Called Frequency should be either epoch or step"
-        if self.use_data_parallel:
+        if self.use_ddp:
             model = model.module
         assert (
             len(model.components) > 0
@@ -627,7 +631,7 @@ class ConfigurableTrainer:
             return
         genotype = (
             network.module.model.genotype()
-            if self.use_data_parallel
+            if self.use_ddp
             else network.model.genotype()
         )
         result_train, rusult_valid, result_test = self.benchmark_api.query(
@@ -661,7 +665,7 @@ class ConfigurableTrainer:
             + " Conv2DLoRA module"
         )
         # clear OLES_OPS from pre_grads, avg and count
-        if self.use_data_parallel:
+        if self.use_ddp:
             network.module.apply(clear_grad_cosine)
         else:
             network.apply(clear_grad_cosine)
@@ -676,7 +680,7 @@ class ConfigurableTrainer:
         self.model_optimizer = type(self.model_optimizer)(
             (
                 network.module.model_weight_parameters()  # type: ignore
-                if self.use_data_parallel
+                if self.use_ddp
                 else network.model_weight_parameters()  # type: ignore
             ),
             **optimizer_hyperparameters,
@@ -710,14 +714,14 @@ class ConfigurableTrainer:
         )
 
         if is_gm_score_enabled:
-            if self.use_data_parallel:
+            if self.use_ddp:
                 network.module.reset_gm_score_attributes()
             else:
                 network.reset_gm_score_attributes()
 
     def get_all_running_mean_scores(self, network: torch.nn.Module) -> dict:
         running_sim_dict = {}
-        model = network.module if self.use_data_parallel else network
+        model = network.module if self.use_ddp else network
         for name, module in model.named_modules():
             if hasattr(module, "running_sim"):
                 running_sim_dict[f"gm_scores/{name}"] = module.running_sim.avg
@@ -726,14 +730,14 @@ class ConfigurableTrainer:
     def update_sample_function(
         self,
         profile: Profile,
-        model: SearchSpace | torch.nn.DataParallel,
+        model: SearchSpace | DistributedDataParallel,
         calling_frequency: str,
     ) -> None:
         assert calling_frequency in [
             "epoch",
             "step",
         ], "Called Frequency should be either epoch or step"
-        if self.use_data_parallel:
+        if self.use_ddp:
             model = model.module
         assert (
             len(model.components) > 0
@@ -746,7 +750,7 @@ class ConfigurableTrainer:
             profile.reset_sample_function(model)
 
     def get_arch_values_as_dict(self, model: SearchSpace) -> dict:
-        if isinstance(model, torch.nn.DataParallel):
+        if isinstance(model, DistributedDataParallel):
             model = model.module
         arch_values = model.arch_parameters
         arch_values_dict = {}

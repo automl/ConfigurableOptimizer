@@ -5,10 +5,12 @@ from typing import Tuple, Union
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Dataset, Sampler
+from torch.utils.data import DataLoader, Dataset, DistributedSampler, Sampler
 from torchvision import transforms
 import torchvision.datasets as dset
 from torchvision.transforms import Compose
+
+import confopt.utils.distributed as dist_utils
 
 from .imgnet16 import ImageNet16
 
@@ -52,7 +54,7 @@ class AbstractData(ABC):
             self.shuffle = False
 
     @abstractmethod
-    def build_datasets(self) -> tuple[DS, DS, Dataset]:
+    def build_datasets(self) -> tuple[DS, DS, DS]:
         ...
 
     @abstractmethod
@@ -66,13 +68,38 @@ class AbstractData(ABC):
         ...
 
     def get_dataloaders(
-        self, batch_size: int = 64, n_workers: int = 2
+        self,
+        batch_size: int = 64,
+        n_workers: int = 2,
+        use_distributed_sampler: bool = False,
     ) -> tuple[DataLoader, DataLoader | None, DataLoader]:
         (
             (train_data, train_sampler),
             (val_data, val_sampler),
-            test_data,
+            (test_data, test_sampler),
         ) = self.build_datasets()
+
+        if use_distributed_sampler:
+            rank, world_size = dist_utils.get_rank(), dist_utils.get_world_size()
+            choose_sampler = (
+                lambda data, sampler: sampler if sampler is not None else data
+            )
+            train_sampler = DistributedSampler(
+                choose_sampler(train_data, train_sampler),
+                num_replicas=world_size,
+                rank=rank,
+            )
+            val_sampler = DistributedSampler(
+                choose_sampler(val_data, val_sampler),
+                num_replicas=world_size,
+                rank=rank,
+            )
+            test_sampler = DistributedSampler(
+                choose_sampler(test_data, test_sampler),
+                num_replicas=world_size,
+                rank=rank,
+            )
+
         train_queue = DataLoader(
             train_data,  # type: ignore
             batch_size=batch_size,
@@ -97,6 +124,7 @@ class AbstractData(ABC):
             batch_size=batch_size,
             pin_memory=True,
             num_workers=n_workers,
+            sampler=test_sampler,
         )
 
         return train_queue, valid_queue, test_queue
@@ -128,7 +156,7 @@ class CIFARData(AbstractData):
 
         return train_transform, test_transform
 
-    def build_datasets(self) -> tuple[DS, DS, Dataset]:
+    def build_datasets(self) -> tuple[DS, DS, DS]:
         train_transform, test_transform = self.get_transforms()
         train_data, test_data = self.load_datasets(
             self.root, train_transform, test_transform
@@ -147,10 +175,10 @@ class CIFARData(AbstractData):
             return (
                 (train_data, train_sampler),
                 (train_data, val_sampler),
-                test_data,
+                (test_data, None),
             )
 
-        return (train_data, None), (None, None), test_data
+        return (train_data, None), (None, None), (test_data, None)
 
 
 class ImageNetData(AbstractData):
@@ -176,7 +204,7 @@ class ImageNetData(AbstractData):
 
         return train_transform, test_transform
 
-    def build_datasets(self) -> tuple[DS, DS, Dataset]:
+    def build_datasets(self) -> tuple[DS, DS, DS]:
         train_transform, test_transform = self.get_transforms()
         train_data, test_data = self.load_datasets(
             self.root, train_transform, test_transform
@@ -195,10 +223,10 @@ class ImageNetData(AbstractData):
             return (
                 (train_data, train_sampler),
                 (train_data, val_sampler),
-                test_data,
+                (test_data, None),
             )
 
-        return (train_data, None), (None, None), test_data
+        return (train_data, None), (None, None), (test_data, None)
 
 
 class CIFAR10Data(CIFARData):
