@@ -5,7 +5,7 @@ from confopt.train.experiment import DatasetType, SearchSpaceType
 if __name__ == "__main__":
     profile = DiscreteProfile()
     config = profile.get_trainer_config()
-    profile.configure_trainer(use_data_parallel=True)
+    profile.configure_trainer(use_ddp=True)
     config.update({"genotype": profile.get_genotype()})
 
     experiment = Experiment(

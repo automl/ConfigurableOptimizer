@@ -38,7 +38,7 @@ class Trainer:
         criterion: CriterionType,
         logger: Logger,
         batch_size: int,
-        use_data_parallel: bool = False,
+        use_ddp: bool = False,
         print_freq: int = 20,
         drop_path_prob: float = 0.1,
         load_saved_model: bool = False,
@@ -53,7 +53,7 @@ class Trainer:
         )
         self.logger = logger
         self.criterion = criterion
-        self.use_data_parallel = use_data_parallel
+        self.use_ddp = use_ddp
         self.print_freq = print_freq
         self.batch_size = batch_size
         self.load_saved_model = load_saved_model
@@ -153,7 +153,7 @@ class Trainer:
         return False
 
     def search(self, epochs: int) -> None:
-        if self.use_data_parallel is True:
+        if self.use_ddp is True:
             network, criterion = self._load_onto_data_parallel(
                 self.model, self.criterion
             )

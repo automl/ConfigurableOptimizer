@@ -313,7 +313,7 @@ class Experiment:
             criterion=criterion,
             logger=self.logger,
             batch_size=trainer_arguments.batch_size,  # type: ignore
-            use_ddp=trainer_arguments.use_data_parallel,  # type: ignore
+            use_ddp=trainer_arguments.use_ddp,  # type: ignore
             load_saved_model=load_saved_model,
             load_best_model=load_best_model,
             start_epoch=start_epoch,
@@ -746,7 +746,7 @@ class Experiment:
 
         self.logger.save_genotype(genotype_str)
 
-        if train_config.get("use_data_parallel", False) is True:
+        if train_config.get("use_ddp", False) is True:
             assert torch.distributed.is_initialized(), "DDP is not initialized!"
             world_size = dist_utils.get_world_size()
             train_config["lr"] *= world_size  # type: ignore
@@ -789,7 +789,7 @@ class Experiment:
             criterion=criterion,
             logger=self.logger,
             batch_size=trainer_arguments.batch_size,  # type: ignore
-            use_data_parallel=trainer_arguments.use_data_parallel,  # type: ignore
+            use_ddp=trainer_arguments.use_ddp,  # type: ignore
             print_freq=trainer_arguments.print_freq,  # type: ignore
             drop_path_prob=trainer_arguments.drop_path_prob,  # type: ignore
             load_saved_model=load_saved_model,

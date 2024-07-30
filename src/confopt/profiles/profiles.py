@@ -294,7 +294,7 @@ class DiscreteProfile:
             "cutout": -1,
             "cutout_length": 16,
             "train_portion": 0.7,
-            "use_data_parallel": True,
+            "use_ddp": True,
             "checkpointing_freq": 2,
         }
         self.train_config = default_train_config
