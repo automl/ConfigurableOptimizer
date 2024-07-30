@@ -313,7 +313,7 @@ class Experiment:
             criterion=criterion,
             logger=self.logger,
             batch_size=trainer_arguments.batch_size,  # type: ignore
-            use_ddp=trainer_arguments.use_ddp,  # type: ignore
+            use_data_parallel=trainer_arguments.use_data_parallel,  # type: ignore
             load_saved_model=load_saved_model,
             load_best_model=load_best_model,
             start_epoch=start_epoch,
