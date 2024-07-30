@@ -54,7 +54,6 @@ class DiscreteTrainer(ConfigurableTrainer):
             criterion=criterion,
             logger=logger,
             batch_size=batch_size,
-            use_ddp=use_ddp,
             print_freq=print_freq,
             drop_path_prob=drop_path_prob,
             load_saved_model=load_saved_model,
@@ -64,6 +63,7 @@ class DiscreteTrainer(ConfigurableTrainer):
             epochs=epochs,
             debug_mode=debug_mode,
         )
+        self.use_ddp = use_ddp
         # self.use_supernet_checkpoint = use_supernet_checkpoint
 
     def average_metrics_across_workers(

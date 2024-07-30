@@ -12,7 +12,13 @@ from typing_extensions import TypeAlias
 
 from confopt.dataset import AbstractData
 from confopt.searchspace import SearchSpace
-from confopt.utils import AverageMeter, Logger, calc_accuracy, clear_grad_cosine
+from confopt.utils import (
+    AverageMeter,
+    Logger,
+    calc_accuracy,
+    clear_grad_cosine,
+    get_device,
+)
 
 from .searchprofile import Profile
 
@@ -54,9 +60,7 @@ class ConfigurableTrainer:
         self.arch_optimizer = arch_optimizer
         self.scheduler = scheduler
         self.data = data
-        self.device = (
-            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        )
+        self.device = get_device()
         self.logger = logger
         self.criterion = criterion
         self.use_data_parallel = use_data_parallel
