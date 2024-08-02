@@ -13,7 +13,7 @@ from confopt.dataset import AbstractData
 from confopt.searchspace import SearchSpace
 from confopt.utils import AverageMeter, Logger, calc_accuracy, clear_grad_cosine
 
-from .searchprofile import Profile
+from .searchprofile import SearchSpaceHandler
 
 TrainingMetrics = namedtuple("TrainingMetrics", ["loss", "acc_top1", "acc_top5"])
 
@@ -73,13 +73,13 @@ class ConfigurableTrainer:
 
     def train(  # noqa: C901, PLR0915, PLR0912
         self,
-        profile: Profile,
+        search_space_handler: SearchSpaceHandler,
         is_wandb_log: bool = True,
         lora_warm_epochs: int = 0,
         oles: bool = False,
         calc_gm_score: bool = False,
     ) -> None:
-        profile.adapt_search_space(self.model)
+        search_space_handler.adapt_search_space(self.model)
 
         if self.load_saved_model or self.load_best_model or self.start_epoch != 0:
             self._load_model_state_if_exists()
@@ -104,16 +104,16 @@ class ConfigurableTrainer:
         is_warm_epoch = False
         if lora_warm_epochs > 0:
             assert (
-                profile.lora_configs is not None
-            ), "Expected profile's lora configs to be populated"
+                search_space_handler.lora_configs is not None
+            ), "The SearchSpaceHandler's LoRA configs are missing"
             assert (
-                profile.lora_configs.get("r", 0) > 0
+                search_space_handler.lora_configs.get("r", 0) > 0
             ), "Value of r should be greater than 0"
             is_warm_epoch = True
         warm_epochs = lora_warm_epochs
-        if profile.partial_connector:
+        if search_space_handler.partial_connector:
             warm_epochs = max(
-                profile.partial_connector.num_warm_epoch, lora_warm_epochs
+                search_space_handler.partial_connector.num_warm_epoch, lora_warm_epochs
             )
             is_warm_epoch = True
 
@@ -124,18 +124,20 @@ class ConfigurableTrainer:
             if epoch == warm_epochs + 1:
                 if lora_warm_epochs > 0:
                     self._initialize_lora_modules(
-                        lora_warm_epochs, profile, network, calc_gm_score
+                        lora_warm_epochs, search_space_handler, network, calc_gm_score
                     )
                 is_warm_epoch = False
 
             self._component_new_step_or_epoch(network, calling_frequency="epoch")
-            self.update_sample_function(profile, network, calling_frequency="epoch")
+            self.update_sample_function(
+                search_space_handler, network, calling_frequency="epoch"
+            )
 
             # Reset WandB Log dictionary
             self.logger.reset_wandb_logs()
 
             base_metrics, arch_metrics = self.train_func(
-                profile,
+                search_space_handler,
                 train_loader,
                 val_loader,
                 network,
@@ -283,7 +285,7 @@ class ConfigurableTrainer:
 
     def train_func(  # noqa: PLR0912, PLR0915, C901
         self,
-        profile: Profile,
+        search_space_handler: SearchSpaceHandler,
         train_loader: DataLoaderType,
         valid_loader: DataLoaderType,
         network: SearchSpace | torch.nn.DataParallel,
@@ -317,7 +319,9 @@ class ConfigurableTrainer:
             # self.scheduler.update(None, 1.0 * step / len(xloader))
             self._component_new_step_or_epoch(network, calling_frequency="step")
             if step == 1:
-                self.update_sample_function(profile, network, calling_frequency="step")
+                self.update_sample_function(
+                    search_space_handler, network, calling_frequency="step"
+                )
 
             arch_inputs, arch_targets = next(iter(valid_loader))
 
@@ -338,9 +342,9 @@ class ConfigurableTrainer:
                 arch_optimizer.step()
 
                 if self.use_data_parallel:
-                    profile.perturb_parameter(network.module)
+                    search_space_handler.perturb_parameter(network.module)
                 else:
-                    profile.perturb_parameter(network)
+                    search_space_handler.perturb_parameter(network)
 
                 self._update_meters(
                     inputs=arch_inputs,
@@ -648,14 +652,16 @@ class ConfigurableTrainer:
     def _initialize_lora_modules(
         self,
         lora_warm_epochs: int,
-        profile: Profile,
+        search_space_handler: SearchSpaceHandler,
         network: torch.nn.Module,
         is_gm_score_enabled: bool = False,
     ) -> None:
         self.logger.log(
             f"The searchspace has been warm started with {lora_warm_epochs} epochs"
         )
-        profile.activate_lora(network, **profile.lora_configs)  # type: ignore
+        search_space_handler.activate_lora(
+            network, **search_space_handler.lora_configs
+        )  # type: ignore
         self.logger.log(
             "LoRA layers have been initialized for all operations with"
             + " Conv2DLoRA module"
@@ -725,7 +731,7 @@ class ConfigurableTrainer:
 
     def update_sample_function(
         self,
-        profile: Profile,
+        search_space_handler: SearchSpaceHandler,
         model: SearchSpace | torch.nn.DataParallel,
         calling_frequency: str,
     ) -> None:
@@ -739,11 +745,12 @@ class ConfigurableTrainer:
             len(model.components) > 0
         ), "There are no oneshot components inside the search space"
         if calling_frequency == "epoch":
-            profile.update_sample_function_from_sampler(model)
+            search_space_handler.update_sample_function_from_sampler(model)
         elif (
-            calling_frequency == "step" and profile.sampler.sample_frequency == "epoch"
+            calling_frequency == "step"
+            and search_space_handler.sampler.sample_frequency == "epoch"
         ):
-            profile.reset_sample_function(model)
+            search_space_handler.reset_sample_function(model)
 
     def get_arch_values_as_dict(self, model: SearchSpace) -> dict:
         if isinstance(model, torch.nn.DataParallel):

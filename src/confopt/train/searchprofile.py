@@ -18,7 +18,7 @@ from confopt.searchspace.common import (
 )
 
 
-class Profile:
+class SearchSpaceHandler:
     def __init__(
         self,
         sampler: BaseSampler,
@@ -69,7 +69,7 @@ class Profile:
 
         if self.pruner:
             search_space.components.append(self.pruner)
-        
+
         if self.lora_toggler:
             search_space.components.append(self.lora_toggler)
 
@@ -163,6 +163,6 @@ class Profile:
 if __name__ == "__main__":
     search_space = DARTSSearchSpace()
     sampler = DARTSSampler(search_space.arch_parameters)
-    profile = Profile(sampler=sampler)
-    profile.adapt_search_space(search_space=search_space)
+    search_space_handler = SearchSpaceHandler(sampler=sampler)
+    search_space_handler.adapt_search_space(search_space=search_space)
     print("success")

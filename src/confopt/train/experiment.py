@@ -50,7 +50,7 @@ from confopt.searchspace import (
     SearchSpace,
     TransNASBench101SearchSpace,
 )
-from confopt.train import ConfigurableTrainer, DiscreteTrainer, Profile
+from confopt.train import ConfigurableTrainer, DiscreteTrainer, SearchSpaceHandler
 from confopt.utils import Logger
 from confopt.utils.time import check_date_format
 
@@ -321,7 +321,7 @@ class Experiment:
         )
 
         trainer.train(
-            profile=self.profile,  # type: ignore
+            search_space_handler=self.profile,  # type: ignore
             is_wandb_log=self.is_wandb_log,
             lora_warm_epochs=config["trainer"].get(  # type: ignore
                 "lora_warm_epochs", 0
@@ -481,7 +481,7 @@ class Experiment:
     def set_profile(self, config: dict) -> None:
         assert self.sampler is not None
 
-        self.profile = Profile(
+        self.profile = SearchSpaceHandler(
             sampler=self.sampler,
             edge_normalization=self.edge_normalization,
             partial_connector=self.partial_connector,
