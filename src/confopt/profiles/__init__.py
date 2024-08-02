@@ -1,6 +1,6 @@
 from .profile_config import BaseProfile
 from .profiles import (
-    DartsProfile,
+    DARTSProfile,
     DiscreteProfile,
     DRNASProfile,
     GDASProfile,
@@ -9,7 +9,7 @@ from .profiles import (
 
 __all__ = [
     "BaseProfile",
-    "DartsProfile",
+    "DARTSProfile",
     "GDASProfile",
     "DRNASProfile",
     "SNASProfile",

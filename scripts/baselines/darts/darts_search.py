@@ -5,7 +5,7 @@ import json
 
 import wandb
 
-from confopt.profiles import DartsProfile, DiscreteProfile
+from confopt.profiles import DARTSProfile, DiscreteProfile
 from confopt.train import DatasetType, Experiment, SearchSpaceType
 
 dataset_size = {
@@ -55,8 +55,8 @@ def read_args() -> argparse.Namespace:
     return args
 
 
-def get_darts_profile(args: argparse.Namespace) -> DartsProfile:
-    profile = DartsProfile(
+def get_darts_profile(args: argparse.Namespace) -> DARTSProfile:
+    profile = DARTSProfile(
         epochs=args.search_epochs,
         sampler_sample_frequency="step",
     )

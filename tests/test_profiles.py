@@ -1,7 +1,7 @@
 import unittest
 
 from confopt.profiles import (
-    DartsProfile,
+    DARTSProfile,
     DRNASProfile,
     GDASProfile,
     BaseProfile,
@@ -9,7 +9,7 @@ from confopt.profiles import (
 )
 
 
-class TestProfileConfig(unittest.TestCase):
+class TestBaseProfile(unittest.TestCase):
     def test_config_change(self) -> None:
         profile = BaseProfile(
             "TEST",
@@ -78,7 +78,7 @@ class TestDartsProfile(unittest.TestCase):
         partial_connector_config = {
             "k": 2,
         }
-        profile = DartsProfile(
+        profile = DARTSProfile(
             epochs=100,
             is_partial_connection=True,
             perturbation="random",
@@ -98,7 +98,7 @@ class TestDartsProfile(unittest.TestCase):
         }
 
         with self.assertRaises(AssertionError):
-            profile = DartsProfile(  # noqa: F841
+            profile = DARTSProfile(  # noqa: F841
                 epochs=100,
                 is_partial_connection=True,
                 perturbation="random",
@@ -108,7 +108,7 @@ class TestDartsProfile(unittest.TestCase):
             )
 
     def test_sampler_change(self) -> None:
-        profile = DartsProfile(
+        profile = DARTSProfile(
             epochs=100,
             sampler_sample_frequency="step",
         )
@@ -123,7 +123,7 @@ class TestDartsProfile(unittest.TestCase):
             profile.configure_sampler(invalid_config="step")
 
     def test_sampler_post_fn(self) -> None:
-        profile = DartsProfile(epochs=1)
+        profile = DARTSProfile(epochs=1)
         assert profile.sampler_config["arch_combine_fn"] == "default"
         sampler_config = {"arch_combine_fn": "sigmoid"}
         profile.configure_sampler(**sampler_config)

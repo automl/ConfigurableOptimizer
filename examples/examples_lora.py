@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from confopt.profiles import DartsProfile
+from confopt.profiles import DARTSProfile
 from confopt.train import DatasetType, Experiment, SearchSpaceType
 
 if __name__ == "__main__":
@@ -11,7 +11,7 @@ if __name__ == "__main__":
     seed = 100
 
 
-    profile = DartsProfile(
+    profile = DARTSProfile(
         is_partial_connection=True,
         perturbation="random",
         sampler_sample_frequency="step",

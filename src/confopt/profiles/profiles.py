@@ -10,7 +10,7 @@ from .profile_config import BaseProfile
 Genotype = namedtuple("Genotype", "normal normal_concat reduce reduce_concat")
 
 
-class DartsProfile(BaseProfile, ABC):
+class DARTSProfile(BaseProfile, ABC):
     def __init__(
         self,
         epochs: int,
