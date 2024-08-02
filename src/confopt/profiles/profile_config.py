@@ -14,7 +14,7 @@ ADVERSERIAL_DATA = (
 INIT_CHANNEL_NUM = 16
 
 
-class ProfileConfig:
+class BaseProfile:
     def __init__(
         self,
         config_type: str,
@@ -283,14 +283,14 @@ class ProfileConfig:
             ), f"{config_key} not a valid configuration for the dropout module"
             self.dropout_config[config_key] = kwargs[config_key]
 
-    def configure_lora_config(self, **kwargs) -> None:  # type: ignore
+    def configure_lora(self, **kwargs) -> None:  # type: ignore
         for config_key in kwargs:
             assert (
                 config_key in self.lora_config
             ), f"{config_key} not a valid configuration for the lora layers"
             self.lora_config[config_key] = kwargs[config_key]
 
-    def configure_oles_config(self, **kwargs) -> None:  # type: ignore
+    def configure_oles(self, **kwargs) -> None:  # type: ignore
         for config_key in kwargs:
             assert (
                 config_key in self.oles_config
@@ -305,7 +305,7 @@ class ProfileConfig:
             self.searchspace_config.update(config)
 
     @abstractmethod
-    def configure_extra_config(self, config: dict) -> None:
+    def configure_extra(self, config: dict) -> None:
         self.extra_config = config
 
     def get_name_wandb_run(self) -> str:

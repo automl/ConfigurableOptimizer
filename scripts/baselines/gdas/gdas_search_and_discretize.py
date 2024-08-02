@@ -102,7 +102,7 @@ if __name__ == "__main__":
         discrete_profile.train_config.update({"search_space": {"C": 36, "layers": 20}})
 
     discrete_config = discrete_profile.get_trainer_config()
-    profile.configure_extra_config(
+    profile.configure_extra(
         {
             "discrete_trainer": discrete_config,
             "project_name": "BASELINES",

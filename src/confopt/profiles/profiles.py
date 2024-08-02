@@ -5,12 +5,12 @@ from collections import namedtuple
 
 from confopt.utils import get_num_classes
 
-from .profile_config import ProfileConfig
+from .profile_config import BaseProfile
 
 Genotype = namedtuple("Genotype", "normal normal_concat reduce reduce_concat")
 
 
-class DartsProfile(ProfileConfig, ABC):
+class DartsProfile(BaseProfile, ABC):
     def __init__(
         self,
         epochs: int,
@@ -72,7 +72,7 @@ class DartsProfile(ProfileConfig, ABC):
         self.sampler_config = darts_config  # type: ignore
 
 
-class GDASProfile(ProfileConfig, ABC):
+class GDASProfile(BaseProfile, ABC):
     def __init__(
         self,
         epochs: int,
@@ -140,7 +140,7 @@ class GDASProfile(ProfileConfig, ABC):
         self.sampler_config = gdas_config  # type: ignore
 
 
-class SNASProfile(ProfileConfig, ABC):
+class SNASProfile(BaseProfile, ABC):
     def __init__(
         self,
         epochs: int,
@@ -214,7 +214,7 @@ class SNASProfile(ProfileConfig, ABC):
         self.sampler_config = snas_config  # type: ignore
 
 
-class DRNASProfile(ProfileConfig, ABC):
+class DRNASProfile(BaseProfile, ABC):
     def __init__(
         self,
         epochs: int,

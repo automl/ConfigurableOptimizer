@@ -4,14 +4,14 @@ from confopt.profiles import (
     DartsProfile,
     DRNASProfile,
     GDASProfile,
-    ProfileConfig,
+    BaseProfile,
     SNASProfile,
 )
 
 
 class TestProfileConfig(unittest.TestCase):
     def test_config_change(self) -> None:
-        profile = ProfileConfig(
+        profile = BaseProfile(
             "TEST",
             epochs=1,
             is_partial_connection=True,
@@ -40,7 +40,7 @@ class TestProfileConfig(unittest.TestCase):
         )
 
     def test_invalid_configuration(self) -> None:
-        profile = ProfileConfig(
+        profile = BaseProfile(
             "TEST",
             epochs=1,
             is_partial_connection=True,

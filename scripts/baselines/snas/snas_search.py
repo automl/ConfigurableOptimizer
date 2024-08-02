@@ -83,7 +83,7 @@ def get_snas_profile(args: argparse.Namespace) -> SNASProfile:
         "learning_rate_min": 0.001,
     }
     profile.configure_trainer(**train_config)
-    profile.configure_extra_config(
+    profile.configure_extra(
         {
             "project_name": "BASELINES",
             "run_type": "SNAS",

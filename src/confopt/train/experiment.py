@@ -32,9 +32,9 @@ from confopt.oneshot.perturbator import SDARTSPerturbator
 from confopt.oneshot.pruner.pruner import Pruner
 from confopt.oneshot.weightentangler import WeightEntangler
 from confopt.profiles import (
+    BaseProfile,
     DiscreteProfile,
     GDASProfile,
-    ProfileConfig,
 )
 from confopt.searchspace import (
     BabyDARTSSearchSpace,
@@ -152,7 +152,7 @@ class Experiment:
 
     def run_with_profile(
         self,
-        profile: ProfileConfig,
+        profile: BaseProfile,
         start_epoch: int = 0,
         load_saved_model: bool = False,
         load_best_model: bool = False,
