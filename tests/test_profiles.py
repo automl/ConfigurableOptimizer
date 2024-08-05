@@ -26,7 +26,7 @@ class TestBaseProfile(unittest.TestCase):
             "epsilon": 0.5,
         }
 
-        trainer_config = {"use_ddp": True}
+        trainer_config = {"use_data_parallel": True}
 
         profile.configure_partial_connector(**partial_connector_config)
         profile.configure_perturbator(**perturbator_config)
@@ -35,8 +35,8 @@ class TestBaseProfile(unittest.TestCase):
         assert profile.partial_connector_config["k"] == partial_connector_config["k"]
         assert profile.perturb_config["epsilon"] == perturbator_config["epsilon"]
         assert (
-            profile.trainer_config["use_ddp"]
-            == trainer_config["use_ddp"]
+            profile.trainer_config["use_data_parallel"]
+            == trainer_config["use_data_parallel"]
         )
 
     def test_invalid_configuration(self) -> None:
