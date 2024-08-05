@@ -115,7 +115,7 @@ if __name__ == "__main__":
         exp_name="SNAS_BASELINE",
     )
 
-    trainer = experiment.run_with_profile(profile)
+    trainer = experiment.train_supernet(profile)
 
     if IS_WANDB_LOG:
         wandb.finish()  # type: ignore

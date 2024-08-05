@@ -30,4 +30,4 @@ if __name__ == "__main__":
         debug_mode=IS_DEBUG_MODE,
     )
 
-    experiment.run_with_profile(profile)
+    experiment.train_supernet(profile)

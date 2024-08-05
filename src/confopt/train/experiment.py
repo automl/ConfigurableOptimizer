@@ -159,7 +159,7 @@ class Experiment:
     def cleanup_ddp(self) -> None:
         dist_utils.cleanup()
 
-    def run_with_profile(
+    def train_supernet(
         self,
         profile: BaseProfile,
         start_epoch: int = 0,
@@ -185,7 +185,7 @@ class Experiment:
             oles = False
             calc_gm_score = False
         assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
-        return self.runner(
+        return self._train_supernet(
             config,
             start_epoch,
             load_saved_model,
@@ -196,7 +196,7 @@ class Experiment:
             calc_gm_score,
         )
 
-    def runner(
+    def _train_supernet(
         self,
         config: dict | None = None,
         start_epoch: int = 0,
@@ -556,7 +556,7 @@ class Experiment:
             )
         return None
 
-    def run_discrete_model_with_profile(
+    def train_discrete_model(
         self,
         profile: DiscreteProfile,
         start_epoch: int = 0,
@@ -570,7 +570,7 @@ class Experiment:
         )
         genotype_str = profile.get_genotype()
 
-        return self.run_discrete_model(
+        return self._train_discrete_model(
             searchspace_config=searchspace_config,
             train_config=train_config,
             start_epoch=start_epoch,
@@ -674,7 +674,7 @@ class Experiment:
         return model, genotype_str  # type: ignore
 
     # refactor the name to train
-    def run_discrete_model(
+    def _train_discrete_model(
         self,
         searchspace_config: dict,
         train_config: dict,
@@ -935,7 +935,7 @@ if __name__ == "__main__":
     # )
 
     profile = DiscreteProfile()
-    discret_trainer = experiment.run_discrete_model_with_profile(
+    discret_trainer = experiment.train_discrete_model(
         profile,
         start_epoch=args.start_epoch,
         load_saved_model=args.load_saved_model,

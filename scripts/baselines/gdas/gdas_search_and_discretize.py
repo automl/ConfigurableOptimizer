@@ -125,9 +125,9 @@ if __name__ == "__main__":
         exp_name="GDAS_BASELINE",
     )
 
-    trainer = experiment.run_with_profile(profile)
+    trainer = experiment.train_supernet(profile)
 
-    discret_trainer = experiment.run_discrete_model_with_profile(
+    discret_trainer = experiment.train_discrete_model(
         discrete_profile,
         # start_epoch=args.eval_epochs,
         # load_saved_model=args.load_saved_model,

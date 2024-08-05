@@ -110,7 +110,7 @@ if __name__ == "__main__":
         profile_config=drnas_profile, last_search_runtime=args.last_search_runtime
     )
 
-    discret_trainer = experiment.run_discrete_model_with_profile(
+    discret_trainer = experiment.train_discrete_model(
         discrete_profile,
         start_epoch=args.start_epoch,
         load_saved_model=args.load_saved_model,

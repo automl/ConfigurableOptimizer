@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
 
     experiment.init_ddp()
-    trainer = experiment.run_discrete_model_with_profile(
+    trainer = experiment.train_discrete_model(
         profile,
         start_epoch=0,
         load_saved_model=False,

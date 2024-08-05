@@ -32,4 +32,4 @@ if __name__ == "__main__":
         debug_mode=IS_DEBUG_MODE,
     )
 
-    search_trainer = experiment.run_with_profile(profile)
+    search_trainer = experiment.train_supernet(profile)
