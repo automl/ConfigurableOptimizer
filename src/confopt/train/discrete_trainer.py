@@ -292,39 +292,6 @@ class DiscreteTrainer(ConfigurableTrainer):
         base_metrics = TrainingMetrics(base_losses.avg, base_top1.avg, base_top5.avg)
         return base_metrics
 
-    def evaluate(
-        self,
-        valid_loader: DataLoaderType,
-        network: SearchSpace,
-        criterion: CriterionType,
-    ) -> TrainingMetrics:
-        arch_losses, arch_top1, arch_top5 = (
-            AverageMeter(),
-            AverageMeter(),
-            AverageMeter(),
-        )
-        network.eval()
-
-        with torch.no_grad():
-            for _step, (valid_inputs, valid_targets) in enumerate(valid_loader):
-                # prediction
-                valid_inputs = valid_inputs.to(self.device)
-                valid_targets = valid_targets.to(self.device, non_blocking=True)
-
-                _, logits = network(valid_inputs)
-                valid_loss = criterion(logits, valid_targets)
-
-                # record
-                valid_prec1, valid_prec5 = calc_accuracy(
-                    logits.data, valid_targets.data, topk=(1, 5)
-                )
-
-                arch_losses.update(valid_loss.item(), valid_inputs.size(0))
-                arch_top1.update(valid_prec1.item(), valid_inputs.size(0))
-                arch_top5.update(valid_prec5.item(), valid_inputs.size(0))
-
-        return TrainingMetrics(arch_losses.avg, arch_top1.avg, arch_top5.avg)
-
     def test(self, is_wandb_log: bool = True) -> TrainingMetrics:
         test_losses, test_top1, test_top5 = (
             AverageMeter(),

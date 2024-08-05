@@ -7,6 +7,7 @@ from typing import Any
 from fvcore.common.checkpoint import Checkpointer, PeriodicCheckpointer
 import torch
 from torch import nn
+from torch.nn import DataParallel
 from torch.nn.parallel import DistributedDataParallel
 from typing_extensions import TypeAlias
 
@@ -293,7 +294,7 @@ class ConfigurableTrainer:
         search_space_handler: SearchSpaceHandler,
         train_loader: DataLoaderType,
         valid_loader: DataLoaderType,
-        network: SearchSpace | torch.nn.DataParallel,
+        network: SearchSpace | DataParallel,
         criterion: CriterionType,
         w_optimizer: OptimizerType,
         arch_optimizer: OptimizerType,
@@ -445,7 +446,7 @@ class ConfigurableTrainer:
     def evaluate(
         self,
         valid_loader: DataLoaderType,
-        network: SearchSpace | torch.nn.DataParallel,
+        network: SearchSpace | DataParallel | DistributedDataParallel,
         criterion: CriterionType,
     ) -> TrainingMetrics:
         arch_losses, arch_top1, arch_top5 = (
@@ -457,10 +458,6 @@ class ConfigurableTrainer:
 
         with torch.no_grad():
             for _step, (arch_inputs, arch_targets) in enumerate(valid_loader):
-                # if torch.cuda.is_available():
-                #     arch_targets = arch_targets.cuda(non_blocking=True)
-                #     arch_inputs = arch_inputs.cuda(non_blocking=True)
-
                 # prediction
                 arch_inputs = arch_inputs.to(self.device)
                 arch_targets = arch_targets.to(self.device, non_blocking=True)
@@ -497,7 +494,7 @@ class ConfigurableTrainer:
     ) -> tuple[nn.Module, CriterionType]:
         if torch.cuda.is_available():
             network, criterion = (
-                torch.nn.DataParallel(self.model).cuda(),
+                DataParallel(self.model).cuda(),
                 criterion.cuda(),
             )
 
@@ -622,7 +619,7 @@ class ConfigurableTrainer:
         top5_meter.update(base_prec5.item(), inputs.size(0))
 
     def _component_new_step_or_epoch(
-        self, model: SearchSpace | torch.nn.DataParallel, calling_frequency: str
+        self, model: SearchSpace | DataParallel, calling_frequency: str
     ) -> None:
         assert calling_frequency in [
             "epoch",
@@ -747,7 +744,7 @@ class ConfigurableTrainer:
     def update_sample_function(
         self,
         search_space_handler: SearchSpaceHandler,
-        model: SearchSpace | torch.nn.DataParallel,
+        model: SearchSpace | DataParallel,
         calling_frequency: str,
     ) -> None:
         assert calling_frequency in [
@@ -768,7 +765,7 @@ class ConfigurableTrainer:
             search_space_handler.reset_sample_function(model)
 
     def get_arch_values_as_dict(self, model: SearchSpace) -> dict:
-        if isinstance(model, torch.nn.DataParallel):
+        if isinstance(model, DataParallel):
             model = model.module
         arch_values = model.arch_parameters
         arch_values_dict = {}
