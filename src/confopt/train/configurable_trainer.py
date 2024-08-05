@@ -141,7 +141,7 @@ class ConfigurableTrainer:
             # Reset WandB Log dictionary
             self.logger.reset_wandb_logs()
 
-            base_metrics, arch_metrics = self.train_func(
+            base_metrics, arch_metrics = self._train_epoch(
                 search_space_handler,
                 train_loader,
                 val_loader,
@@ -172,7 +172,7 @@ class ConfigurableTrainer:
                 )
 
             # Log Valid Metrics
-            valid_metrics = self.valid_func(val_loader, self.model, self.criterion)
+            valid_metrics = self.evaluate(val_loader, self.model, self.criterion)
             self.logger.log_metrics("Evaluation: ", valid_metrics, epoch_str)
 
             self.logger.add_wandb_log_metrics(
@@ -288,7 +288,7 @@ class ConfigurableTrainer:
             epoch_time.update(time.time() - start_time)
             start_time = time.time()
 
-    def train_func(  # noqa: PLR0912, PLR0915, C901
+    def _train_epoch(  # noqa: PLR0912, PLR0915, C901
         self,
         search_space_handler: SearchSpaceHandler,
         train_loader: DataLoaderType,
@@ -442,7 +442,7 @@ class ConfigurableTrainer:
 
         return base_metrics, arch_metrics
 
-    def valid_func(
+    def evaluate(
         self,
         valid_loader: DataLoaderType,
         network: SearchSpace | torch.nn.DataParallel,

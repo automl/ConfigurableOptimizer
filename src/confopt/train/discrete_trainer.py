@@ -128,7 +128,7 @@ class DiscreteTrainer(ConfigurableTrainer):
                 train_time.sum,
             )
 
-        valid_metrics = self.valid_func(val_loader, network, criterion)
+        valid_metrics = self.evaluate(val_loader, network, criterion)
         valid_metrics = self.average_metrics_across_workers(
             valid_metrics
         )  # type:ignore
@@ -292,7 +292,7 @@ class DiscreteTrainer(ConfigurableTrainer):
         base_metrics = TrainingMetrics(base_losses.avg, base_top1.avg, base_top5.avg)
         return base_metrics
 
-    def valid_func(
+    def evaluate(
         self,
         valid_loader: DataLoaderType,
         network: SearchSpace,
