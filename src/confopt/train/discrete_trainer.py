@@ -7,8 +7,11 @@ from fvcore.common.checkpoint import Checkpointer
 import torch
 from torch import nn
 import torch.distributed as dist
+from torch.nn.modules.loss import _Loss as Loss
 from torch.nn.parallel import DistributedDataParallel
-from typing_extensions import TypeAlias
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
+from torch.utils.data import DataLoader
 
 from confopt.dataset import AbstractData
 from confopt.searchspace import SearchSpace
@@ -18,20 +21,15 @@ import confopt.utils.distributed as dist_utils
 
 TrainingMetrics = namedtuple("TrainingMetrics", ["loss", "acc_top1", "acc_top5"])
 
-DataLoaderType: TypeAlias = torch.utils.data.DataLoader
-OptimizerType: TypeAlias = torch.optim.Optimizer
-LRSchedulerType: TypeAlias = torch.optim.lr_scheduler.LRScheduler
-CriterionType: TypeAlias = torch.nn.modules.loss._Loss
-
 
 class DiscreteTrainer(ConfigurableTrainer):
     def __init__(
         self,
         model: nn.Module,
         data: AbstractData,
-        model_optimizer: OptimizerType,
-        scheduler: LRSchedulerType,
-        criterion: CriterionType,
+        model_optimizer: Optimizer,
+        scheduler: LRScheduler,
+        criterion: Loss,
         logger: Logger,
         batch_size: int,
         use_ddp: bool = False,
@@ -90,9 +88,9 @@ class DiscreteTrainer(ConfigurableTrainer):
     def _train_epoch(
         self,
         network: SearchSpace | DistributedDataParallel,
-        train_loader: DataLoaderType,
-        val_loader: DataLoaderType,
-        criterion: CriterionType,
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        criterion: Loss,
         rank: int,
         epoch: int,
         total_epochs: int,
@@ -237,9 +235,9 @@ class DiscreteTrainer(ConfigurableTrainer):
 
     def _train(
         self,
-        train_loader: DataLoaderType,
+        train_loader: DataLoader,
         network: SearchSpace | DistributedDataParallel,
-        criterion: CriterionType,
+        criterion: Loss,
         print_freq: int,
     ) -> TrainingMetrics:
         data_time, batch_time = AverageMeter(), AverageMeter()

@@ -8,8 +8,11 @@ from fvcore.common.checkpoint import Checkpointer, PeriodicCheckpointer
 import torch
 from torch import nn
 from torch.nn import DataParallel
+from torch.nn.modules.loss import _Loss as Loss
 from torch.nn.parallel import DistributedDataParallel
-from typing_extensions import TypeAlias
+from torch.optim import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
+from torch.utils.data import DataLoader
 
 from confopt.dataset import AbstractData
 from confopt.searchspace import SearchSpace
@@ -25,10 +28,6 @@ from .search_space_handler import SearchSpaceHandler
 
 TrainingMetrics = namedtuple("TrainingMetrics", ["loss", "acc_top1", "acc_top5"])
 
-DataLoaderType: TypeAlias = torch.utils.data.DataLoader
-OptimizerType: TypeAlias = torch.optim.Optimizer
-LRSchedulerType: TypeAlias = torch.optim.lr_scheduler.LRScheduler
-CriterionType: TypeAlias = torch.nn.modules.loss._Loss
 
 DEBUG_STEPS = 5
 
@@ -38,10 +37,10 @@ class ConfigurableTrainer:
         self,
         model: SearchSpace,
         data: AbstractData,
-        model_optimizer: OptimizerType,
-        arch_optimizer: OptimizerType | None,
-        scheduler: LRSchedulerType,
-        criterion: CriterionType,
+        model_optimizer: Optimizer,
+        arch_optimizer: Optimizer | None,
+        scheduler: LRScheduler,
+        criterion: Loss,
         logger: Logger,
         batch_size: int,
         use_data_parallel: bool = False,
@@ -292,12 +291,12 @@ class ConfigurableTrainer:
     def _train_epoch(  # noqa: PLR0912, PLR0915, C901
         self,
         search_space_handler: SearchSpaceHandler,
-        train_loader: DataLoaderType,
-        valid_loader: DataLoaderType,
+        train_loader: DataLoader,
+        valid_loader: DataLoader,
         network: SearchSpace | DataParallel,
-        criterion: CriterionType,
-        w_optimizer: OptimizerType,
-        arch_optimizer: OptimizerType,
+        criterion: Loss,
+        w_optimizer: Optimizer,
+        arch_optimizer: Optimizer,
         print_freq: int,
         is_warm_epoch: bool = False,
         oles: bool = False,
@@ -445,9 +444,9 @@ class ConfigurableTrainer:
 
     def evaluate(
         self,
-        valid_loader: DataLoaderType,
+        valid_loader: DataLoader,
         network: SearchSpace | DataParallel | DistributedDataParallel,
-        criterion: CriterionType,
+        criterion: Loss,
     ) -> TrainingMetrics:
         arch_losses, arch_top1, arch_top5 = (
             AverageMeter(),
@@ -480,8 +479,8 @@ class ConfigurableTrainer:
         return TrainingMetrics(arch_losses.avg, arch_top1.avg, arch_top5.avg)
 
     def _load_onto_distributed_data_parallel(
-        self, network: nn.Module, criterion: CriterionType
-    ) -> tuple[nn.Module, CriterionType]:
+        self, network: nn.Module, criterion: Loss
+    ) -> tuple[nn.Module, Loss]:
         if torch.cuda.is_available():
             torch.cuda.set_device(self.device)
             network = DistributedDataParallel(self.model.cuda())
@@ -490,8 +489,8 @@ class ConfigurableTrainer:
         return network, criterion
 
     def _load_onto_data_parallel(
-        self, network: nn.Module, criterion: CriterionType
-    ) -> tuple[nn.Module, CriterionType]:
+        self, network: nn.Module, criterion: Loss
+    ) -> tuple[nn.Module, Loss]:
         if torch.cuda.is_available():
             network, criterion = (
                 DataParallel(self.model).cuda(),
