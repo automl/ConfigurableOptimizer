@@ -7,11 +7,18 @@ from typing import Any
 from fvcore.common.checkpoint import Checkpointer, PeriodicCheckpointer
 import torch
 from torch import nn
+from torch.nn.parallel import DistributedDataParallel
 from typing_extensions import TypeAlias
 
 from confopt.dataset import AbstractData
 from confopt.searchspace import SearchSpace
-from confopt.utils import AverageMeter, Logger, calc_accuracy, clear_grad_cosine
+from confopt.utils import (
+    AverageMeter,
+    Logger,
+    calc_accuracy,
+    clear_grad_cosine,
+    get_device,
+)
 
 from .search_space_handler import SearchSpaceHandler
 
@@ -53,9 +60,7 @@ class ConfigurableTrainer:
         self.arch_optimizer = arch_optimizer
         self.scheduler = scheduler
         self.data = data
-        self.device = (
-            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        )
+        self.device = get_device()
         self.logger = logger
         self.criterion = criterion
         self.use_data_parallel = use_data_parallel
@@ -476,6 +481,16 @@ class ConfigurableTrainer:
                     break
 
         return TrainingMetrics(arch_losses.avg, arch_top1.avg, arch_top5.avg)
+
+    def _load_onto_distributed_data_parallel(
+        self, network: nn.Module, criterion: CriterionType
+    ) -> tuple[nn.Module, CriterionType]:
+        if torch.cuda.is_available():
+            torch.cuda.set_device(self.device)
+            network = DistributedDataParallel(self.model.cuda())
+            criterion = criterion.cuda()
+
+        return network, criterion
 
     def _load_onto_data_parallel(
         self, network: nn.Module, criterion: CriterionType

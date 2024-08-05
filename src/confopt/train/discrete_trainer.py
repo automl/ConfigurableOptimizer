@@ -6,12 +6,15 @@ import time
 from fvcore.common.checkpoint import Checkpointer
 import torch
 from torch import nn
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel
 from typing_extensions import TypeAlias
 
 from confopt.dataset import AbstractData
 from confopt.searchspace import SearchSpace
 from confopt.train import ConfigurableTrainer
-from confopt.utils import AverageMeter, Logger, calc_accuracy
+from confopt.utils import AverageMeter, Logger, calc_accuracy, unwrap_model
+import confopt.utils.distributed as dist_utils
 
 TrainingMetrics = namedtuple("TrainingMetrics", ["loss", "acc_top1", "acc_top5"])
 
@@ -31,7 +34,7 @@ class DiscreteTrainer(ConfigurableTrainer):
         criterion: CriterionType,
         logger: Logger,
         batch_size: int,
-        use_data_parallel: bool = False,
+        use_ddp: bool = False,
         print_freq: int = 2,
         drop_path_prob: float = 0.1,
         load_saved_model: bool = False,
@@ -51,7 +54,6 @@ class DiscreteTrainer(ConfigurableTrainer):
             criterion=criterion,
             logger=logger,
             batch_size=batch_size,
-            use_data_parallel=use_data_parallel,
             print_freq=print_freq,
             drop_path_prob=drop_path_prob,
             load_saved_model=load_saved_model,
@@ -61,77 +63,82 @@ class DiscreteTrainer(ConfigurableTrainer):
             epochs=epochs,
             debug_mode=debug_mode,
         )
+        self.use_ddp = use_ddp
         # self.use_supernet_checkpoint = use_supernet_checkpoint
 
-    def train(self, epochs: int, is_wandb_log: bool = True) -> None:
-        self.epochs = epochs
-        # self.model = self.model.discretize()  # type: ignore
+    def average_metrics_across_workers(
+        self, metrics: TrainingMetrics
+    ) -> TrainingMetrics | None:
+        if not dist.is_initialized():
+            return metrics
 
-        if self.load_saved_model or self.load_best_model or self.start_epoch != 0:
-            assert (
-                sum(
-                    [
-                        self.load_best_model,
-                        self.load_saved_model,
-                        (self.start_epoch > 0),
-                    ]
-                )
-                <= 1
-            )
+        rank, world_size = dist_utils.get_rank(), dist_utils.get_world_size()
+        metrics_tensor = torch.tensor(
+            [metrics.loss, metrics.acc_top1, metrics.acc_top5]
+        ).cuda()
 
-            self._load_model_state_if_exists()
-        else:
-            if hasattr(self.model, "arch_parametes"):
-                assert self.model.arch_parametes == [None]
-            self._init_empty_model_state_info()
+        print(f"ALL: reducing tensor from rank {rank}")
+        dist.reduce(metrics_tensor, dst=0, op=dist.ReduceOp.SUM)
 
-        if self.use_data_parallel:
-            network, criterion = self._load_onto_data_parallel(
-                self.model, self.criterion
-            )
-        else:
-            network: nn.Module = self.model  # type: ignore
-            criterion = self.criterion
+        if rank == 0:
+            metrics_tensor /= world_size
+            metrics = TrainingMetrics(*metrics_tensor.cpu().tolist())
+            return metrics
 
+        return None
+
+    def _train_epoch(
+        self,
+        network: SearchSpace | DistributedDataParallel,
+        train_loader: DataLoaderType,
+        val_loader: DataLoaderType,
+        criterion: CriterionType,
+        rank: int,
+        epoch: int,
+        total_epochs: int,
+        is_wandb_log: bool,
+    ) -> None:
         start_time = time.time()
-        search_time, epoch_time = AverageMeter(), AverageMeter()
+        train_time, epoch_time = AverageMeter(), AverageMeter()
 
-        train_loader, val_loader, _ = self.data.get_dataloaders(
-            batch_size=self.batch_size,
-            n_workers=0,
-        )
-
-        for epoch in range(self.start_epoch, epochs):
-            epoch_str = f"{epoch:03d}-{epochs:03d}"
-
-            if self.logger.search_space == "darts":
-                if isinstance(network, torch.nn.DataParallel):
-                    network.module.drop_path_prob = self.drop_path_prob * epoch / epochs
-                else:
-                    network.drop_path_prob = self.drop_path_prob * epoch / epochs
-
-            base_metrics = self.train_func(
-                train_loader,
-                network,
-                criterion,
-                self.print_freq,
+        if (
+            self.logger.search_space == "darts"
+        ):  # FIXME: This is hacky. Should be fixed.
+            unwrap_model(network).drop_path_prob = (
+                self.drop_path_prob * epoch / total_epochs
             )
 
-            # Logging
+        base_metrics = self._train(
+            train_loader,
+            network,
+            criterion,
+            self.print_freq,
+        )
+        base_metrics = self.average_metrics_across_workers(base_metrics)  # type:ignore
+
+        # Logging
+        if rank == 0:
+            epoch_str = f"{epoch:03d}-{total_epochs:03d}"
             self.logger.reset_wandb_logs()
-            search_time.update(time.time() - start_time)
+            train_time.update(time.time() - start_time)
             self.logger.log_metrics(
                 "[Discrete] Train: Model/Network metrics ",
                 base_metrics,
                 epoch_str,
-                search_time.sum,
+                train_time.sum,
             )
 
-            valid_metrics = self.valid_func(val_loader, network, criterion)
+        valid_metrics = self.valid_func(val_loader, network, criterion)
+        valid_metrics = self.average_metrics_across_workers(
+            valid_metrics
+        )  # type:ignore
+
+        # Logging
+        if rank == 0:
             self.logger.log_metrics("[Discrete] Evaluation: ", valid_metrics, epoch_str)
 
             self.logger.add_wandb_log_metrics(
-                "discrete/train/model", base_metrics, epoch, search_time.sum
+                "discrete/train/model", base_metrics, epoch, train_time.sum
             )
             self.logger.add_wandb_log_metrics("discrete/eval", valid_metrics, epoch)
 
@@ -166,17 +173,72 @@ class DiscreteTrainer(ConfigurableTrainer):
                     name="best_model", checkpointables=checkpointables
                 )
 
-            # measure elapsed time
-            epoch_time.update(time.time() - start_time)
-            start_time = time.time()
+        # measure elapsed time
+        epoch_time.update(time.time() - start_time)
+        start_time = time.time()
 
-            if self.scheduler is not None:
-                self.scheduler.step()
+        if self.scheduler is not None:
+            self.scheduler.step()
 
-    def train_func(
+    def train(self, epochs: int, is_wandb_log: bool = True) -> None:
+        self.epochs = epochs
+
+        if self.load_saved_model or self.load_best_model or self.start_epoch != 0:
+            assert (
+                sum(
+                    [
+                        self.load_best_model,
+                        self.load_saved_model,
+                        (self.start_epoch > 0),
+                    ]
+                )
+                <= 1
+            )
+
+            self._load_model_state_if_exists()
+        else:
+            if hasattr(self.model, "arch_parametes"):
+                assert self.model.arch_parametes == [None]
+            self._init_empty_model_state_info()
+
+        if self.use_ddp:
+            local_rank, rank, world_size = (
+                dist_utils.get_local_rank(),
+                dist_utils.get_rank(),
+                dist_utils.get_world_size(),
+            )
+            dist_utils.print_on_master_only(rank == 0)
+            print("ALL: local_rank, rank, world_size", local_rank, rank, world_size)
+            network, criterion = self._load_onto_distributed_data_parallel(
+                self.model, self.criterion
+            )
+        else:
+            local_rank, rank, world_size = 0, 0, 1
+            network: nn.Module = self.model  # type: ignore
+            criterion = self.criterion
+
+        train_loader, val_loader, _ = self.data.get_dataloaders(
+            batch_size=self.batch_size,
+            n_workers=0,  # FIXME: This looks suboptimal
+            use_distributed_sampler=self.use_ddp,
+        )
+
+        for epoch in range(self.start_epoch, epochs):
+            self._train_epoch(
+                network=network,
+                train_loader=train_loader,
+                val_loader=val_loader,
+                criterion=criterion,
+                rank=rank,
+                epoch=epoch,
+                total_epochs=epochs,
+                is_wandb_log=is_wandb_log,
+            )
+
+    def _train(
         self,
         train_loader: DataLoaderType,
-        network: SearchSpace | torch.nn.DataParallel,
+        network: SearchSpace | DistributedDataParallel,
         criterion: CriterionType,
         print_freq: int,
     ) -> TrainingMetrics:
@@ -190,6 +252,7 @@ class DiscreteTrainer(ConfigurableTrainer):
         end = time.time()
 
         for step, (base_inputs, base_targets) in enumerate(train_loader):
+            print("ALL: Step", step)
             # FIXME: What was the point of this? and is it safe to remove?
             # scheduler.update(None, 1.0 * step / len(xloader))
 
@@ -204,10 +267,7 @@ class DiscreteTrainer(ConfigurableTrainer):
             base_loss = criterion(logits, base_targets)
             base_loss.backward()
 
-            if isinstance(network, torch.nn.DataParallel):
-                torch.nn.utils.clip_grad_norm_(network.module.parameters(), 5)
-            else:
-                torch.nn.utils.clip_grad_norm_(network.parameters(), 5)
+            torch.nn.utils.clip_grad_norm_(unwrap_model(network).parameters(), 5)
 
             self.model_optimizer.step()
 
@@ -272,18 +332,28 @@ class DiscreteTrainer(ConfigurableTrainer):
             AverageMeter(),
         )
         self.logger.reset_wandb_logs()
-        if self.use_data_parallel is True:
-            network, criterion = self._load_onto_data_parallel(
+        if self.use_ddp is True:
+            local_rank, rank, world_size = (
+                dist_utils.get_local_rank(),
+                dist_utils.get_rank(),
+                dist_utils.get_rank(),
+            )
+            dist_utils.print_on_master_only(rank == 0)
+            print(
+                "ALL: test:: local_rank, rank, world_size", local_rank, rank, world_size
+            )
+            network, criterion = self._load_onto_distributed_data_parallel(
                 self.model, self.criterion
             )
         else:
-            network: nn.Module = self.model  # type: ignore
+            network: nn.Module = self.model  # type:ignore
             criterion = self.criterion
         network.eval()
 
         *_, test_loader = self.data.get_dataloaders(
             batch_size=self.batch_size,
-            n_workers=0,
+            n_workers=0,  # FIXME: This looks suboptimal
+            use_distributed_sampler=self.use_ddp,
         )
 
         with torch.no_grad():
@@ -303,12 +373,14 @@ class DiscreteTrainer(ConfigurableTrainer):
                 test_top5.update(test_prec5.item(), test_inputs.size(0))
 
         test_metrics = TrainingMetrics(test_losses.avg, test_top1.avg, test_top5.avg)
+        test_metrics = self.average_metrics_across_workers(test_metrics)  # type: ignore
 
-        self.logger.add_wandb_log_metrics("discrete/test", test_metrics)
-        if is_wandb_log:
-            self.logger.push_wandb_logs()
+        if dist_utils.get_rank() == 0:
+            self.logger.add_wandb_log_metrics("discrete/test", test_metrics)
+            if is_wandb_log:
+                self.logger.push_wandb_logs()
 
-        self.logger.log_metrics("[Discrete] Test", test_metrics, epoch_str="---")
+            self.logger.log_metrics("[Discrete] Test", test_metrics, epoch_str="---")
 
         return test_metrics
 

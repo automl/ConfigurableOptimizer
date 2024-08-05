@@ -38,7 +38,6 @@ from confopt.profiles import (
 )
 from confopt.searchspace import (
     BabyDARTSSearchSpace,
-    DARTSGenotype,  # noqa: F401
     DARTSImageNetModel,
     DARTSModel,
     DARTSSearchSpace,
@@ -50,8 +49,12 @@ from confopt.searchspace import (
     SearchSpace,
     TransNASBench101SearchSpace,
 )
+from confopt.searchspace import (
+    DARTSGenotype as Genotype,  # noqa: F401
+)
 from confopt.train import ConfigurableTrainer, DiscreteTrainer, SearchSpaceHandler
 from confopt.utils import Logger
+from confopt.utils import distributed as dist_utils
 from confopt.utils.time import check_date_format
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -149,6 +152,12 @@ class Experiment:
         torch.manual_seed(rand_seed)
         cudnn.enabled = True
         torch.cuda.manual_seed(rand_seed)
+
+    def init_ddp(self) -> None:
+        dist_utils.init_distributed()
+
+    def cleanup_ddp(self) -> None:
+        dist_utils.cleanup()
 
     def run_with_profile(
         self,
@@ -668,7 +677,7 @@ class Experiment:
     def run_discrete_model(
         self,
         searchspace_config: dict,
-        train_config: dict | None = None,
+        train_config: dict,
         start_epoch: int = 0,
         load_saved_model: bool = False,
         load_best_model: bool = False,
@@ -737,6 +746,12 @@ class Experiment:
 
         self.logger.save_genotype(genotype_str)
 
+        if train_config.get("use_ddp", False) is True:
+            assert torch.distributed.is_initialized(), "DDP is not initialized!"
+            world_size = dist_utils.get_world_size()
+            train_config["lr"] *= world_size  # type: ignore
+            train_config["learning_rate_min"] *= world_size  # type: ignore
+
         Arguments = namedtuple(  # type: ignore
             "Configure", " ".join(train_config.keys())  # type: ignore
         )
@@ -774,7 +789,7 @@ class Experiment:
             criterion=criterion,
             logger=self.logger,
             batch_size=trainer_arguments.batch_size,  # type: ignore
-            use_data_parallel=trainer_arguments.use_data_parallel,  # type: ignore
+            use_ddp=trainer_arguments.use_ddp,  # type: ignore
             print_freq=trainer_arguments.print_freq,  # type: ignore
             drop_path_prob=trainer_arguments.drop_path_prob,  # type: ignore
             load_saved_model=load_saved_model,

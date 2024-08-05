@@ -293,6 +293,7 @@ class DiscreteProfile:
             "lr": 0.025,
             "epochs": 100,
             "optim": "sgd",
+            "scheduler": "cosine_annealing_lr",
             "optim_config": {
                 "momentum": 0.9,
                 "nesterov": 0,
@@ -307,7 +308,7 @@ class DiscreteProfile:
             "cutout": -1,
             "cutout_length": 16,
             "train_portion": 0.7,
-            "use_data_parallel": True,
+            "use_ddp": True,
             "checkpointing_freq": 2,
         }
         self.train_config = default_train_config
