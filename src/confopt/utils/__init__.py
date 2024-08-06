@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, Literal
 
 import torch
+from torch import nn
 
 from .checkpoints import (
     copy_checkpoint,
@@ -19,6 +20,33 @@ from .distributed import (
 from .logger import Logger, prepare_logger
 from .normalize_params import normalize_params
 from .time import get_runtime, get_time_as_string
+
+
+class ExperimentCheckpointLoader:
+    @classmethod
+    def load_checkpoint(
+        cls,
+        logger: Logger,
+        src: Literal["last", "best", "epoch"],
+        epoch: int | None = None,
+    ) -> nn.Module:
+        assert src in [
+            "last",
+            "best",
+            "epoch",
+        ], "src must be 'last', 'best', or 'epoch'"
+
+        if src == "best":
+            path = logger.path("best_model")
+        elif src == "last":
+            path = logger.path("last_checkpoint")
+        elif src == "epoch":
+            assert epoch is not None, "epoch argument must be given when src is 'epoch'"
+            path = logger.path("checkpoints")
+            path = "{}/{}_{:07d}.pth".format(path, "model", epoch)
+
+        logger.log(f"Loading checkpoint {path}")
+        return torch.load(path, map_location=torch.device("cpu"))
 
 
 class AverageMeter:

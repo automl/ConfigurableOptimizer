@@ -181,23 +181,8 @@ class DiscreteTrainer(ConfigurableTrainer):
     def train(self, epochs: int, is_wandb_log: bool = True) -> None:
         self.epochs = epochs
 
-        if self.load_saved_model or self.load_best_model or self.start_epoch != 0:
-            assert (
-                sum(
-                    [
-                        self.load_best_model,
-                        self.load_saved_model,
-                        (self.start_epoch > 0),
-                    ]
-                )
-                <= 1
-            )
-
-            self._load_model_state_if_exists()
-        else:
-            if hasattr(self.model, "arch_parametes"):
-                assert self.model.arch_parametes == [None]
-            self._init_empty_model_state_info()
+        if hasattr(self.model, "arch_parametes"):
+            assert self.model.arch_parametes == [None]
 
         if self.use_ddp:
             local_rank, rank, world_size = (
