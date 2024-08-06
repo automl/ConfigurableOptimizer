@@ -797,6 +797,7 @@ class Experiment:
             start_epoch=start_epoch,
             checkpointing_freq=trainer_arguments.checkpointing_freq,  # type: ignore
             epochs=trainer_arguments.epochs,  # type: ignore
+            debug_mode=self.debug_mode,
         )
 
         trainer.train(

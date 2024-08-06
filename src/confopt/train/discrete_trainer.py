@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 
 from confopt.dataset import AbstractData
 from confopt.searchspace import SearchSpace
-from confopt.train import ConfigurableTrainer
+from confopt.train import DEBUG_STEPS, ConfigurableTrainer
 from confopt.utils import AverageMeter, Logger, calc_accuracy, unwrap_model
 import confopt.utils.distributed as dist_utils
 
@@ -234,8 +234,8 @@ class DiscreteTrainer(ConfigurableTrainer):
         network.train()
         end = time.time()
 
-        for step, (base_inputs, base_targets) in enumerate(train_loader):
-            print("ALL: Step", step)
+        for _step, (base_inputs, base_targets) in enumerate(train_loader):
+            print("ALL: Step", _step)
             # FIXME: What was the point of this? and is it safe to remove?
             # scheduler.update(None, 1.0 * step / len(xloader))
 
@@ -268,7 +268,10 @@ class DiscreteTrainer(ConfigurableTrainer):
             batch_time.update(time.time() - end)
             end = time.time()
 
-            if step % print_freq == 0 or step + 1 == len(train_loader):
+            if self.debug_mode and _step > DEBUG_STEPS:
+                break
+
+            if _step % print_freq == 0 or _step + 1 == len(train_loader):
                 # TODO: what is this doing ?
                 ...
 
@@ -321,6 +324,9 @@ class DiscreteTrainer(ConfigurableTrainer):
                 test_losses.update(test_loss.item(), test_inputs.size(0))
                 test_top1.update(test_prec1.item(), test_inputs.size(0))
                 test_top5.update(test_prec5.item(), test_inputs.size(0))
+
+                if self.debug_mode and _step > DEBUG_STEPS:
+                    break
 
         test_metrics = TrainingMetrics(test_losses.avg, test_top1.avg, test_top5.avg)
         test_metrics = self.average_metrics_across_workers(test_metrics)  # type: ignore
