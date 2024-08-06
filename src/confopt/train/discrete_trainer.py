@@ -171,6 +171,11 @@ class DiscreteTrainer(ConfigurableTrainer):
                     name="best_model", checkpointables=checkpointables
                 )
 
+            if epoch == total_epochs - 1:
+                self.checkpointer.save(
+                    name="model_final", checkpointables=checkpointables
+                )
+
         # measure elapsed time
         epoch_time.update(time.time() - start_time)
         start_time = time.time()
