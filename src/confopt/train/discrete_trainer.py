@@ -186,6 +186,8 @@ class DiscreteTrainer(ConfigurableTrainer):
     def train(self, epochs: int, is_wandb_log: bool = True) -> None:
         self.epochs = epochs
 
+        self._init_experiment_state()
+
         if hasattr(self.model, "arch_parametes"):
             assert self.model.arch_parametes == [None]
 
