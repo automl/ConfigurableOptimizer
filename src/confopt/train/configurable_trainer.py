@@ -77,6 +77,15 @@ class ConfigurableTrainer:
         self.query_dataset = query_dataset
         self.benchmark_api = benchmark_api
 
+    def _init_experiment_state(self) -> None:
+        """Initializes the state of the experiment.
+
+        If training is to continue from a previous checkpoint, then the state
+        is laoded from the checkpoint. Else, empty states are initialized for
+        the run.
+
+        Also instantiates the Checkpointer objects used throughout training.
+        """
         if self.load_saved_model or self.load_best_model or self.start_epoch != 0:
             assert (
                 sum([self.start_epoch > 0, self.load_best_model, self.load_saved_model])
@@ -91,7 +100,9 @@ class ConfigurableTrainer:
                 src = "epoch"
                 epoch = self.start_epoch
 
-            checkpoint = ExperimentCheckpointLoader.load_checkpoint(logger, src, epoch)
+            checkpoint = ExperimentCheckpointLoader.load_checkpoint(
+                self.logger, src, epoch
+            )
             self._load_checkpoint(checkpoint)
         else:
             self._init_empty_exp_state_info()
@@ -113,6 +124,7 @@ class ConfigurableTrainer:
         calc_gm_score: bool = False,
     ) -> None:
         search_space_handler.adapt_search_space(self.model)
+        self._init_experiment_state()
 
         if self.use_data_parallel:
             network, criterion = self._load_onto_data_parallel(
