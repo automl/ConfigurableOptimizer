@@ -104,6 +104,7 @@ class ConfigurableTrainer:
                 self.logger, src, epoch
             )
             self._load_checkpoint(checkpoint)
+            self.logger.set_up_new_run()
         else:
             self._init_empty_exp_state_info()
 
