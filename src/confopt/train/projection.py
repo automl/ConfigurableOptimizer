@@ -154,6 +154,7 @@ class PerturbationArchSelection:
         self, model: SearchSpace, proj_queue: torch.utils.DataLoader
     ) -> None:
         # Select Topology
+        self.trainer.logger.log("Selecting Topology")
         assert (
             self.searchspace_type != SearchSpaceType.NB201
         ), "NB201SearchSpace does not support topolgy selection"
@@ -167,7 +168,7 @@ class PerturbationArchSelection:
         )
         model.mark_projected_edge(selected_nid_reduce, eids_reduce, cell_type="reduce")
 
-    def select_architecture(self) -> None:  # noqa: C901, PLR0912
+    def select_architecture(self) -> None:  # noqa: C901, PLR0912, PLR0915
         self.model = self.trainer.model
 
         if self.trainer.use_data_parallel:
@@ -191,18 +192,6 @@ class PerturbationArchSelection:
         else:
             network.set_projection_mode(True)
 
-        # Initial Evaluation
-        train_acc, train_obj = self.evaluate(network, train_queue)
-        valid_acc, valid_obj = self.evaluate(network, valid_queue)
-
-        self.trainer.logger.log(
-            "[DARTS-PT-Tuning] Initial Evaluation "
-            + f" train_acc: {train_acc:.3f},"
-            + f" train_loss: {train_obj:.3f} |"
-            + f" valid_acc: {valid_acc:.3f},"
-            + f" valid_loss: {valid_obj:.3f}"
-        )
-
         # get total tune epochs
         if self.searchspace_type == SearchSpaceType.NB201:
             num_projections = self.model.get_num_edges() - 1
@@ -213,8 +202,20 @@ class PerturbationArchSelection:
             )
             tune_epochs = self.projection_interval * num_projections + 1
 
-        # reset optimizer with lr/10
         if self.trainer.start_epoch == 0:
+            # Initial Evaluation
+            train_acc, train_obj = self.evaluate(network, train_queue)
+            valid_acc, valid_obj = self.evaluate(network, valid_queue)
+
+            self.trainer.logger.log(
+                "[DARTS-PT-Tuning] Initial Evaluation "
+                + f" train_acc: {train_acc:.3f},"
+                + f" train_loss: {train_obj:.3f} |"
+                + f" valid_acc: {valid_acc:.3f},"
+                + f" valid_loss: {valid_obj:.3f}"
+            )
+
+            # reset optimizer with lr/10
             self._reset_optimizer_and_scheduler(tune_epochs)
 
         # make a dummy profile
@@ -225,7 +226,8 @@ class PerturbationArchSelection:
             )
         )
 
-        for epoch in range(self.trainer.start_epoch, tune_epochs):
+        for epoch in range(self.trainer.start_epoch + 1, tune_epochs + 1):
+            epoch_str = f"{epoch:03d}-{tune_epochs:03d}"
             self.trainer.logger.reset_wandb_logs()
             # project
             if epoch % self.projection_interval == 0 or epoch == tune_epochs - 1:
@@ -249,17 +251,26 @@ class PerturbationArchSelection:
                 self.trainer.print_freq,
             )
 
-            train_acc, train_obj = self.evaluate(network, train_queue)
-            valid_acc, valid_obj = self.evaluate(network, valid_queue)
+            train_acc, train_loss = self.evaluate(network, train_queue)
+            valid_acc, valid_loss = self.evaluate(network, valid_queue)
             self.trainer.logger.log(
-                f"[DARTS-PT-Tuning] [Epoch {epoch}]"
+                f"[DARTS-PT-Tuning] [{epoch_str}]"
                 + f" train_acc: {train_acc:.3f},"
-                + f" train_loss: {train_obj:.3f} |"
+                + f" train_loss: {train_loss:.3f} |"
                 + f" valid_acc: {valid_acc:.3f},"
-                + f" valid_loss: {valid_obj:.3f}"
+                + f" valid_loss: {valid_loss:.3f}"
             )
 
             # wandb logging
+            log_dict = {
+                "tune/train_acc": train_acc,
+                "tune/train_loss": train_loss,
+                "tune/valid_acc": valid_acc,
+                "tune/valid_loss": valid_loss,
+            }
+
+            self.trainer.logger.update_wandb_logs(log_dict)
+
             arch_values_dict = self.trainer.get_arch_values_as_dict(network)
             self.trainer.logger.update_wandb_logs(arch_values_dict)
 
@@ -273,6 +284,10 @@ class PerturbationArchSelection:
             checkpointables = self.trainer._get_checkpointables(epoch=epoch)
             self.trainer.periodic_checkpointer.step(
                 iteration=epoch, checkpointables=checkpointables
+            )
+            genotype = self.model.get_genotype().tostr()  # type: ignore
+            self.trainer.logger.save_genotype(
+                genotype, epoch, self.trainer.checkpointing_freq
             )
 
     def evaluate(
