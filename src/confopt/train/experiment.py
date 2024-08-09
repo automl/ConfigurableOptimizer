@@ -5,7 +5,7 @@ from collections import namedtuple
 from enum import Enum
 import json
 import random
-from typing import Callable
+from typing import Callable, Literal
 import warnings
 
 import numpy as np
@@ -53,6 +53,7 @@ from confopt.searchspace import (
     DARTSGenotype as Genotype,  # noqa: F401
 )
 from confopt.train import ConfigurableTrainer, DiscreteTrainer, SearchSpaceHandler
+from confopt.train.projection import PerturbationArchSelection
 from confopt.utils import Logger
 from confopt.utils import distributed as dist_utils
 from confopt.utils.time import check_date_format
@@ -196,6 +197,17 @@ class Experiment:
             calc_gm_score,
         )
 
+    def _init_wandb(self, run_name: str, config: dict) -> None:
+        wandb.init(  # type: ignore
+            name=run_name,
+            project=(
+                config.get("project_name", "Configurable_Optimizer")
+                if config is not None
+                else "Configurable_Optimizer"
+            ),
+            config=config,
+        )
+
     def _train_supernet(
         self,
         config: dict | None = None,
@@ -245,83 +257,13 @@ class Experiment:
             use_benchmark=use_benchmark,
         )
         if self.is_wandb_log:
-            wandb.init(  # type: ignore
-                name=run_name,
-                project=(
-                    config.get("project_name", "Configurable_Optimizer")
-                    if config is not None
-                    else "Configurable_Optimizer"
-                ),
-                config=config,
-            )
+            self._init_wandb(run_name, config)  # type: ignore
 
-        Arguments = namedtuple(  # type: ignore
-            "Configure", " ".join(config["trainer"].keys())  # type: ignore
-        )
-        trainer_arguments = Arguments(**config["trainer"])  # type: ignore
-
-        criterion = self._get_criterion(
-            criterion_str=trainer_arguments.criterion  # type: ignore
-        )
-
-        data = self._get_dataset(self.dataset_str)(
-            root="datasets",
-            cutout=trainer_arguments.cutout,  # type: ignore
-            train_portion=trainer_arguments.train_portion,  # type: ignore
-        )
-
-        model = self.search_space
-        # model =
-
-        w_optimizer = self._get_optimizer(trainer_arguments.optim)(  # type: ignore
-            model.model_weight_parameters(),
-            trainer_arguments.lr,  # type: ignore
-            **config["trainer"].get("optim_config", {}),  # type: ignore
-        )
-
-        w_scheduler = self._get_scheduler(
-            scheduler_str=trainer_arguments.scheduler,  # type: ignore
-            optimizer=w_optimizer,
-            num_epochs=trainer_arguments.epochs,  # type: ignore
-            eta_min=trainer_arguments.learning_rate_min,  # type: ignore
-            config=config["trainer"].get("scheduler_config", {}),  # type: ignore
-        )
-
-        if self.edge_normalization and hasattr(model, "beta_parameters"):
-            arch_optimizer = self._get_optimizer(
-                trainer_arguments.arch_optim  # type: ignore
-            )(
-                [*model.arch_parameters, *model.beta_parameters],
-                lr=config["trainer"].get("arch_lr", 0.001),  # type: ignore
-                **config["trainer"].get("arch_optim_config", {}),  # type: ignore
-            )
-        else:
-            arch_optimizer = self._get_optimizer(
-                trainer_arguments.arch_optim  # type: ignore
-            )(
-                model.arch_parameters,
-                lr=config["trainer"].get("arch_lr", 0.001),  # type: ignore
-                **config["trainer"].get("arch_optim_config", {}),  # type: ignore
-            )
-
-        trainer = ConfigurableTrainer(
-            model=model,
-            data=data,
-            model_optimizer=w_optimizer,
-            arch_optimizer=arch_optimizer,
-            scheduler=w_scheduler,
-            criterion=criterion,
-            logger=self.logger,
-            batch_size=trainer_arguments.batch_size,  # type: ignore
-            use_data_parallel=trainer_arguments.use_data_parallel,  # type: ignore
+        trainer = self._initialize_configurable_trainer(
+            config=config,  # type: ignore
+            start_epoch=start_epoch,
             load_saved_model=load_saved_model,
             load_best_model=load_best_model,
-            start_epoch=start_epoch,
-            checkpointing_freq=trainer_arguments.checkpointing_freq,  # type: ignore
-            epochs=trainer_arguments.epochs,  # type: ignore
-            debug_mode=self.debug_mode,
-            query_dataset=self.dataset_str.value,
-            benchmark_api=self.benchmark_api,
         )
 
         config_str = json.dumps(config, indent=2, default=str)
@@ -808,6 +750,193 @@ class Experiment:
         trainer.test(is_wandb_log=self.is_wandb_log)
 
         return trainer
+
+    def _initialize_configurable_trainer(
+        self,
+        config: dict,
+        start_epoch: int = 0,
+        load_saved_model: bool = False,
+        load_best_model: bool = False,
+    ) -> ConfigurableTrainer:
+        Arguments = namedtuple(  # type: ignore
+            "Configure", " ".join(config["trainer"].keys())  # type: ignore
+        )
+        trainer_arguments = Arguments(**config["trainer"])  # type: ignore
+
+        criterion = self._get_criterion(
+            criterion_str=trainer_arguments.criterion  # type: ignore
+        )
+
+        data = self._get_dataset(self.dataset_str)(
+            root="datasets",
+            cutout=trainer_arguments.cutout,  # type: ignore
+            train_portion=trainer_arguments.train_portion,  # type: ignore
+        )
+
+        model = self.search_space
+
+        w_optimizer = self._get_optimizer(trainer_arguments.optim)(  # type: ignore
+            model.model_weight_parameters(),
+            trainer_arguments.lr,  # type: ignore
+            **config["trainer"].get("optim_config", {}),  # type: ignore
+        )
+
+        w_scheduler = self._get_scheduler(
+            scheduler_str=trainer_arguments.scheduler,  # type: ignore
+            optimizer=w_optimizer,
+            num_epochs=trainer_arguments.epochs,  # type: ignore
+            eta_min=trainer_arguments.learning_rate_min,  # type: ignore
+            config=config["trainer"].get("scheduler_config", {}),  # type: ignore
+        )
+
+        if self.edge_normalization and hasattr(model, "beta_parameters"):
+            arch_optimizer = self._get_optimizer(
+                trainer_arguments.arch_optim  # type: ignore
+            )(
+                [*model.arch_parameters, *model.beta_parameters],
+                lr=config["trainer"].get("arch_lr", 0.001),  # type: ignore
+                **config["trainer"].get("arch_optim_config", {}),  # type: ignore
+            )
+        else:
+            arch_optimizer = self._get_optimizer(
+                trainer_arguments.arch_optim  # type: ignore
+            )(
+                model.arch_parameters,
+                lr=config["trainer"].get("arch_lr", 0.001),  # type: ignore
+                **config["trainer"].get("arch_optim_config", {}),  # type: ignore
+            )
+
+        trainer = ConfigurableTrainer(
+            model=model,
+            data=data,
+            model_optimizer=w_optimizer,
+            arch_optimizer=arch_optimizer,
+            scheduler=w_scheduler,
+            criterion=criterion,
+            logger=self.logger,
+            batch_size=trainer_arguments.batch_size,  # type: ignore
+            use_data_parallel=trainer_arguments.use_data_parallel,  # type: ignore
+            load_saved_model=load_saved_model,
+            load_best_model=load_best_model,
+            start_epoch=start_epoch,
+            checkpointing_freq=trainer_arguments.checkpointing_freq,  # type: ignore
+            epochs=trainer_arguments.epochs,  # type: ignore
+            debug_mode=self.debug_mode,
+            query_dataset=self.dataset_str.value,
+            benchmark_api=self.benchmark_api,
+        )
+
+        return trainer
+
+    def select_perturbation_based_arch(
+        self,
+        profile: BaseProfile,
+        model_source: Literal["supernet", "arch_selection"] = "supernet",
+        start_epoch: int = 0,
+        load_best_model: bool = False,
+        load_saved_model: bool = False,
+        is_wandb_log: bool = False,
+        run_name: str = "darts-pt",
+    ) -> PerturbationArchSelection:
+        # find pt_configs in the profile
+        assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
+
+        if load_best_model or load_saved_model or start_epoch:
+            # self.searchspace is not trained
+            last_run = False
+            if not self.runtime:
+                last_run = True
+
+            if model_source == "supernet":
+                arch_selection = False
+            elif model_source == "arch_selection":
+                assert (
+                    load_best_model is False
+                ), "Cannot load best model for arch selection"
+                arch_selection = True
+            else:
+                raise AttributeError("Illegal model source provided")
+
+            self.logger = Logger(
+                log_dir="logs",
+                exp_name=self.exp_name,
+                dataset=str(self.dataset_str.value),
+                search_space=self.search_space_str.value,
+                seed=self.seed,
+                runtime=self.runtime,
+                use_supernet_checkpoint=True,
+                arch_selection=arch_selection,
+                last_run=last_run,
+            )
+        else:
+            assert (
+                model_source == "supernet"
+            ), "Model source can be arch_selection only with loading parameters"
+            # use the self.logger
+            # that is already in the experiment from last supernet training
+
+        # initialize searchspace handler
+        config = profile.get_config()
+
+        self.sampler_str = SamplerType(profile.sampler_type)
+        self.perturbator_str = PerturbatorType(profile.perturb_type)
+        self.is_partial_connection = profile.is_partial_connection
+        self.dropout = profile.dropout
+        self.edge_normalization = profile.is_partial_connection
+        self.entangle_op_weights = profile.entangle_op_weights
+
+        self._enum_to_objects(
+            self.search_space_str,
+            self.sampler_str,
+            self.perturbator_str,
+            config=config,
+        )
+
+        # Load model from trainer's init
+        trainer = self._initialize_configurable_trainer(
+            config=config,
+            start_epoch=start_epoch,
+            load_saved_model=load_saved_model,
+            load_best_model=load_best_model,
+        )
+        search_space_handler = self.profile
+        search_space_handler.adapt_search_space(trainer.model)
+
+        # Load from supernet
+        if model_source == "supernet":
+            trainer._init_experiment_state(setup_new_run=False)
+
+            # reroute logger
+            self.logger = Logger(
+                log_dir="logs",
+                exp_name=self.exp_name,
+                dataset=str(self.dataset_str.value),
+                search_space=self.search_space_str.value,
+                seed=self.seed,
+                use_supernet_checkpoint=True,
+                arch_selection=True,
+            )
+            trainer.load_saved_model = False
+            trainer.load_best_model = False
+            trainer.start_epoch = 0
+            trainer.logger = self.logger
+
+        trainer._init_experiment_state()
+
+        if is_wandb_log:
+            self._init_wandb(run_name, config)
+
+        arch_selector = PerturbationArchSelection(
+            trainer,
+            config["pt_selection"].get("projection_criteria", "acc"),
+            config["pt_selection"].get("projection_interval", 10),
+            edge_decision="random",
+            searchspace_type=self.search_space_str.value,
+            is_wandb_log=is_wandb_log,
+        )
+        arch_selector.select_architecture()
+
+        return arch_selector
 
 
 if __name__ == "__main__":
