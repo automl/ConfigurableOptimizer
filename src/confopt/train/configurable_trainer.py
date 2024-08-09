@@ -352,8 +352,10 @@ class ConfigurableTrainer:
         )
         network.train()
         end = time.time()
-        layer_alignment_scores[0].reset()  # type: ignore
-        layer_alignment_scores[1].reset()  # type: ignore
+
+        if layer_alignment_scores is not None:
+            layer_alignment_scores[0].reset()  # type: ignore
+            layer_alignment_scores[1].reset()  # type: ignore
 
         for step, (base_inputs, base_targets) in enumerate(train_loader):
             # FIXME: What was the point of this? and is it safe to remove?
@@ -418,8 +420,9 @@ class ConfigurableTrainer:
                     score_normal,
                     score_reduce,
                 ) = network_module.get_mean_layer_alignment_score()
-                layer_alignment_scores[0].update(val=score_normal)  # type: ignore
-                layer_alignment_scores[1].update(val=score_reduce)  # type: ignore
+                if layer_alignment_scores is not None:
+                    layer_alignment_scores[0].update(val=score_normal)  # type: ignore
+                    layer_alignment_scores[1].update(val=score_reduce)  # type: ignore
 
             if self.use_data_parallel:
                 torch.nn.utils.clip_grad_norm_(
