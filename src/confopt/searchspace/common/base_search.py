@@ -67,3 +67,8 @@ class SearchSpace(ModelWrapper, ABC):
 
     def get_num_skip_ops(self) -> tuple[int, int]:
         return -1, -1
+
+
+class ArchAttentionHandler(ModelWrapper):
+    def set_arch_attention(self, enabled: bool) -> None:
+        self.model.is_arch_attention_enabled = enabled
