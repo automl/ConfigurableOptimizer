@@ -669,8 +669,8 @@ class Network(nn.Module):
         self, normal_alphas: nn.Parameter, reduce_alphas: nn.Parameter
     ) -> tuple[torch.Tensor, torch.Tensor]:
         all_arch_params = torch.concat((normal_alphas, reduce_alphas))
-        all_arch_attn = self.multihead_attention(
-            all_arch_params, all_arch_params, all_arch_params
+        all_arch_attn, _ = self.multihead_attention(
+            all_arch_params, all_arch_params, all_arch_params, need_weights=False
         )
         num_edges_normal = normal_alphas.shape[0]
         attn_normal = all_arch_attn[:num_edges_normal]

@@ -322,7 +322,7 @@ class TNB101SearchModel(nn.Module):
         return list(params)
 
     def _compute_arch_attention(self, alphas: nn.Parameter) -> torch.Tensor:
-        attn_alphas = self.multihead_attention(alphas, alphas, alphas)
+        attn_alphas, _ = self.multihead_attention(alphas, alphas, alphas)
         return attn_alphas
 
 
