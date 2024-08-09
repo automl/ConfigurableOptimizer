@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from typing import Literal
 import warnings
 
 import torch
@@ -35,6 +36,7 @@ class BaseProfile:
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
         prune_num_keeps: list[int] | None = None,
+        pt_select_architecture: bool = False,
     ) -> None:
         self.config_type = config_type
         self.epochs = epochs
@@ -56,8 +58,24 @@ class BaseProfile:
         self.entangle_op_weights = entangle_op_weights
         self._set_oles_configs(oles, calc_gm_score)
         self._set_pruner_configs(prune_epochs, prune_num_keeps)
+        self._set_pt_select_configs(pt_select_architecture)
+
         PROFILE_TYPE = "BASE"
         self.sampler_type = str.lower(PROFILE_TYPE)
+
+    def _set_pt_select_configs(
+        self,
+        pt_select_architecture: bool = False,
+        pt_projection_criteria: Literal["acc", "loss"] = "acc",
+        pt_projection_interval: int = 10,
+    ) -> None:
+        if pt_select_architecture:
+            self.pt_select_configs = {
+                "projection_interval": pt_projection_interval,
+                "projection_criteria": pt_projection_criteria,
+            }
+        else:
+            self.pt_select_configs = None  # type: ignore
 
     def _set_pruner_configs(
         self,
@@ -153,6 +171,7 @@ class BaseProfile:
             "searchspace_str": self.searchspace_str,
             "weight_type": weight_type,
             "oles": self.oles_config,
+            "pt_selection": self.pt_select_configs,
         }
 
         if hasattr(self, "pruner_config"):
@@ -296,6 +315,14 @@ class BaseProfile:
                 config_key in self.oles_config
             ), f"{config_key} not a valid configuration for the oles config"
             self.oles_config[config_key] = kwargs[config_key]
+
+    def configure_pt_selection(self, **kwargs) -> None:  # type: ignore
+        for config_key in kwargs:
+            assert config_key in self.pt_select_configs, (
+                f"{config_key} not a valid configuration for the"
+                + "perturbation based selection config"
+            )
+            self.pt_select_configs[config_key] = kwargs[config_key]
 
     @abstractmethod
     def set_searchspace_config(self, config: dict) -> None:

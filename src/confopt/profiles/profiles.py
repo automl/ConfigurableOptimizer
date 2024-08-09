@@ -33,6 +33,7 @@ class DARTSProfile(BaseProfile, ABC):
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
         prune_num_keeps: list[int] | None = None,
+        pt_select_architecture: bool = False,
     ) -> None:
         PROFILE_TYPE = "DARTS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -55,6 +56,7 @@ class DARTSProfile(BaseProfile, ABC):
             calc_gm_score,
             prune_epochs,
             prune_num_keeps,
+            pt_select_architecture,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
@@ -97,6 +99,7 @@ class GDASProfile(BaseProfile, ABC):
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
         prune_num_keeps: list[int] | None = None,
+        pt_select_architecture: bool = False,
     ) -> None:
         PROFILE_TYPE = "GDAS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -121,6 +124,7 @@ class GDASProfile(BaseProfile, ABC):
             calc_gm_score,
             prune_epochs,
             prune_num_keeps,
+            pt_select_architecture,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
@@ -167,6 +171,7 @@ class SNASProfile(BaseProfile, ABC):
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
         prune_num_keeps: list[int] | None = None,
+        pt_select_architecture: bool = False,
     ) -> None:
         PROFILE_TYPE = "SNAS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -193,6 +198,7 @@ class SNASProfile(BaseProfile, ABC):
             calc_gm_score,
             prune_epochs,
             prune_num_keeps,
+            pt_select_architecture,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
@@ -237,6 +243,7 @@ class DRNASProfile(BaseProfile, ABC):
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
         prune_num_keeps: list[int] | None = None,
+        pt_select_architecture: bool = False,
     ) -> None:
         PROFILE_TYPE = "DRNAS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -259,6 +266,7 @@ class DRNASProfile(BaseProfile, ABC):
             calc_gm_score,
             prune_epochs,
             prune_num_keeps,
+            pt_select_architecture,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
