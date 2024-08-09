@@ -10,10 +10,15 @@ from confopt.oneshot.base_component import OneShotComponent
 from confopt.utils import reset_gm_score_attributes
 
 
-class SearchSpace(nn.Module, ABC):
+class ModelWrapper(nn.Module):
     def __init__(self, model: nn.Module):
         super().__init__()
         self.model = model
+
+
+class SearchSpace(ModelWrapper, ABC):
+    def __init__(self, model: nn.Module):
+        super().__init__(model)
         self.components: list[OneShotComponent] = []
 
     @property
