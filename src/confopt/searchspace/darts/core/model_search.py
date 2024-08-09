@@ -28,11 +28,13 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 
 class MixedOp(nn.Module):
-    def __init__(self, C: int, stride: int, primitives: list[str] = PRIMITIVES):
+    def __init__(
+        self, C: int, stride: int, primitives: list[str] = PRIMITIVES, k: int = 1
+    ):
         super().__init__()
         self._ops = nn.ModuleList()
         for primitive in primitives:
-            op = OPS[primitive](C, stride, False)
+            op = OPS[primitive](C // k, stride, False)
             self._ops.append(op)
 
     def forward(self, x: torch.Tensor, weights: list[torch.Tensor]) -> torch.Tensor:
@@ -50,6 +52,7 @@ class Cell(nn.Module):
         reduction: bool,
         reduction_prev: bool,
         primitives: list[str] = PRIMITIVES,
+        k: int = 1,
     ):
         """Neural Cell for DARTS.
 
@@ -64,6 +67,7 @@ class Cell(nn.Module):
             reduction (bool): Whether the cell is a reduction cell.
             reduction_prev (bool): Whether the previous cell is a reduction cell.
             primitives (list): The list of primitives to use for generating cell.
+            k (int): Shows how much of the channel widths should be used. Defaults to 1.
 
         Attributes:
             preprocess0(nn.Module): Preprocess for input from previous-previous cell.
@@ -90,7 +94,7 @@ class Cell(nn.Module):
         for i in range(self._steps):
             for j in range(2 + i):
                 stride = 2 if reduction and j < 2 else 1
-                ops = MixedOp(C, stride, primitives)._ops
+                ops = MixedOp(C, stride, primitives, k)._ops
                 op = OperationChoices(ops, is_reduction_cell=reduction)
                 self._ops.append(op)
 
@@ -172,6 +176,7 @@ class Network(nn.Module):
         edge_normalization: bool = False,
         discretized: bool = False,
         is_baby_darts: bool = False,
+        k: int = 1,
     ) -> None:
         """Implementation of DARTS search space's network model.
 
@@ -187,6 +192,7 @@ class Network(nn.Module):
             discretized (bool): Whether supernet is discretized to only have one operation on
             each edge or not.
             is_baby_darts (bool): Controls which primitive list to use
+            k (int): how much of the channel width should be used in the forward pass. Defaults to 1 which mean the whole channel width.
 
         Attributes:
             stem (nn.Sequential): Stem network composed of Conv2d and BatchNorm2d layers.
@@ -246,6 +252,7 @@ class Network(nn.Module):
                 reduction,
                 reduction_prev,
                 self.primitives,
+                k,
             )
             reduction_prev = reduction
             self.cells += [cell]
