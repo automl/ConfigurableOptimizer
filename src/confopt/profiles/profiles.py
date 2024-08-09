@@ -73,6 +73,8 @@ class DARTSProfile(BaseProfile, ABC):
 
 
 class GDASProfile(BaseProfile, ABC):
+    PROFILE_TYPE = "GDAS"
+
     def __init__(
         self,
         epochs: int,
@@ -98,12 +100,11 @@ class GDASProfile(BaseProfile, ABC):
         prune_epochs: list[int] | None = None,
         prune_num_keeps: list[int] | None = None,
     ) -> None:
-        PROFILE_TYPE = "GDAS"
         self.sampler_sample_frequency = sampler_sample_frequency
         self.tau_min = tau_min
         self.tau_max = tau_max
         super().__init__(
-            PROFILE_TYPE,
+            self.PROFILE_TYPE,
             epochs,
             is_partial_connection,
             dropout,
@@ -122,7 +123,7 @@ class GDASProfile(BaseProfile, ABC):
             prune_epochs,
             prune_num_keeps,
         )
-        self.sampler_type = str.lower(PROFILE_TYPE)
+        self.sampler_type = str.lower(self.PROFILE_TYPE)
 
         if partial_connector_config is not None:
             self.configure_partial_connector(**partial_connector_config)
@@ -138,6 +139,10 @@ class GDASProfile(BaseProfile, ABC):
             "tau_max": self.tau_max,
         }
         self.sampler_config = gdas_config  # type: ignore
+
+
+class ReinMaxProfile(GDASProfile):
+    PROFILE_TYPE = "REINMAX"
 
 
 class SNASProfile(BaseProfile, ABC):
