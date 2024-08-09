@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import partial
+from typing import Literal
 
 import torch
 from torch import nn
@@ -136,3 +137,53 @@ class DARTSSearchSpace(SearchSpace):
         alphas_normal, alphas_reduce = self.model.arch_parameters()
         count_skip = lambda alphas: sum(alphas[:, 1:].argmax(dim=1) == 2)
         return count_skip(alphas_normal), count_skip(alphas_reduce)
+
+    def get_num_ops(self) -> int:
+        return self.model.num_ops
+
+    def get_num_edges(self) -> int:
+        return self.model.num_edges
+
+    def get_num_nodes(self) -> int:
+        return len(self.model.nid2eids.keys())
+
+    def get_candidate_flags(self, topology: bool = False) -> list:
+        if topology:
+            return self.model.candidate_flags_edge
+        return self.model.candidate_flags
+
+    def get_nodes_to_edge_mapping(self, selected_node: int) -> dict:
+        return self.model.nid2eids[selected_node]
+
+    def remove_from_projected_weights(
+        self,
+        selected_edge: int,
+        selected_op: int | None,
+        cell_type: Literal["normal", "reduce"],
+        topology: bool = False,
+    ) -> None:
+        self.model.remove_from_projected_weights(
+            cell_type, selected_edge, selected_op, topology
+        )
+
+    def mark_projected_operation(
+        self,
+        selected_edge: int,
+        selected_op: int,
+        cell_type: Literal["normal", "reduce"],
+    ) -> None:
+        self.model.mark_projected_op(selected_edge, selected_op, cell_type)
+
+    def mark_projected_edge(
+        self,
+        selected_node: int,
+        selected_edges: list[int],
+        cell_type: Literal["normal", "reduce"],
+    ) -> None:
+        self.model.mark_projected_edges(selected_node, selected_edges, cell_type)
+
+    def set_projection_mode(self, value: bool) -> None:
+        self.model.projection_mode = value
+
+    def set_projection_evaluation(self, value: bool) -> None:
+        self.model.projection_evaluation = value

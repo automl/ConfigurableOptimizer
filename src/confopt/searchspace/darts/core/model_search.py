@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import copy
 import math
 from typing import Literal
+import warnings
 
 import torch
 from torch import nn
@@ -380,7 +382,13 @@ class Network(nn.Module):
         self.weights["normal"] = []
         self.weights["reduce"] = []
 
-        weights_normal, weights_reduce = self.sample_with_mask()
+        if self.projection_mode:
+            weights_normal, weights_reduce = (
+                self.get_projected_weights("normal"),
+                self.get_projected_weights("reduce"),
+            )
+        else:
+            weights_normal, weights_reduce = self.sample_with_mask()
 
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
@@ -408,7 +416,12 @@ class Network(nn.Module):
         self.weights["normal"] = []
         self.weights["reduce"] = []
 
-        weights_normal, weights_reduce = self.sample_with_mask()
+        if self.projection_mode:
+            weights_normal, weights_reduce = self.get_projected_weights(
+                "normal"
+            ), self.get_projected_weights("reduce")
+        else:
+            weights_normal, weights_reduce = self.sample_with_mask()
 
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
@@ -481,6 +494,8 @@ class Network(nn.Module):
             self.betas_normal,
             self.betas_reduce,
         ]
+
+        self._initialize_projection_params()
 
     def arch_parameters(self) -> list[torch.nn.Parameter]:
         """Get a list containing the architecture parameters or alphas.
@@ -642,6 +657,114 @@ class Network(nn.Module):
             params -= set(self.alphas_reduce)
             params -= set(self.alphas_normal)
         return list(params)
+
+    def _initialize_projection_params(self) -> None:
+        k = sum(1 for i in range(self._steps) for n in range(2 + i))
+        self.num_edges = k
+        self.num_ops = len(self.alphas_normal[0])
+        self.proj_weights = {  # for hard/soft assignment after project
+            "normal": torch.zeros_like(self.alphas_normal),
+            "reduce": torch.zeros_like(self.alphas_reduce),
+        }
+
+        self.candidate_flags = {
+            "normal": torch.tensor(
+                self.num_edges * [True], requires_grad=False, dtype=torch.bool
+            ).to(DEVICE),
+            "reduce": torch.tensor(
+                self.num_edges * [True], requires_grad=False, dtype=torch.bool
+            ).to(DEVICE),
+        }
+        self.candidate_flags_edge = {
+            "normal": torch.tensor(
+                3 * [True], requires_grad=False, dtype=torch.bool
+            ).to(DEVICE),
+            "reduce": torch.tensor(
+                3 * [True], requires_grad=False, dtype=torch.bool
+            ).to(DEVICE),
+        }
+        self.nid2eids = {0: [2, 3, 4], 1: [5, 6, 7, 8], 2: [9, 10, 11, 12, 13]}
+        self.nid2selected_eids = {  # type: ignore
+            "normal": {0: [], 1: [], 2: []},
+            "reduce": {0: [], 1: [], 2: []},
+        }
+        self.projection_mode = False
+        self.projection_evaluation = False
+        self.removal_cell_type: Literal["normal", "reduce"] | None = None
+        self.removed_projected_weights = {
+            "normal": None,
+            "reduce": None,
+        }
+
+    def remove_from_projected_weights(
+        self,
+        cell_type: Literal["normal", "reduce"],
+        selected_edge: int,
+        selected_op: int | None,
+        topology: bool = False,
+    ) -> None:
+        weights = self.get_projected_weights(cell_type)
+        proj_mask = torch.ones_like(weights[selected_edge])
+        if topology:
+            if selected_op is not None:
+                warnings.warn(
+                    "selected_op should be set to None in case of topology search",
+                    stacklevel=1,
+                )
+            weights[selected_edge].data.fill_(0)
+        else:
+            proj_mask[selected_op] = 0
+
+        weights[selected_edge] = weights[selected_edge] * proj_mask
+
+        self.removed_projected_weights = {
+            "normal": None,
+            "reduce": None,
+        }
+        self.removal_cell_type = cell_type
+        self.removed_projected_weights[cell_type] = weights
+
+    def mark_projected_op(
+        self, eid: int, opid: int, cell_type: Literal["normal", "reduce"]
+    ) -> None:
+        self.proj_weights[cell_type][eid][opid] = 1
+        self.candidate_flags[cell_type][eid] = False
+
+    def mark_projected_edges(
+        self, nid: int, eids: list[int], cell_type: Literal["normal", "reduce"]
+    ) -> None:
+        for eid in self.nid2eids[nid]:
+            if eid not in eids:  # not top2
+                self.proj_weights[cell_type][eid].data.fill_(0)
+        self.nid2selected_eids[cell_type][nid] = copy.deepcopy(eids)
+        self.candidate_flags_edge[cell_type][nid] = False
+
+    def get_projected_weights(
+        self, cell_type: Literal["normal", "reduce"]
+    ) -> torch.Tensor:
+        assert cell_type in ["normal", "reduce"]
+
+        if self.projection_evaluation and self.removal_cell_type == cell_type:
+            return self.removed_projected_weights[cell_type]
+
+        if cell_type == "normal":
+            weights = torch.softmax(self.alphas_normal, dim=-1)
+        else:
+            weights = torch.softmax(self.alphas_reduce, dim=-1)
+
+        ## proj op
+        for eid in range(self.num_edges):
+            if not self.candidate_flags[cell_type][eid]:
+                weights[eid].data.copy_(self.proj_weights[cell_type][eid])
+
+        ## proj edge
+        for nid in self.nid2eids:
+            if not self.candidate_flags_edge[cell_type][nid]:  ## projected node
+                for eid in self.nid2eids[nid]:
+                    if eid not in self.nid2selected_eids[cell_type][nid]:
+                        weights[eid].data.copy_(self.proj_weights[cell_type][eid])
+
+        return weights
 
 
 def preserve_grads(m: nn.Module) -> None:
