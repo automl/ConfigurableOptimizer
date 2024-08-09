@@ -104,3 +104,60 @@ class NASBench201SearchSpace(SearchSpace):
         alphas_normal = self.model.arch_parameters
         count_skip = lambda alphas: sum(alphas.argmax(dim=-1) == 1)
         return count_skip(alphas_normal), -1
+
+    def get_num_ops(self) -> int:
+        return self.model.num_ops
+
+    def get_num_edges(self) -> int:
+        return self.model.num_edges
+
+    def get_num_nodes(self) -> int:
+        raise NotImplementedError(
+            "get_num_nodes is not implemented for NB201SearchSpace"
+        )
+
+    def get_candidate_flags(self, topology: bool = False) -> list:
+        assert topology is False
+        return self.model.candidate_flags
+
+    def get_nodes_to_edge_mapping(self, selected_node: int) -> dict:  # type: ignore
+        raise NotImplementedError(
+            "get_nodes_to_edge_mapping is not implemented for NB201SearchSpace"
+        )
+
+    def remove_from_projected_weights(
+        self,
+        selected_edge: int,
+        selected_op: int | None,
+        cell_type: str | None = None,
+        topology: bool = False,
+    ) -> None:
+        assert topology is False
+        assert cell_type is None
+        assert selected_op is not None
+        self.model.remove_from_projected_weights(selected_edge, selected_op)
+
+    def mark_projected_operation(
+        self,
+        selected_edge: int,
+        selected_op: int,
+        cell_type: str | None = None,
+    ) -> None:
+        assert cell_type is None
+        self.model.mark_projected_op(selected_edge, selected_op)
+
+    def mark_projected_edge(  # type: ignore
+        self,
+        selected_node: int,
+        selected_edges: list[int],
+        cell_type: str | None = None,
+    ) -> None:
+        raise NotImplementedError(
+            "mark_projected_edge is not implemented for NB201SearchSpace"
+        )
+
+    def set_projection_mode(self, value: bool) -> None:
+        self.model.projection_mode = value
+
+    def set_projection_evaluation(self, value: bool) -> None:
+        self.model.projection_evaluation = value

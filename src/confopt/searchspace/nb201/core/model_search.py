@@ -134,6 +134,7 @@ class NB201SearchModel(nn.Module):
             1e-3 * torch.randn(num_edge)  # type: ignore
         )
         self.weights: dict[str, list[torch.Tensor]] = {}
+        self._initialize_projection_params()
 
     def get_weights(self) -> list[nn.Parameter]:
         """Get a list of learnable parameters in the model. (does not include alpha or
@@ -293,7 +294,10 @@ class NB201SearchModel(nn.Module):
 
         self.weights["alphas"] = []
 
-        weights = self.sample_with_mask()
+        if self.projection_mode:
+            weights = self.get_projected_weights()
+        else:
+            weights = self.sample_with_mask()
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
@@ -327,7 +331,10 @@ class NB201SearchModel(nn.Module):
         inputs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         self.weights["alphas"] = []
-        weights = self.sample_with_mask()
+        if self.projection_mode:
+            weights = self.get_projected_weights()
+        else:
+            weights = self.sample_with_mask()
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
@@ -428,6 +435,44 @@ class NB201SearchModel(nn.Module):
         if self.arch_parameters is not None:
             params -= set(self.arch_parameters)
         return list(params)
+
+    def _initialize_projection_params(self) -> None:
+        self.num_edges = len(self.arch_parameters)  # type: ignore
+        self.num_ops = len(self.arch_parameters[0])  # type: ignore
+        self.candidate_flags = torch.tensor(
+            len(self.arch_parameters) * [True],  # type: ignore
+            requires_grad=False,
+            dtype=torch.bool,
+        ).to(DEVICE)
+        self.proj_weights = torch.zeros_like(self.arch_parameters)
+
+        self.projection_mode = False
+        self.projection_evaluation = False
+        self.removed_projected_weights = None
+
+    def mark_projected_op(self, eid: int, opid: int) -> None:
+        self.proj_weights[eid][opid] = 1
+        self.candidate_flags[eid] = False
+
+    def get_projected_weights(self) -> torch.Tensor:
+        if self.projection_evaluation:
+            return self.removed_projected_weights
+        weights = torch.softmax(self.arch_parameters, dim=-1)
+        for eid in range(len(self.arch_parameters)):  # type: ignore
+            if not self.candidate_flags[eid]:
+                weights[eid].data.copy_(self.proj_weights[eid])
+
+        return weights
+
+    def remove_from_projected_weights(
+        self, selected_edge: int, selected_op: int
+    ) -> None:
+        weights = self.get_projected_weights()
+        proj_mask = torch.ones_like(weights[selected_edge])
+        proj_mask[selected_op] = 0
+
+        weights[selected_edge] = weights[selected_edge] * proj_mask
+        self.removed_projected_weights = weights
 
 
 def preserve_grads(m: nn.Module) -> None:
