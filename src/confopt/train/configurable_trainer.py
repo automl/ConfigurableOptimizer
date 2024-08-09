@@ -77,7 +77,7 @@ class ConfigurableTrainer:
         self.query_dataset = query_dataset
         self.benchmark_api = benchmark_api
 
-    def _init_experiment_state(self) -> None:
+    def _init_experiment_state(self, setup_new_run: bool = True) -> None:
         """Initializes the state of the experiment.
 
         If training is to continue from a previous checkpoint, then the state
@@ -104,7 +104,8 @@ class ConfigurableTrainer:
                 self.logger, src, epoch
             )
             self._load_checkpoint(checkpoint)
-            self.logger.set_up_new_run()
+            if setup_new_run:
+                self.logger.set_up_new_run()
         else:
             self._init_empty_exp_state_info()
 
