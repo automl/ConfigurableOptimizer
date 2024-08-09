@@ -74,6 +74,7 @@ class NB201SearchModel(nn.Module):
         affine: bool = False,
         track_running_stats: bool = False,
         edge_normalization: bool = False,
+        k: int = 1,
     ):
         super().__init__()
         self._C = C
@@ -108,6 +109,7 @@ class NB201SearchModel(nn.Module):
                     search_space,
                     affine,
                     track_running_stats,
+                    k=k,
                 )
 
                 if num_edge is None:
