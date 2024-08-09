@@ -35,6 +35,7 @@ class BaseProfile:
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
         prune_num_keeps: list[int] | None = None,
+        is_arch_attention_enabled: bool = False,
     ) -> None:
         self.config_type = config_type
         self.epochs = epochs
@@ -58,6 +59,7 @@ class BaseProfile:
         self._set_pruner_configs(prune_epochs, prune_num_keeps)
         PROFILE_TYPE = "BASE"
         self.sampler_type = str.lower(PROFILE_TYPE)
+        self.is_arch_attention_enabled = is_arch_attention_enabled
 
     def _set_pruner_configs(
         self,
@@ -153,6 +155,7 @@ class BaseProfile:
             "searchspace_str": self.searchspace_str,
             "weight_type": weight_type,
             "oles": self.oles_config,
+            "is_arch_attention_enabled": self.is_arch_attention_enabled,
         }
 
         if hasattr(self, "pruner_config"):
