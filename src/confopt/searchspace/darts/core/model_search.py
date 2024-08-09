@@ -550,8 +550,16 @@ class Network(nn.Module):
                 n += 1
             return gene
 
-        gene_normal = _parse(F.softmax(self.alphas_normal, dim=-1).data.cpu().numpy())
-        gene_reduce = _parse(F.softmax(self.alphas_reduce, dim=-1).data.cpu().numpy())
+        if self.is_arch_attention_enabled:
+            alphas_normal, alphas_reduce = self._compute_arch_attention(
+                self.alphas_normal, self.alphas_reduce
+            )
+        else:
+            alphas_normal = self.alphas_normal
+            alphas_reduce = self.alphas_reduce
+
+        gene_normal = _parse(F.softmax(alphas_normal, dim=-1).data.cpu().numpy())
+        gene_reduce = _parse(F.softmax(alphas_reduce, dim=-1).data.cpu().numpy())
 
         concat = range(2 + self._steps - self._multiplier, self._steps + 2)
         genotype = DARTSGenotype(

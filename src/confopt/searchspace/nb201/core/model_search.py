@@ -232,14 +232,18 @@ class NB201SearchModel(nn.Module):
             nodes.
         """
         genotypes = []
+
+        if self.is_arch_attention_enabled:
+            arch_parameters = self._compute_arch_attention(self.arch_parameters)
+        else:
+            arch_parameters = self.arch_parameters
+
         for i in range(1, self.max_nodes):
             xlist = []
             for j in range(i):
                 node_str = f"{i}<-{j}"
                 with torch.no_grad():
-                    weights = self.arch_parameters[  # type: ignore
-                        self.edge2index[node_str]
-                    ]
+                    weights = arch_parameters[self.edge2index[node_str]]  # type: ignore
                     # betas = self.beta_parameters[self.edge2index[node_str]]
                     op_name = self.op_names[weights.argmax().item()]  # type: ignore
                 xlist.append((op_name, j))

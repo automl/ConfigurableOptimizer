@@ -303,8 +303,13 @@ class TNB101SearchModel(nn.Module):
             edge_normalization=False,
         ).to(next(self.parameters()).device)
 
+        if self.is_arch_attention_enabled:
+            arch_parameters = self._compute_arch_attention(self.arch_parameters)
+        else:
+            arch_parameters = self.arch_parameters
+
         for cell in dicrete_model.cells:
-            cell._discretize(self._arch_parameters)
+            cell._discretize(arch_parameters)
         dicrete_model._arch_parameters = None
 
         return dicrete_model
