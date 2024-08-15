@@ -459,7 +459,7 @@ def preserve_grads(m: nn.Module) -> None:
 
 
 # TODO: break function from OLES paper to have less branching.
-def check_grads_cosine(m: nn.Module, oles: bool = False) -> None:  # noqa: C901
+def update_grads_cosine_similarity(m: nn.Module) -> None:
     if (
         isinstance(
             m,
@@ -504,10 +504,28 @@ def check_grads_cosine(m: nn.Module, oles: bool = False) -> None:  # noqa: C901
     if not hasattr(m, "count"):
         m.count = 0
 
-    if m.count == 20:
-        if m.avg / m.count < 0.4 and oles:
+    m.count += 1
+
+
+def apply_operator_early_stopping(
+    m: nn.Module, n_count: int = 20, threshold: float = 0.4
+) -> None:
+    if not isinstance(m, tuple(OLES_OPS)) or not hasattr(m, "pre_grads"):
+        return
+
+    true_i = 0
+
+    for param in m.parameters():
+        if param.requires_grad and param.grad is not None:
+            g = param.grad.detach().cpu()
+            if len(g) != 0:
+                true_i += 1
+
+    if true_i == 0:
+        return
+
+    if m.count == n_count:
+        if m.avg / m.count < threshold:
             freeze(m)
         m.count = 0
         m.avg = 0
-    else:
-        m.count += 1

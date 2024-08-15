@@ -16,6 +16,10 @@ from torch.utils.data import DataLoader
 
 from confopt.dataset import AbstractData
 from confopt.searchspace import SearchSpace
+from confopt.searchspace.common.base_search import (
+    GradientMatchingScoreSupport,
+    OperationStatisticsSupport,
+)
 from confopt.utils import (
     AverageMeter,
     ExperimentCheckpointLoader,
@@ -23,6 +27,7 @@ from confopt.utils import (
     calc_accuracy,
     clear_grad_cosine,
     get_device,
+    unwrap_model,
 )
 
 from .search_space_handler import SearchSpaceHandler
@@ -222,11 +227,8 @@ class ConfigurableTrainer:
             self.logger.update_wandb_logs(arch_values_dict)
 
             # Log GM scores
-            if calc_gm_score:
-                if self.use_data_parallel:
-                    gm_score = network.module.calc_avg_gm_score()
-                else:
-                    gm_score = network.calc_avg_gm_score()
+            if calc_gm_score and isinstance(network, GradientMatchingScoreSupport):
+                gm_score = unwrap_model(network).calc_avg_gm_score()
                 gm_metrics = {
                     "gm_scores/mean_gm": gm_score,
                     "gm_scores/epochs": epoch,
@@ -236,18 +238,9 @@ class ConfigurableTrainer:
                 # Add for all modules
                 self.logger.update_wandb_logs(gm_metrics)
 
-            # Count skip connections in this epoch
-            normal_cell_n_skip, reduce_cell_n_skip = (
-                network.module.get_num_skip_ops()
-                if self.use_data_parallel
-                else network.get_num_skip_ops()
-            )
-
-            n_skip_connections = {
-                "skip_connections/normal": normal_cell_n_skip,
-                "skip_connections/reduce": reduce_cell_n_skip,
-            }
-            self.logger.update_wandb_logs(n_skip_connections)
+            if isinstance(unwrap_model(network), OperationStatisticsSupport):
+                ops_stats = unwrap_model(network).get_op_stats()
+                self.logger.update_wandb_logs(ops_stats)
 
             # Log Layer Alignment scores
             self.logger.log(
@@ -399,10 +392,11 @@ class ConfigurableTrainer:
 
             # calculate gm_score
             if calc_gm_score:
-                if self.use_data_parallel:
-                    network.module.check_grads_cosine(oles)  # type: ignore
-                else:
-                    network.check_grads_cosine(oles)  # type: ignore
+                supernet = unwrap_model(network)
+                if isinstance(supernet, GradientMatchingScoreSupport):
+                    supernet.update_grads_cosine_similarity()
+                    if oles:
+                        supernet.apply_operator_early_stopping()
 
             # update the model weights
             w_optimizer.zero_grad()
@@ -412,12 +406,11 @@ class ConfigurableTrainer:
             base_loss = criterion(logits, base_targets)
             base_loss.backward()
 
-            network_module = network.module if self.use_data_parallel else network
-            if hasattr(network_module, "get_mean_layer_alignment_score"):
+            if isinstance(unwrap_model(network), OperationStatisticsSupport):
                 (
                     score_normal,
                     score_reduce,
-                ) = network_module.get_mean_layer_alignment_score()
+                ) = unwrap_model(network).get_mean_layer_alignment_score()
                 layer_alignment_scores[0].update(val=score_normal)  # type: ignore
                 layer_alignment_scores[1].update(val=score_reduce)  # type: ignore
 

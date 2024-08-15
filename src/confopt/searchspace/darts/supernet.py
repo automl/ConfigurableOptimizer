@@ -1,20 +1,34 @@
 from __future__ import annotations
 
-from functools import partial
-
 import torch
 from torch import nn
 
-from confopt.searchspace.common.base_search import ArchAttentionSupport, SearchSpace
+from confopt.searchspace.common.base_search import (
+    ArchAttentionSupport,
+    GradientMatchingScoreSupport,
+    LayerAlignmentScoreSupport,
+    OperationStatisticsSupport,
+    SearchSpace,
+)
 
 from .core import DARTSSearchModel
 from .core.genotypes import DARTSGenotype
-from .core.model_search import check_grads_cosine, preserve_grads
+from .core.model_search import (
+    apply_operator_early_stopping,
+    preserve_grads,
+    update_grads_cosine_similarity,
+)
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
-class DARTSSearchSpace(SearchSpace, ArchAttentionSupport):
+class DARTSSearchSpace(
+    SearchSpace,
+    ArchAttentionSupport,
+    GradientMatchingScoreSupport,
+    OperationStatisticsSupport,
+    LayerAlignmentScoreSupport,
+):
     def __init__(self, *args, **kwargs):  # type: ignore
         """DARTS Search Space for Neural Architecture Search.
 
@@ -107,9 +121,11 @@ class DARTSSearchSpace(SearchSpace, ArchAttentionSupport):
     def preserve_grads(self) -> None:
         self.model.apply(preserve_grads)
 
-    def check_grads_cosine(self, oles: bool = False) -> None:
-        check_grads_cosine_part = partial(check_grads_cosine, oles=oles)
-        self.model.apply(check_grads_cosine_part)
+    def update_grads_cosine_similarity(self) -> None:
+        self.model.apply(update_grads_cosine_similarity)
+
+    def apply_operator_early_stopping(self) -> None:
+        self.model.apply(apply_operator_early_stopping)
 
     def calc_avg_gm_score(self) -> float:
         sim_avg = []
@@ -124,12 +140,13 @@ class DARTSSearchSpace(SearchSpace, ArchAttentionSupport):
     def get_mean_layer_alignment_score(self) -> tuple[float, float]:
         return self.model._get_mean_layer_alignment_score()
 
-    def reset_gm_scores(self) -> None:
-        for module in self.model.modules():
-            if hasattr(module, "running_sim"):
-                module.running_sim.reset()
-
-    def get_num_skip_ops(self) -> tuple[int, int]:
+    def get_num_skip_ops(self) -> dict[str, int]:
         alphas_normal, alphas_reduce = self.model.arch_parameters()
         count_skip = lambda alphas: sum(alphas[:, 1:].argmax(dim=1) == 2)
-        return count_skip(alphas_normal), count_skip(alphas_reduce)
+
+        stats = {
+            "skip_connections/normal": count_skip(alphas_normal),
+            "skip_connections/reduce": count_skip(alphas_reduce),
+        }
+
+        return stats

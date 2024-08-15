@@ -1,19 +1,33 @@
 from __future__ import annotations
 
-from functools import partial
-
 import torch
 from torch import nn
 
-from confopt.searchspace.common.base_search import ArchAttentionSupport, SearchSpace
+from confopt.searchspace.common.base_search import (
+    ArchAttentionSupport,
+    GradientMatchingScoreSupport,
+    LayerAlignmentScoreSupport,
+    OperationStatisticsSupport,
+    SearchSpace,
+)
 
 from .core.genotypes import Structure as NB201Gynotype
-from .core.model_search import NB201SearchModel, check_grads_cosine, preserve_grads
+from .core.model_search import (
+    NB201SearchModel,
+    preserve_grads,
+    update_grads_cosine_similarity,
+)
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
-class NASBench201SearchSpace(SearchSpace, ArchAttentionSupport):
+class NASBench201SearchSpace(
+    SearchSpace,
+    ArchAttentionSupport,
+    GradientMatchingScoreSupport,
+    OperationStatisticsSupport,
+    LayerAlignmentScoreSupport,
+):
     def __init__(self, *args, **kwargs):  # type: ignore
         """Initialize the custom search model of NASBench201SearchSpace.
 
@@ -74,9 +88,11 @@ class NASBench201SearchSpace(SearchSpace, ArchAttentionSupport):
     def preserve_grads(self) -> None:
         self.model.apply(preserve_grads)
 
-    def check_grads_cosine(self, oles: bool = False) -> None:
-        check_grads_cosine_part = partial(check_grads_cosine, oles=oles)
-        self.model.apply(check_grads_cosine_part)
+    def update_grads_cosine_similarity(self) -> None:
+        self.model.apply(update_grads_cosine_similarity)
+
+    def apply_operator_early_stopping(self) -> None:
+        self.model.apply()
 
     def calc_avg_gm_score(self) -> float:
         sim_avg = []
@@ -88,15 +104,15 @@ class NASBench201SearchSpace(SearchSpace, ArchAttentionSupport):
         avg_gm_score = sum(sim_avg) / len(sim_avg)
         return avg_gm_score
 
-    def reset_gm_scores(self) -> None:
-        for module in self.model.modules():
-            if hasattr(module, "running_sim"):
-                module.running_sim.reset()
-
     def get_mean_layer_alignment_score(self) -> tuple[float, float]:
         return self.model._get_mean_layer_alignment_score(), 0
 
-    def get_num_skip_ops(self) -> tuple[int, int]:
+    def get_num_skip_ops(self) -> dict[str, int]:
         alphas_normal = self.model.arch_parameters
         count_skip = lambda alphas: sum(alphas.argmax(dim=-1) == 1)
-        return count_skip(alphas_normal), -1
+
+        stats = {
+            "skip_connections/normal": count_skip(alphas_normal),
+        }
+
+        return stats
