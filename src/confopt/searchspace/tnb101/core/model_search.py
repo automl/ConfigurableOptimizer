@@ -109,6 +109,12 @@ class TNB101SearchModel(nn.Module):
         )
         self._beta_parameters = nn.Parameter(1e-3 * torch.randn(self.num_edge))
 
+        # Multi-head attention for architectural parameters
+        self.is_arch_attention_enabled = False  # disabled by default
+        self.multihead_attention = nn.MultiheadAttention(
+            embed_dim=len(self.op_names), num_heads=1
+        )
+
     def arch_parameters(self) -> nn.Parameter:
         return self._arch_parameters
 
@@ -144,6 +150,9 @@ class TNB101SearchModel(nn.Module):
 
     def sample_with_mask(self) -> torch.Tensor:
         weights_to_sample = self._arch_parameters
+
+        if self.is_arch_attention_enabled:
+            weights_to_sample = self._compute_arch_attention(weights_to_sample)
 
         if self.mask is not None:
             weights_to_sample = self.remove_pruned_alphas(weights_to_sample)
@@ -294,8 +303,13 @@ class TNB101SearchModel(nn.Module):
             edge_normalization=False,
         ).to(next(self.parameters()).device)
 
+        if self.is_arch_attention_enabled:
+            arch_parameters = self._compute_arch_attention(self.arch_parameters)
+        else:
+            arch_parameters = self.arch_parameters
+
         for cell in dicrete_model.cells:
-            cell._discretize(self._arch_parameters)
+            cell._discretize(arch_parameters)
         dicrete_model._arch_parameters = None
 
         return dicrete_model
@@ -306,6 +320,10 @@ class TNB101SearchModel(nn.Module):
         if self._arch_parameters is not None:
             params -= set(self._arch_parameters)
         return list(params)
+
+    def _compute_arch_attention(self, alphas: nn.Parameter) -> torch.Tensor:
+        attn_alphas, _ = self.multihead_attention(alphas, alphas, alphas)
+        return attn_alphas
 
 
 class TNB101SearchCell(nn.Module):

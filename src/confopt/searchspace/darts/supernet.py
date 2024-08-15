@@ -5,7 +5,7 @@ from functools import partial
 import torch
 from torch import nn
 
-from confopt.searchspace.common.base_search import SearchSpace
+from confopt.searchspace.common.base_search import ArchAttentionHandler, SearchSpace
 
 from .core import DARTSSearchModel
 from .core.genotypes import DARTSGenotype
@@ -14,7 +14,7 @@ from .core.model_search import check_grads_cosine, preserve_grads
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
-class DARTSSearchSpace(SearchSpace):
+class DARTSSearchSpace(SearchSpace, ArchAttentionHandler):
     def __init__(self, *args, **kwargs):  # type: ignore
         """DARTS Search Space for Neural Architecture Search.
 

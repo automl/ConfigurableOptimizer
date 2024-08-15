@@ -255,6 +255,12 @@ class Network(nn.Module):
         self.classifier = nn.Linear(C_prev, num_classes)
         self.weights: dict[str, list[torch.Tensor]] = {}
 
+        # Multi-head attention for architectural parameters
+        self.is_arch_attention_enabled = False  # disabled by default
+        self.multihead_attention = nn.MultiheadAttention(
+            embed_dim=len(self.primitives), num_heads=1
+        )
+
         self._initialize_parameters()
 
     def new(self) -> Network:
@@ -337,6 +343,14 @@ class Network(nn.Module):
     def sample_with_mask(self) -> tuple[torch.Tensor, torch.Tensor]:
         weights_normal_to_sample = self.alphas_normal
         weights_reduce_to_sample = self.alphas_reduce
+
+        if self.is_arch_attention_enabled:
+            (
+                weights_normal_to_sample,
+                weights_reduce_to_sample,
+            ) = self._compute_arch_attention(
+                weights_normal_to_sample, weights_reduce_to_sample
+            )
 
         if self.mask is not None:
             # The shape of weights will change
@@ -536,8 +550,16 @@ class Network(nn.Module):
                 n += 1
             return gene
 
-        gene_normal = _parse(F.softmax(self.alphas_normal, dim=-1).data.cpu().numpy())
-        gene_reduce = _parse(F.softmax(self.alphas_reduce, dim=-1).data.cpu().numpy())
+        if self.is_arch_attention_enabled:
+            alphas_normal, alphas_reduce = self._compute_arch_attention(
+                self.alphas_normal, self.alphas_reduce
+            )
+        else:
+            alphas_normal = self.alphas_normal
+            alphas_reduce = self.alphas_reduce
+
+        gene_normal = _parse(F.softmax(alphas_normal, dim=-1).data.cpu().numpy())
+        gene_reduce = _parse(F.softmax(alphas_reduce, dim=-1).data.cpu().numpy())
 
         concat = range(2 + self._steps - self._multiplier, self._steps + 2)
         genotype = DARTSGenotype(
@@ -642,6 +664,19 @@ class Network(nn.Module):
             params -= set(self.alphas_reduce)
             params -= set(self.alphas_normal)
         return list(params)
+
+    def _compute_arch_attention(
+        self, normal_alphas: nn.Parameter, reduce_alphas: nn.Parameter
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        all_arch_params = torch.concat((normal_alphas, reduce_alphas))
+        all_arch_attn, _ = self.multihead_attention(
+            all_arch_params, all_arch_params, all_arch_params, need_weights=False
+        )
+        num_edges_normal = normal_alphas.shape[0]
+        attn_normal = all_arch_attn[:num_edges_normal]
+        attn_reduce = all_arch_attn[num_edges_normal:]
+
+        return attn_normal, attn_reduce
 
 
 def preserve_grads(m: nn.Module) -> None:

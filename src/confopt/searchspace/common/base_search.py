@@ -10,10 +10,15 @@ from confopt.oneshot.base_component import OneShotComponent
 from confopt.utils import reset_gm_score_attributes
 
 
-class SearchSpace(nn.Module, ABC):
+class ModelWrapper(nn.Module):
     def __init__(self, model: nn.Module):
         super().__init__()
         self.model = model
+
+
+class SearchSpace(ModelWrapper, ABC):
+    def __init__(self, model: nn.Module):
+        super().__init__(model)
         self.components: list[OneShotComponent] = []
 
     @property
@@ -62,3 +67,8 @@ class SearchSpace(nn.Module, ABC):
 
     def get_num_skip_ops(self) -> tuple[int, int]:
         return -1, -1
+
+
+class ArchAttentionHandler(ModelWrapper):
+    def set_arch_attention(self, enabled: bool) -> None:
+        self.model.is_arch_attention_enabled = enabled

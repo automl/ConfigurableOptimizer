@@ -38,6 +38,7 @@ from confopt.profiles import (
     GDASProfile,
 )
 from confopt.searchspace import (
+    ArchAttentionHandler,
     BabyDARTSSearchSpace,
     DARTSImageNetModel,
     DARTSModel,
@@ -137,7 +138,7 @@ class Experiment:
         is_wandb_log: bool = False,
         debug_mode: bool = False,
         exp_name: str = "test",
-        runtime: str = "",
+        runtime: str | None = None,
     ) -> None:
         self.search_space_str = search_space
         self.dataset_str = dataset
@@ -378,7 +379,20 @@ class Experiment:
 
         self.set_lora_toggler(config.get("lora", {}), config.get("lora_extra", {}))
         self.set_weight_entangler()
+        self.set_arch_attention_between_edges(
+            config.get("is_arch_attention_enabled", False)
+        )
         self.set_profile(config)
+
+    def set_arch_attention_between_edges(self, enabled: bool) -> None:
+        if enabled is False:  # disabled by default
+            return
+
+        assert isinstance(
+            self.search_space, ArchAttentionHandler
+        ), "SearchSpace must be of type ArchAttentionHandler to \
+            enable attention between edges"
+        self.search_space.set_arch_attention(enabled)
 
     def set_search_space(
         self,
@@ -801,6 +815,7 @@ class Experiment:
             start_epoch=start_epoch,
             checkpointing_freq=trainer_arguments.checkpointing_freq,  # type: ignore
             epochs=trainer_arguments.epochs,  # type: ignore
+            debug_mode=self.debug_mode,
         )
 
         trainer.train(

@@ -135,6 +135,12 @@ class NB201SearchModel(nn.Module):
         )
         self.weights: dict[str, list[torch.Tensor]] = {}
 
+        # Multi-head attention for architectural parameters
+        self.is_arch_attention_enabled = False  # disabled by default
+        self.multihead_attention = nn.MultiheadAttention(
+            embed_dim=len(self.op_names), num_heads=1
+        )
+
     def get_weights(self) -> list[nn.Parameter]:
         """Get a list of learnable parameters in the model. (does not include alpha or
         beta parameters).
@@ -226,14 +232,18 @@ class NB201SearchModel(nn.Module):
             nodes.
         """
         genotypes = []
+
+        if self.is_arch_attention_enabled:
+            arch_parameters = self._compute_arch_attention(self.arch_parameters)
+        else:
+            arch_parameters = self.arch_parameters
+
         for i in range(1, self.max_nodes):
             xlist = []
             for j in range(i):
                 node_str = f"{i}<-{j}"
                 with torch.no_grad():
-                    weights = self.arch_parameters[  # type: ignore
-                        self.edge2index[node_str]
-                    ]
+                    weights = arch_parameters[self.edge2index[node_str]]  # type: ignore
                     # betas = self.beta_parameters[self.edge2index[node_str]]
                     op_name = self.op_names[weights.argmax().item()]  # type: ignore
                 xlist.append((op_name, j))
@@ -266,6 +276,9 @@ class NB201SearchModel(nn.Module):
 
     def sample_with_mask(self) -> torch.Tensor:
         weights_to_sample = self.arch_parameters
+
+        if self.is_arch_attention_enabled:
+            weights_to_sample = self._compute_arch_attention(weights_to_sample)
 
         if self.mask is not None:
             weights_to_sample = self.remove_pruned_alphas(weights_to_sample)
@@ -428,6 +441,10 @@ class NB201SearchModel(nn.Module):
         if self.arch_parameters is not None:
             params -= set(self.arch_parameters)
         return list(params)
+
+    def _compute_arch_attention(self, alphas: nn.Parameter) -> torch.Tensor:
+        attn_alphas, _ = self.multihead_attention(alphas, alphas, alphas)
+        return attn_alphas
 
 
 def preserve_grads(m: nn.Module) -> None:
