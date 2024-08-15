@@ -189,7 +189,9 @@ def set_ops_to_prune(model: torch.nn.Module, mask: torch.Tensor) -> None:
 
 
 def unwrap_model(model: torch.nn.Module) -> torch.nn.Module:
-    if isinstance(model, torch.nn.DataParallel):
+    if isinstance(
+        model, (torch.nn.DataParallel, torch.nn.parallel.DistributedDataParallel)
+    ):
         return model.module
     return model
 
