@@ -132,13 +132,13 @@ class ConfigurableTrainer:
         search_space_handler.adapt_search_space(self.model)
         self._init_experiment_state()
 
-        if self.use_data_parallel:
-            network, criterion = self._load_onto_data_parallel(
-                self.model, self.criterion
-            )
-        else:
-            network: nn.Module = self.model  # type: ignore
-            criterion = self.criterion
+        network = (
+            self._load_onto_data_parallel(self.model)
+            if self.use_data_parallel
+            else self.model
+        )
+        unwrapped_network = self.model
+        criterion = self.criterion
 
         start_time = time.time()
         search_time, epoch_time = AverageMeter(), AverageMeter()
@@ -227,8 +227,10 @@ class ConfigurableTrainer:
             self.logger.update_wandb_logs(arch_values_dict)
 
             # Log GM scores
-            if calc_gm_score and isinstance(network, GradientMatchingScoreSupport):
-                gm_score = unwrap_model(network).calc_avg_gm_score()
+            if calc_gm_score and isinstance(
+                unwrapped_network, GradientMatchingScoreSupport
+            ):
+                gm_score = unwrapped_network.calc_avg_gm_score()
                 gm_metrics = {
                     "gm_scores/mean_gm": gm_score,
                     "gm_scores/epochs": epoch,
@@ -238,8 +240,8 @@ class ConfigurableTrainer:
                 # Add for all modules
                 self.logger.update_wandb_logs(gm_metrics)
 
-            if isinstance(unwrap_model(network), OperationStatisticsSupport):
-                ops_stats = unwrap_model(network).get_op_stats()
+            if isinstance(unwrapped_network, OperationStatisticsSupport):
+                ops_stats = unwrapped_network.get_op_stats()
                 self.logger.update_wandb_logs(ops_stats)
 
             # Log Layer Alignment scores
@@ -307,17 +309,16 @@ class ConfigurableTrainer:
                         self.logger.log(f"alpha {i} is {alpha}")
 
             # Reset GM Scores
-            if calc_gm_score:
-                if self.use_data_parallel:
-                    network.module.reset_gm_scores()
-                else:
-                    network.reset_gm_scores()
+            if calc_gm_score and isinstance(
+                unwrapped_network, GradientMatchingScoreSupport
+            ):
+                unwrapped_network.reset_gm_scores()
 
             # measure elapsed time
             epoch_time.update(time.time() - start_time)
             start_time = time.time()
 
-    def _train_epoch(  # noqa: PLR0912, PLR0915, C901
+    def _train_epoch(  # noqa: PLR0915, C901
         self,
         search_space_handler: SearchSpaceHandler,
         train_loader: DataLoader,
@@ -344,6 +345,7 @@ class ConfigurableTrainer:
             AverageMeter(),
         )
         network.train()
+        unwrapped_network = unwrap_model(network)
         end = time.time()
         layer_alignment_scores[0].reset()  # type: ignore
         layer_alignment_scores[1].reset()  # type: ignore
@@ -375,10 +377,7 @@ class ConfigurableTrainer:
                 arch_loss.backward()
                 arch_optimizer.step()
 
-                if self.use_data_parallel:
-                    search_space_handler.perturb_parameter(network.module)
-                else:
-                    search_space_handler.perturb_parameter(network)
+                search_space_handler.perturb_parameter(unwrapped_network)
 
                 self._update_meters(
                     inputs=arch_inputs,
@@ -391,12 +390,12 @@ class ConfigurableTrainer:
                 )
 
             # calculate gm_score
-            if calc_gm_score:
-                supernet = unwrap_model(network)
-                if isinstance(supernet, GradientMatchingScoreSupport):
-                    supernet.update_grads_cosine_similarity()
-                    if oles:
-                        supernet.apply_operator_early_stopping()
+            if calc_gm_score and isinstance(
+                unwrapped_network, GradientMatchingScoreSupport
+            ):
+                unwrapped_network.update_grads_cosine_similarity()
+                if oles:
+                    unwrapped_network.apply_operator_early_stopping()
 
             # update the model weights
             w_optimizer.zero_grad()
@@ -406,29 +405,25 @@ class ConfigurableTrainer:
             base_loss = criterion(logits, base_targets)
             base_loss.backward()
 
-            if isinstance(unwrap_model(network), OperationStatisticsSupport):
+            if isinstance(unwrapped_network, OperationStatisticsSupport):
                 (
                     score_normal,
                     score_reduce,
-                ) = unwrap_model(network).get_mean_layer_alignment_score()
+                ) = unwrapped_network.get_mean_layer_alignment_score()
                 layer_alignment_scores[0].update(val=score_normal)  # type: ignore
                 layer_alignment_scores[1].update(val=score_reduce)  # type: ignore
 
-            if self.use_data_parallel:
-                torch.nn.utils.clip_grad_norm_(
-                    network.module.model_weight_parameters(), 5
-                )
-            else:
-                torch.nn.utils.clip_grad_norm_(network.model_weight_parameters(), 5)
+            torch.nn.utils.clip_grad_norm_(
+                unwrapped_network.model_weight_parameters(), 5
+            )
 
             w_optimizer.step()
 
-            # save grads of operations
-            if calc_gm_score:
-                if self.use_data_parallel:
-                    network.module.preserve_grads()  # type: ignore
-                else:
-                    network.preserve_grads()  # type: ignore
+            # save grads of operations for gm_score
+            if calc_gm_score and isinstance(
+                unwrapped_network, GradientMatchingScoreSupport
+            ):
+                unwrapped_network.preserve_grads()  # type: ignore
 
             w_optimizer.zero_grad()
             if not is_warm_epoch:
@@ -517,16 +512,11 @@ class ConfigurableTrainer:
 
         return network, criterion
 
-    def _load_onto_data_parallel(
-        self, network: nn.Module, criterion: Loss
-    ) -> tuple[nn.Module, Loss]:
+    def _load_onto_data_parallel(self, network: nn.Module) -> tuple[nn.Module, Loss]:
         if torch.cuda.is_available():
-            network, criterion = (
-                DataParallel(self.model).cuda(),
-                criterion.cuda(),
-            )
+            network = DataParallel(self.model).cuda()
 
-        return network, criterion
+        return network
 
     def _init_empty_exp_state_info(self) -> None:
         self.start_epoch = 0
@@ -628,11 +618,9 @@ class ConfigurableTrainer:
     ) -> None:
         if self.benchmark_api is None:
             return
-        genotype = (
-            network.module.model.genotype()
-            if self.use_data_parallel
-            else network.model.genotype()
-        )
+
+        genotype = unwrap_model(network).model.genotype()
+
         result_train, rusult_valid, result_test = self.benchmark_api.query(
             genotype, dataset=self.query_dataset
         )
@@ -666,10 +654,10 @@ class ConfigurableTrainer:
             + " Conv2DLoRA module"
         )
         # clear OLES_OPS from pre_grads, avg and count
-        if self.use_data_parallel:
-            network.module.apply(clear_grad_cosine)
-        else:
-            network.apply(clear_grad_cosine)
+        unwrapped_network = unwrap_model(network)
+        unwrapped_network.apply(
+            clear_grad_cosine
+        )  # TODO-AK: to wrap or not to wrap, that is the question
         # reinitialize optimizer
         optimizer_hyperparameters = self.model_optimizer.defaults
         old_param_lrs = []
@@ -679,11 +667,7 @@ class ConfigurableTrainer:
             old_initial_lrs.append(param_group["initial_lr"])
 
         self.model_optimizer = type(self.model_optimizer)(
-            (
-                network.module.model_weight_parameters()  # type: ignore
-                if self.use_data_parallel
-                else network.model_weight_parameters()  # type: ignore
-            ),
+            unwrapped_network.model_weight_parameters(),
             **optimizer_hyperparameters,
         )
         # change the lr for optimizer
@@ -714,15 +698,14 @@ class ConfigurableTrainer:
             **scheduler_config,
         )
 
-        if is_gm_score_enabled:
-            if self.use_data_parallel:
-                network.module.reset_gm_score_attributes()
-            else:
-                network.reset_gm_score_attributes()
+        if is_gm_score_enabled and isinstance(network, GradientMatchingScoreSupport):
+            unwrapped_network.reset_gm_score_attributes()
 
     def get_all_running_mean_scores(self, network: torch.nn.Module) -> dict:
         running_sim_dict = {}
-        model = network.module if self.use_data_parallel else network
+        model = unwrap_model(
+            network
+        )  # TODO-AK: to wrap or not to wrap, that is the question
         for name, module in model.named_modules():
             if hasattr(module, "running_sim"):
                 running_sim_dict[f"gm_scores/{name}"] = module.running_sim.avg
