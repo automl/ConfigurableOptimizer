@@ -65,10 +65,6 @@ class NASBench201SearchSpace(SearchSpace, ArchAttentionSupport):
         """
         self.model.arch_parameters.data = arch_parameters[0]
 
-    def prune(self, num_keep: int) -> None:
-        """Prune the model's architecture parameters."""
-        self.model.prune(num_keep=num_keep)  # type: ignore
-
     def discretize(self) -> nn.Module:
         return self.model._discretize()  # type: ignore
 
