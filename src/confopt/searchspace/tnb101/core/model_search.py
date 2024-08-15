@@ -304,9 +304,9 @@ class TNB101SearchModel(nn.Module):
         ).to(next(self.parameters()).device)
 
         if self.is_arch_attention_enabled:
-            arch_parameters = self._compute_arch_attention(self.arch_parameters)
+            arch_parameters = self._compute_arch_attention(self._arch_parameters)
         else:
-            arch_parameters = self.arch_parameters
+            arch_parameters = self._arch_parameters
 
         for cell in dicrete_model.cells:
             cell._discretize(arch_parameters)
