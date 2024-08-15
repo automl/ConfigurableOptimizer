@@ -5,7 +5,7 @@ from functools import partial
 import torch
 from torch import nn
 
-from confopt.searchspace.common.base_search import ArchAttentionHandler, SearchSpace
+from confopt.searchspace.common.base_search import ArchAttentionSupport, SearchSpace
 
 from .core.genotypes import Structure as NB201Gynotype
 from .core.model_search import NB201SearchModel, check_grads_cosine, preserve_grads
@@ -13,7 +13,7 @@ from .core.model_search import NB201SearchModel, check_grads_cosine, preserve_gr
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
-class NASBench201SearchSpace(SearchSpace, ArchAttentionHandler):
+class NASBench201SearchSpace(SearchSpace, ArchAttentionSupport):
     def __init__(self, *args, **kwargs):  # type: ignore
         """Initialize the custom search model of NASBench201SearchSpace.
 

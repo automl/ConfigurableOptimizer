@@ -69,6 +69,6 @@ class SearchSpace(ModelWrapper, ABC):
         return -1, -1
 
 
-class ArchAttentionHandler(ModelWrapper):
+class ArchAttentionSupport(ModelWrapper):
     def set_arch_attention(self, enabled: bool) -> None:
         self.model.is_arch_attention_enabled = enabled

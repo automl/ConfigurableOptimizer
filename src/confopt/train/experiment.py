@@ -38,7 +38,7 @@ from confopt.profiles import (
     GDASProfile,
 )
 from confopt.searchspace import (
-    ArchAttentionHandler,
+    ArchAttentionSupport,
     BabyDARTSSearchSpace,
     DARTSImageNetModel,
     DARTSModel,
@@ -389,7 +389,7 @@ class Experiment:
             return
 
         assert isinstance(
-            self.search_space, ArchAttentionHandler
+            self.search_space, ArchAttentionSupport
         ), "SearchSpace must be of type ArchAttentionHandler to \
             enable attention between edges"
         self.search_space.set_arch_attention(enabled)

@@ -3,14 +3,14 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from confopt.searchspace.common.base_search import ArchAttentionHandler, SearchSpace
+from confopt.searchspace.common.base_search import ArchAttentionSupport, SearchSpace
 
 from .core import TNB101MicroModel
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
-class TransNASBench101SearchSpace(SearchSpace, ArchAttentionHandler):
+class TransNASBench101SearchSpace(SearchSpace, ArchAttentionSupport):
     def __init__(self, *args, **kwargs):  # type: ignore
         model = TNB101MicroModel(*args, **kwargs).to(DEVICE)
         super().__init__(model)
