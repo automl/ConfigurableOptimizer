@@ -79,13 +79,13 @@ class GradientMatchingScoreSupport(ModelWrapper):
         ...
 
     @abstractmethod
-    def update_grads_cosine_similarity(self) -> None:
-        """Update the cosine similarity of the gradients of the model."""
-        ...
-
-    @abstractmethod
-    def apply_operator_early_stopping(self) -> None:
-        """Apply early stopping to the operations in the model."""
+    def update_gradient_matching_scores(
+        self,
+        early_stop: bool = False,
+        early_stop_frequency: int = 20,
+        early_stop_threshold: float = 0.4,
+    ) -> None:
+        """Update the gradient matching scores of the model."""
         ...
 
     @abstractmethod

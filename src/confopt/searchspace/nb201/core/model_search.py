@@ -13,9 +13,7 @@ from torch import nn
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
 from confopt.utils import (
-    AverageMeter,
     calc_layer_alignment_score,
-    freeze,
     preserve_gradients_in_module,
 )
 from confopt.utils.normalize_params import normalize_params
@@ -456,76 +454,3 @@ def preserve_grads(m: nn.Module) -> None:
     )
 
     preserve_gradients_in_module(m, ignored_modules, OLES_OPS)
-
-
-# TODO: break function from OLES paper to have less branching.
-def update_grads_cosine_similarity(m: nn.Module) -> None:
-    if (
-        isinstance(
-            m,
-            (
-                OperationBlock,
-                OperationChoices,
-                SearchCell,
-                NB201SearchModel,
-            ),
-        )
-        or not isinstance(m, tuple(OLES_OPS))
-        or not hasattr(m, "pre_grads")
-        or not m.pre_grads
-    ):
-        return
-
-    i = 0
-    true_i = 0
-    temp = 0
-
-    for param in m.parameters():
-        if param.requires_grad and param.grad is not None:
-            g = param.grad.detach().cpu()
-            if len(g) != 0:
-                temp += torch.cosine_similarity(g, m.pre_grads[i], dim=0).mean()
-                true_i += 1
-            i += 1
-
-    m.pre_grads.clear()
-    if true_i == 0:
-        return
-    sim_avg = temp / true_i
-
-    if not hasattr(m, "avg"):
-        m.avg = 0
-    m.avg += sim_avg
-
-    if not hasattr(m, "running_sim"):
-        m.running_sim = AverageMeter()
-    m.running_sim.update(sim_avg)
-
-    if not hasattr(m, "count"):
-        m.count = 0
-
-    m.count += 1
-
-
-def apply_operator_early_stopping(
-    m: nn.Module, n_count: int = 20, threshold: float = 0.4
-) -> None:
-    if not isinstance(m, tuple(OLES_OPS)) or not hasattr(m, "pre_grads"):
-        return
-
-    true_i = 0
-
-    for param in m.parameters():
-        if param.requires_grad and param.grad is not None:
-            g = param.grad.detach().cpu()
-            if len(g) != 0:
-                true_i += 1
-
-    if true_i == 0:
-        return
-
-    if m.count == n_count:
-        if m.avg / m.count < threshold:
-            freeze(m)
-        m.count = 0
-        m.avg = 0

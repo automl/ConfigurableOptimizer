@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import partial
+
 import torch
 from torch import nn
 
@@ -10,12 +12,13 @@ from confopt.searchspace.common.base_search import (
     OperationStatisticsSupport,
     SearchSpace,
 )
+from confopt.searchspace.nb201.core.operations import OLES_OPS
+from confopt.utils import update_gradient_matching_scores
 
 from .core.genotypes import Structure as NB201Gynotype
 from .core.model_search import (
     NB201SearchModel,
     preserve_grads,
-    update_grads_cosine_similarity,
 )
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -88,11 +91,20 @@ class NASBench201SearchSpace(
     def preserve_grads(self) -> None:
         self.model.apply(preserve_grads)
 
-    def update_grads_cosine_similarity(self) -> None:
-        self.model.apply(update_grads_cosine_similarity)
-
-    def apply_operator_early_stopping(self) -> None:
-        self.model.apply()
+    def update_gradient_matching_scores(
+        self,
+        early_stop: bool = False,
+        early_stop_frequency: int = 20,
+        early_stop_threshold: float = 0.4,
+    ) -> None:
+        partial_fn = partial(
+            update_gradient_matching_scores,
+            oles_ops=OLES_OPS,
+            early_stop=early_stop,
+            early_stop_frequency=early_stop_frequency,
+            early_stop_threshold=early_stop_threshold,
+        )
+        self.model.apply(partial_fn)
 
     def calc_avg_gm_score(self) -> float:
         sim_avg = []

@@ -196,6 +196,60 @@ def unwrap_model(model: torch.nn.Module) -> torch.nn.Module:
     return model
 
 
+def _init_grad_match_metrics(m: nn.Module) -> None:
+    if not hasattr(m, "avg"):
+        m.avg = 0
+    if not hasattr(m, "running_sim"):
+        m.running_sim = AverageMeter()
+    if not hasattr(m, "count"):
+        m.count = 0
+
+
+def update_gradient_matching_scores(
+    m: nn.Module,
+    oles_ops: list[nn.Module],
+    early_stop: bool = False,
+    early_stop_frequency: int = 20,
+    early_stop_threshold: float = 0.4,
+) -> None:
+    if (
+        not isinstance(m, tuple(oles_ops))
+        or not hasattr(m, "pre_grads")
+        or not m.pre_grads
+    ):
+        return
+
+    i = 0
+    true_i = 0
+    temp = 0
+
+    for param in m.parameters():
+        if param.requires_grad and param.grad is not None:
+            g = param.grad.detach().cpu()
+            if len(g) != 0:
+                temp += torch.cosine_similarity(g, m.pre_grads[i], dim=0).mean()
+                true_i += 1
+            i += 1
+
+    m.pre_grads.clear()
+    if true_i == 0:
+        return
+    sim_avg = temp / true_i
+
+    _init_grad_match_metrics(m)
+
+    m.avg += sim_avg
+    m.running_sim.update(sim_avg)
+
+    if m.count == early_stop_frequency:
+        if m.avg / m.count < early_stop_threshold and early_stop:
+            freeze(m)
+        m.count = 0
+        m.avg = 0
+    else:
+        m.count += 1
+
+
 __all__ = [
     "calc_accuracy",
     "save_checkpoint",
@@ -217,4 +271,5 @@ __all__ = [
     "calc_layer_alignment_score",
     "reset_gm_score_attributes",
     "set_ops_to_prune",
+    "update_gradient_matching_scores",
 ]

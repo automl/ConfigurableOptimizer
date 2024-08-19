@@ -318,7 +318,7 @@ class ConfigurableTrainer:
             epoch_time.update(time.time() - start_time)
             start_time = time.time()
 
-    def _train_epoch(  # noqa: PLR0915, C901
+    def _train_epoch(  # noqa: PLR0915
         self,
         search_space_handler: SearchSpaceHandler,
         train_loader: DataLoader,
@@ -393,9 +393,7 @@ class ConfigurableTrainer:
             if calc_gm_score and isinstance(
                 unwrapped_network, GradientMatchingScoreSupport
             ):
-                unwrapped_network.update_grads_cosine_similarity()
-                if oles:
-                    unwrapped_network.apply_operator_early_stopping()
+                unwrapped_network.update_gradient_matching_scores(early_stop=oles)
 
             # update the model weights
             w_optimizer.zero_grad()
