@@ -88,14 +88,20 @@ class GradientMatchingScoreSupport(ModelWrapper):
         """Update the gradient matching scores of the model."""
         ...
 
-    @abstractmethod
     def calc_avg_gm_score(self) -> float:
         """Calculate the average gradient matching score of the model.
 
         Returns:
             float: The average gradient matching score of the model.
         """
-        ...
+        sim_avg = []
+        for module in self.model.modules():
+            if hasattr(module, "running_sim"):
+                sim_avg.append(module.running_sim.avg)
+        if len(sim_avg) == 0:
+            return 0
+        avg_gm_score = sum(sim_avg) / len(sim_avg)
+        return avg_gm_score
 
     def reset_gm_score_attributes(self) -> None:
         """Reset the gradient matching score attributes of the model."""
