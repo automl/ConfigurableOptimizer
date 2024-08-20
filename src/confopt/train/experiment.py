@@ -498,8 +498,6 @@ class Experiment:
             self.lora_toggler = None
 
     def set_regularizer(self, config: dict) -> None:
-        print(config)
-        print("$$$" * 10)
         if config is None or len(config["active_reg_terms"]) == 0:
             self.regularizer = None
             return
