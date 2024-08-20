@@ -6,16 +6,30 @@ from typing import Literal
 import torch
 from torch import nn
 
-from confopt.searchspace.common.base_search import SearchSpace
+from confopt.searchspace.common.base_search import (
+    ArchAttentionSupport,
+    GradientMatchingScoreSupport,
+    LayerAlignmentScoreSupport,
+    OperationStatisticsSupport,
+    SearchSpace,
+)
+from confopt.searchspace.darts.core.operations import OLES_OPS
+from confopt.utils import update_gradient_matching_scores
 
 from .core import DARTSSearchModel
 from .core.genotypes import DARTSGenotype
-from .core.model_search import check_grads_cosine, preserve_grads
+from .core.model_search import preserve_grads
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
-class DARTSSearchSpace(SearchSpace):
+class DARTSSearchSpace(
+    SearchSpace,
+    ArchAttentionSupport,
+    GradientMatchingScoreSupport,
+    OperationStatisticsSupport,
+    LayerAlignmentScoreSupport,
+):
     def __init__(self, *args, **kwargs):  # type: ignore
         """DARTS Search Space for Neural Architecture Search.
 
@@ -99,9 +113,6 @@ class DARTSSearchSpace(SearchSpace):
             self.model.alphas_reduce,
         ]
 
-    def prune(self, num_keep: int) -> None:
-        self.model.prune(num_keep)  # type: ignore
-
     def discretize(self) -> nn.Module:
         return self.model.discretize()  # type: ignore
 
@@ -111,32 +122,34 @@ class DARTSSearchSpace(SearchSpace):
     def preserve_grads(self) -> None:
         self.model.apply(preserve_grads)
 
-    def check_grads_cosine(self, oles: bool = False) -> None:
-        check_grads_cosine_part = partial(check_grads_cosine, oles=oles)
-        self.model.apply(check_grads_cosine_part)
-
-    def calc_avg_gm_score(self) -> float:
-        sim_avg = []
-        for module in self.model.modules():
-            if hasattr(module, "running_sim"):
-                sim_avg.append(module.running_sim.avg)
-        if len(sim_avg) == 0:
-            return 0
-        avg_gm_score = sum(sim_avg) / len(sim_avg)
-        return avg_gm_score
+    def update_gradient_matching_scores(
+        self,
+        early_stop: bool = False,
+        early_stop_frequency: int = 20,
+        early_stop_threshold: float = 0.4,
+    ) -> None:
+        partial_fn = partial(
+            update_gradient_matching_scores,
+            oles_ops=OLES_OPS,
+            early_stop=early_stop,
+            early_stop_frequency=early_stop_frequency,
+            early_stop_threshold=early_stop_threshold,
+        )
+        self.model.apply(partial_fn)
 
     def get_mean_layer_alignment_score(self) -> tuple[float, float]:
         return self.model._get_mean_layer_alignment_score()
 
-    def reset_gm_scores(self) -> None:
-        for module in self.model.modules():
-            if hasattr(module, "running_sim"):
-                module.running_sim.reset()
-
-    def get_num_skip_ops(self) -> tuple[int, int]:
+    def get_num_skip_ops(self) -> dict[str, int]:
         alphas_normal, alphas_reduce = self.model.arch_parameters()
         count_skip = lambda alphas: sum(alphas[:, 1:].argmax(dim=1) == 2)
-        return count_skip(alphas_normal), count_skip(alphas_reduce)
+
+        stats = {
+            "skip_connections/normal": count_skip(alphas_normal),
+            "skip_connections/reduce": count_skip(alphas_reduce),
+        }
+
+        return stats
 
     def get_num_ops(self) -> int:
         return self.model.num_ops

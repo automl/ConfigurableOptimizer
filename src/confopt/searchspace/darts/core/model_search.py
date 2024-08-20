@@ -11,9 +11,7 @@ import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
 from confopt.utils import (
-    AverageMeter,
     calc_layer_alignment_score,
-    freeze,
     preserve_gradients_in_module,
     set_ops_to_prune,
 )
@@ -257,6 +255,12 @@ class Network(nn.Module):
         self.classifier = nn.Linear(C_prev, num_classes)
         self.weights: dict[str, list[torch.Tensor]] = {}
 
+        # Multi-head attention for architectural parameters
+        self.is_arch_attention_enabled = False  # disabled by default
+        self.multihead_attention = nn.MultiheadAttention(
+            embed_dim=len(self.primitives), num_heads=1
+        )
+
         self._initialize_parameters()
 
     def new(self) -> Network:
@@ -339,6 +343,14 @@ class Network(nn.Module):
     def sample_with_mask(self) -> tuple[torch.Tensor, torch.Tensor]:
         weights_normal_to_sample = self.alphas_normal
         weights_reduce_to_sample = self.alphas_reduce
+
+        if self.is_arch_attention_enabled:
+            (
+                weights_normal_to_sample,
+                weights_reduce_to_sample,
+            ) = self._compute_arch_attention(
+                weights_normal_to_sample, weights_reduce_to_sample
+            )
 
         if self.mask is not None:
             # The shape of weights will change
@@ -551,8 +563,16 @@ class Network(nn.Module):
                 n += 1
             return gene
 
-        gene_normal = _parse(F.softmax(self.alphas_normal, dim=-1).data.cpu().numpy())
-        gene_reduce = _parse(F.softmax(self.alphas_reduce, dim=-1).data.cpu().numpy())
+        if self.is_arch_attention_enabled:
+            alphas_normal, alphas_reduce = self._compute_arch_attention(
+                self.alphas_normal, self.alphas_reduce
+            )
+        else:
+            alphas_normal = self.alphas_normal
+            alphas_reduce = self.alphas_reduce
+
+        gene_normal = _parse(F.softmax(alphas_normal, dim=-1).data.cpu().numpy())
+        gene_reduce = _parse(F.softmax(alphas_reduce, dim=-1).data.cpu().numpy())
 
         concat = range(2 + self._steps - self._multiplier, self._steps + 2)
         genotype = DARTSGenotype(
@@ -766,6 +786,19 @@ class Network(nn.Module):
 
         return weights
 
+    def _compute_arch_attention(
+        self, normal_alphas: nn.Parameter, reduce_alphas: nn.Parameter
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        all_arch_params = torch.concat((normal_alphas, reduce_alphas))
+        all_arch_attn, _ = self.multihead_attention(
+            all_arch_params, all_arch_params, all_arch_params, need_weights=False
+        )
+        num_edges_normal = normal_alphas.shape[0]
+        attn_normal = all_arch_attn[:num_edges_normal]
+        attn_reduce = all_arch_attn[num_edges_normal:]
+
+        return attn_normal, attn_reduce
+
 
 def preserve_grads(m: nn.Module) -> None:
     ignored_modules = (
@@ -777,50 +810,3 @@ def preserve_grads(m: nn.Module) -> None:
     )
 
     preserve_gradients_in_module(m, ignored_modules, OLES_OPS)
-
-
-# TODO: break function from OLES paper to have less branching.
-def check_grads_cosine(m: nn.Module, oles: bool = False) -> None:  # noqa: C901
-    if (
-        isinstance(m, (OperationBlock, OperationChoices, Cell, MixedOp, Network))
-        or not isinstance(m, tuple(OLES_OPS))
-        or not hasattr(m, "pre_grads")
-        or not m.pre_grads
-    ):
-        return
-
-    i = 0
-    true_i = 0
-    temp = 0
-
-    for param in m.parameters():
-        if param.requires_grad and param.grad is not None:
-            g = param.grad.detach().cpu()
-            if len(g) != 0:
-                temp += torch.cosine_similarity(g, m.pre_grads[i], dim=0).mean()
-                true_i += 1
-            i += 1
-
-    m.pre_grads.clear()
-    if true_i == 0:
-        return
-    sim_avg = temp / true_i
-
-    if not hasattr(m, "avg"):
-        m.avg = 0
-    m.avg += sim_avg
-
-    if not hasattr(m, "running_sim"):
-        m.running_sim = AverageMeter()
-    m.running_sim.update(sim_avg)
-
-    if not hasattr(m, "count"):
-        m.count = 0
-
-    if m.count == 20:
-        if m.avg / m.count < 0.4 and oles:
-            freeze(m)
-        m.count = 0
-        m.avg = 0
-    else:
-        m.count += 1

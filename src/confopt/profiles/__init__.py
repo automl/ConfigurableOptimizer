@@ -4,6 +4,7 @@ from .profiles import (
     DiscreteProfile,
     DRNASProfile,
     GDASProfile,
+    ReinMaxProfile,
     SNASProfile,
 )
 
@@ -14,4 +15,5 @@ __all__ = [
     "DRNASProfile",
     "SNASProfile",
     "DiscreteProfile",
+    "ReinMaxProfile",
 ]

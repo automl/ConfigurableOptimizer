@@ -37,6 +37,7 @@ class BaseProfile:
         prune_epochs: list[int] | None = None,
         prune_num_keeps: list[int] | None = None,
         pt_select_architecture: bool = False,
+        is_arch_attention_enabled: bool = False,
     ) -> None:
         self.config_type = config_type
         self.epochs = epochs
@@ -62,6 +63,7 @@ class BaseProfile:
 
         PROFILE_TYPE = "BASE"
         self.sampler_type = str.lower(PROFILE_TYPE)
+        self.is_arch_attention_enabled = is_arch_attention_enabled
 
     def _set_pt_select_configs(
         self,
@@ -172,6 +174,7 @@ class BaseProfile:
             "weight_type": weight_type,
             "oles": self.oles_config,
             "pt_selection": self.pt_select_configs,
+            "is_arch_attention_enabled": self.is_arch_attention_enabled,
         }
 
         if hasattr(self, "pruner_config"):

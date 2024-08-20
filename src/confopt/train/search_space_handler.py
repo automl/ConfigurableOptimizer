@@ -16,6 +16,7 @@ from confopt.searchspace.common import (
     OperationChoices,
     SearchSpace,
 )
+from confopt.searchspace.common.base_search import ArchAttentionSupport
 
 
 class SearchSpaceHandler:
@@ -30,6 +31,7 @@ class SearchSpaceHandler:
         lora_configs: dict | None = None,
         pruner: Pruner | None = None,
         lora_toggler: LoRAToggler | None = None,
+        is_arch_attention_enabled: bool = False,
     ) -> None:
         self.sampler = sampler
         self.edge_normalization = edge_normalization
@@ -44,6 +46,8 @@ class SearchSpaceHandler:
         self.is_argmax_sampler = False
         if isinstance(self.sampler, GDASSampler):
             self.is_argmax_sampler = True
+
+        self.is_arch_attention_enabled = is_arch_attention_enabled
 
     def adapt_search_space(self, search_space: SearchSpace) -> None:
         if hasattr(search_space.model, "edge_normalization"):
@@ -72,6 +76,11 @@ class SearchSpaceHandler:
 
         if self.lora_toggler:
             search_space.components.append(self.lora_toggler)
+
+        if self.is_arch_attention_enabled and isinstance(
+            search_space, ArchAttentionSupport
+        ):
+            search_space.set_arch_attention(True)
 
     def perturb_parameter(self, search_space: SearchSpace) -> None:
         if self.perturbation is not None:
