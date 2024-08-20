@@ -17,7 +17,7 @@ class SDARTSPerturbator(BasePerturbator):
         search_space: SearchSpace | None = None,
         data: tuple[torch.Tensor, torch.Tensor] | None = None,
         loss_criterion: torch.nn.modules.loss._Loss | None = None,
-        attack_type: Literal["random", "adverserial"] = "random",
+        attack_type: Literal["random", "adversarial"] = "random",
         steps: int = 7,
         random_start: bool = True,
         sample_frequency: Literal["epoch", "step"] = "step",
@@ -29,12 +29,12 @@ class SDARTSPerturbator(BasePerturbator):
 
         assert attack_type in [
             "random",
-            "adverserial",
-        ], "attack_type must be either 'random' or 'adverserial'"
+            "adversarial",
+        ], "attack_type must be either 'random' or 'adversarial'"
         self.attack_type = attack_type
 
-        # Initialize variables for adverserial attack
-        if self.attack_type == "adverserial":
+        # Initialize variables for adversarial attack
+        if self.attack_type == "adversarial":
             assert search_space is not None, "search_space should not be None"
 
             assert data is not None, "data should not be None"

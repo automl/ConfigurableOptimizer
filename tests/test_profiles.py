@@ -7,6 +7,7 @@ from confopt.profiles import (
     BaseProfile,
     SNASProfile,
 )
+from confopt.profiles.profiles import ReinMaxProfile
 
 
 class TestBaseProfile(unittest.TestCase):
@@ -229,6 +230,55 @@ class TestGDASProfile(unittest.TestCase):
 
     def test_sampler_change(self) -> None:
         profile = GDASProfile(
+            epochs=100,
+            sampler_sample_frequency="step",
+        )
+        sampler_config = {"tau_max": 12, "tau_min": 0.3}
+        profile.configure_sampler(**sampler_config)
+
+        assert profile.sampler_config["tau_max"] == sampler_config["tau_max"]
+        assert profile.sampler_config["tau_min"] == sampler_config["tau_min"]
+
+        with self.assertRaises(AssertionError):
+            profile.configure_sampler(invalid_config="step")
+
+class TestReinMaxProfile(unittest.TestCase):
+    def test_initialization(self) -> None:
+        perturb_config = {"epsilon": 0.5}
+        partial_connector_config = {
+            "k": 2,
+        }
+        profile = ReinMaxProfile(
+            epochs=100,
+            is_partial_connection=True,
+            perturbation="random",
+            sampler_sample_frequency="step",
+            partial_connector_config=partial_connector_config,
+            perturbator_config=perturb_config,
+        )
+
+        assert profile.sampler_config is not None
+        assert profile.partial_connector_config["k"] == partial_connector_config["k"]
+        assert profile.perturb_config["epsilon"] == perturb_config["epsilon"]
+
+    def test_invalid_initialization(self) -> None:
+        perturb_config = {"invalid_config": 0.5}
+        partial_connector_config = {
+            "invalid_config": 2,
+        }
+
+        with self.assertRaises(AssertionError):
+            profile = ReinMaxProfile(  # noqa: F841
+                epochs=100,
+                is_partial_connection=True,
+                perturbation="random",
+                sampler_sample_frequency="step",
+                partial_connector_config=partial_connector_config,
+                perturbator_config=perturb_config,
+            )
+
+    def test_sampler_change(self) -> None:
+        profile = ReinMaxProfile(
             epochs=100,
             sampler_sample_frequency="step",
         )

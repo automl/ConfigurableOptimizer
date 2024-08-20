@@ -61,7 +61,7 @@ from confopt.utils.time import check_date_format
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 # TODO Change this to real data
-ADVERSERIAL_DATA = (
+ADVERSARIAL_DATA = (
     torch.randn(2, 3, 32, 32).to(DEVICE),
     torch.randint(0, 9, (2,)).to(DEVICE),
 )
@@ -91,7 +91,7 @@ class SamplerType(Enum):
 
 class PerturbatorType(Enum):
     RANDOM = "random"
-    ADVERSERIAL = "adverserial"
+    ADVERSARIAL = "adversarial"
     NONE = "none"
 
 
@@ -172,7 +172,6 @@ class Experiment:
         config = profile.get_config()
         run_name = profile.get_name_wandb_run()
 
-        assert hasattr(profile, "sampler_type")
         self.sampler_str = SamplerType(profile.sampler_type)
         self.perturbator_str = PerturbatorType(profile.perturb_type)
         self.is_partial_connection = profile.is_partial_connection
@@ -834,7 +833,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--perturbator",
         default="none",
-        help="Type of perturbation in (none, random, adverserial)",
+        help="Type of perturbation in (none, random, adversarial)",
         type=str,
     )
     parser.add_argument(

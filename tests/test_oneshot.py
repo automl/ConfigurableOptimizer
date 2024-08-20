@@ -242,7 +242,7 @@ class TestArchSamplers(unittest.TestCase):
         # Changes the model's alpha as well, but if the loss does not decrease, it does
         # not change alpha
         # TODO Improve this test
-        perturbator.attack_type = "adverserial"
+        perturbator.attack_type = "adversarial"
         alphas_before = [
             arch_param.clone() for arch_param in searchspace.arch_parameters
         ]
