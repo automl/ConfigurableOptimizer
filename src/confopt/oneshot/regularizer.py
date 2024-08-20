@@ -8,7 +8,7 @@ from torch.distributions import Dirichlet, kl_divergence
 import torch.nn.functional as F  # noqa: N812
 
 from confopt.oneshot.base_component import OneShotComponent
-from confopt.searchspace.common.base_search import (
+from confopt.searchspace.common import (
     DrNASRegTermSupport,
     FLOPSRegTermSupport,
     SearchSpace,
