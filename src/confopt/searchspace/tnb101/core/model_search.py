@@ -6,7 +6,7 @@ import torch
 from torch import nn
 
 from confopt.searchspace.common import OperationChoices
-from confopt.utils import set_ops_to_prune
+from confopt.utils import prune, set_ops_to_prune
 from confopt.utils.normalize_params import normalize_params
 
 from . import operations as ops
@@ -125,42 +125,13 @@ class TNB101SearchModel(nn.Module):
         # Replace this function on the fly to change the sampling method
         return torch.nn.functional.softmax(alphas, dim=-1)
 
-    def remove_pruned_alphas(self, weights: torch.Tensor) -> torch.Tensor:
-        assert (
-            self.mask is not None
-        ), "This function requires a prior call to prune function"
-
-        weights = weights[self.mask]
-        weights = weights.reshape(self.mask.shape[0], self.mask[0].sum())
-
-        return weights
-
-    def restore_pruned_alpha_shape(self, weights: torch.Tensor) -> torch.Tensor:
-        assert (
-            self.mask is not None
-        ), "This function requires a prior call to prune function"
-        if isinstance(weights, list):
-            weights = torch.stack(weights)
-
-        weights_full = torch.zeros_like(self._arch_parameters)
-        weights_full[self.mask] = weights.view(-1)
-        weights = weights_full
-
-        return weights
-
-    def sample_with_mask(self) -> torch.Tensor:
+    def sample_weights(self) -> torch.Tensor:
         weights_to_sample = self._arch_parameters
 
         if self.is_arch_attention_enabled:
             weights_to_sample = self._compute_arch_attention(weights_to_sample)
 
-        if self.mask is not None:
-            weights_to_sample = self.remove_pruned_alphas(weights_to_sample)
-
         weights = self.sample(weights_to_sample)
-
-        if self.mask is not None:
-            weights = self.restore_pruned_alpha_shape(weights)
 
         return weights
 
@@ -172,7 +143,7 @@ class TNB101SearchModel(nn.Module):
             return self.edge_normalization_forward(inputs)
 
         # alphas = self.sample(self._arch_parameters)
-        alphas = self.sample_with_mask()
+        alphas = self.sample_weights()
 
         if self.mask is not None:
             alphas = normalize_params(alphas, self.mask)
@@ -208,7 +179,7 @@ class TNB101SearchModel(nn.Module):
         inputs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         # alphas = self.sample(self._arch_parameters)
-        alphas = self.sample_with_mask()
+        alphas = self.sample_weights()
 
         if self.mask is not None:
             alphas = normalize_params(alphas, self.mask)
@@ -270,22 +241,22 @@ class TNB101SearchModel(nn.Module):
     def _is_reduction_stage(self, stage: str) -> bool:
         return "r_stage" in stage
 
-    def prune(self, num_keep: int) -> None:
+    def prune(self, prune_fraction: float) -> None:
         """Discretize architecture parameters to enforce sparsity.
 
         Args:
-            num_keep (float): Number of operations to keep.
+            prune_fraction (float): Number of operations to keep.
         """
-        data_to_sort = self._arch_parameters.clone()
-        if self.mask is not None:
-            last_mask = self.mask
-            temp = float("-inf") * torch.ones_like(data_to_sort)
-            data_to_sort[~last_mask] = temp[~last_mask]
+        assert prune_fraction < 1
+        assert prune_fraction >= 0
 
-        sorted_arch_params, _ = torch.sort(data_to_sort, dim=1, descending=True)
-        top_k = num_keep
-        thresholds = sorted_arch_params[:, top_k - 1].unsqueeze(1)
-        self.mask = data_to_sort >= thresholds
+        num_ops = len(self.op_names)
+        top_k = num_ops - int(num_ops * prune_fraction)
+
+        if self.mask is not None:
+            self.mask = prune(self._arch_parameters, top_k, self.mask)
+        else:
+            self.mask = prune(self._arch_parameters, top_k, None)
 
         for cell in self.cells:
             cell.prune_ops(self.mask)

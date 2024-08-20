@@ -113,7 +113,7 @@ def get_num_classes(dataset: str) -> int:
         num_classes = 10
     elif dataset == "cifar100":
         num_classes = 100
-    elif dataset == "imgnet16_120" or dataset == "imgnet16":
+    elif dataset in ("imgnet16_120", "imgnet16"):
         num_classes = 120
     else:
         raise ValueError("dataset is not defined.")
@@ -248,6 +248,29 @@ def update_gradient_matching_scores(
         m.avg = 0
     else:
         m.count += 1
+
+
+def prune(
+    alpha: torch.Tensor,
+    num_keep: int,
+    mask: torch.Tensor | None = None,
+    reset: bool = False,
+) -> torch.Tensor:
+    if mask is not None:
+        alpha.data[~mask] -= 1000000
+    src, index = alpha.topk(k=num_keep, dim=-1)
+    if not reset:
+        alpha.data.copy_(torch.zeros_like(alpha).scatter(dim=1, index=index, src=src))
+    else:
+        alpha.data.copy_(
+            torch.zeros_like(alpha).scatter(
+                dim=1, index=index, src=1e-3 * torch.randn_like(src)
+            )
+        )
+    mask = torch.zeros_like(alpha, dtype=torch.bool).scatter(
+        dim=1, index=index, src=torch.ones_like(src, dtype=torch.bool)
+    )
+    return mask
 
 
 __all__ = [

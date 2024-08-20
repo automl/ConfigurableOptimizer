@@ -50,9 +50,9 @@ class SearchSpace(ModelWrapper):
 
         return all_parameters
 
-    def prune(self, num_keep: int) -> None:
+    def prune(self, prune_fraction: float) -> None:
         """Prune the candidates operations of the supernet."""
-        self.model.prune(num_keep=num_keep)  # type: ignore
+        self.model.prune(prune_fraction=prune_fraction)  # type: ignore
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         return self.model(x)  # type: ignore
