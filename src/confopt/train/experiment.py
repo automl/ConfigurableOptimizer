@@ -31,6 +31,11 @@ from confopt.oneshot.lora_toggler import LoRAToggler
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import SDARTSPerturbator
 from confopt.oneshot.pruner.pruner import Pruner
+from confopt.oneshot.regularizer import (
+    DrNASRegularizationTerm,
+    FLOPSRegularizationTerm,
+    Regularizer,
+)
 from confopt.oneshot.weightentangler import WeightEntangler
 from confopt.profiles import (
     BaseProfile,
@@ -378,6 +383,7 @@ class Experiment:
 
         self.set_lora_toggler(config.get("lora", {}), config.get("lora_extra", {}))
         self.set_weight_entangler()
+        self.set_regularizer(config.get("regularization", {}))
         self.set_profile(config)
 
     def set_search_space(
@@ -491,6 +497,26 @@ class Experiment:
         else:
             self.lora_toggler = None
 
+    def set_regularizer(self, config: dict) -> None:
+        print(config)
+        print("$$$" * 10)
+        if config is None or len(config["active_reg_terms"]) == 0:
+            self.regularizer = None
+            return
+
+        reg_terms = []
+        for term in config["active_reg_terms"]:
+            if term == "drnas":
+                reg_terms.append(DrNASRegularizationTerm(**config["drnas_config"]))
+            elif term == "flops":
+                reg_terms.append(FLOPSRegularizationTerm(**config["flops_config"]))
+
+        self.regularizer = Regularizer(
+            reg_terms=reg_terms,
+            reg_weights=config["reg_weights"],
+            loss_weight=config["loss_weight"],
+        )
+
     def set_profile(self, config: dict) -> None:
         assert self.sampler is not None
 
@@ -505,6 +531,7 @@ class Experiment:
             lora_configs=config.get("lora"),
             pruner=self.pruner,
             is_arch_attention_enabled=config.get("is_arch_attention_enabled", False),
+            regularizer=self.regularizer,
         )
 
     def _get_dataset(self, dataset: DatasetType) -> Callable | None:

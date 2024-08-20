@@ -7,6 +7,8 @@ from torch import nn
 
 from confopt.searchspace.common.base_search import (
     ArchAttentionSupport,
+    DrNASRegTermSupport,
+    FLOPSRegTermSupport,
     GradientMatchingScoreSupport,
     LayerAlignmentScoreSupport,
     OperationStatisticsSupport,
@@ -28,6 +30,8 @@ class DARTSSearchSpace(
     GradientMatchingScoreSupport,
     OperationStatisticsSupport,
     LayerAlignmentScoreSupport,
+    DrNASRegTermSupport,
+    FLOPSRegTermSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
         """DARTS Search Space for Neural Architecture Search.
@@ -149,3 +153,12 @@ class DARTSSearchSpace(
         }
 
         return stats
+
+    def get_drnas_anchors(self) -> tuple[torch.Tensor, torch.Tensor]:
+        return self.model.anchor_normal, self.model.anchor_reduce
+
+    def get_weighted_flops(self) -> torch.Tensor:
+        ### TODO ###
+        ### Computed the FLOPS of the model, weighted by the architectural parameters
+
+        return torch.tensor(0.0)

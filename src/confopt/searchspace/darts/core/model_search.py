@@ -5,6 +5,7 @@ from typing import Literal
 
 import torch
 from torch import nn
+from torch.distributions import Dirichlet
 import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
@@ -493,6 +494,9 @@ class Network(nn.Module):
             self.betas_normal,
             self.betas_reduce,
         ]
+
+        self.anchor_normal = Dirichlet(torch.ones_like(self.alphas_normal).cuda())
+        self.anchor_reduce = Dirichlet(torch.ones_like(self.alphas_reduce).cuda())
 
     def arch_parameters(self) -> list[torch.nn.Parameter]:
         """Get a list containing the architecture parameters or alphas.

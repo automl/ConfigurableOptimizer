@@ -374,6 +374,9 @@ class ConfigurableTrainer:
             if not is_warm_epoch:
                 _, logits = network(arch_inputs)
                 arch_loss = criterion(logits, arch_targets)
+                arch_loss = search_space_handler.add_reg_terms(
+                    unwrapped_network, arch_loss
+                )
                 arch_loss.backward()
                 arch_optimizer.step()
 
@@ -401,6 +404,7 @@ class ConfigurableTrainer:
 
             _, logits = network(base_inputs)
             base_loss = criterion(logits, base_targets)
+            base_loss = search_space_handler.add_reg_terms(unwrapped_network, base_loss)
             base_loss.backward()
 
             if isinstance(unwrapped_network, OperationStatisticsSupport):

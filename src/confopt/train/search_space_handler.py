@@ -8,6 +8,7 @@ from confopt.oneshot.lora_toggler import LoRAToggler
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import BasePerturbator
 from confopt.oneshot.pruner import Pruner
+from confopt.oneshot.regularizer import Regularizer
 from confopt.oneshot.weightentangler import WeightEntangler
 from confopt.searchspace import DARTSSearchSpace
 from confopt.searchspace.common import (
@@ -32,6 +33,7 @@ class SearchSpaceHandler:
         pruner: Pruner | None = None,
         lora_toggler: LoRAToggler | None = None,
         is_arch_attention_enabled: bool = False,
+        regularizer: Regularizer | None = None,
     ) -> None:
         self.sampler = sampler
         self.edge_normalization = edge_normalization
@@ -42,6 +44,7 @@ class SearchSpaceHandler:
         self.lora_configs = lora_configs
         self.pruner = pruner
         self.lora_toggler = lora_toggler
+        self.regularizer = regularizer
 
         self.is_argmax_sampler = False
         if isinstance(self.sampler, GDASSampler):
@@ -167,6 +170,13 @@ class SearchSpaceHandler:
             else:
                 parent_name += "." + comp
         return parent_name, attribute_name
+
+    def add_reg_terms(
+        self, search_space: SearchSpace, loss: torch.Tensor
+    ) -> torch.Tensor:
+        if self.regularizer:
+            return self.regularizer.add_reg_terms(search_space, loss)
+        return loss
 
 
 if __name__ == "__main__":

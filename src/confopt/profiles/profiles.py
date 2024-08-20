@@ -34,6 +34,8 @@ class DARTSProfile(BaseProfile, ABC):
         prune_epochs: list[int] | None = None,
         prune_num_keeps: list[int] | None = None,
         is_arch_attention_enabled: bool = False,
+        is_regularization_enabled: bool = False,
+        regularization_config: dict | None = None,
     ) -> None:
         PROFILE_TYPE = "DARTS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -57,6 +59,8 @@ class DARTSProfile(BaseProfile, ABC):
             prune_epochs,
             prune_num_keeps,
             is_arch_attention_enabled,
+            is_regularization_enabled,
+            regularization_config,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
@@ -102,6 +106,8 @@ class GDASProfile(BaseProfile, ABC):
         prune_epochs: list[int] | None = None,
         prune_num_keeps: list[int] | None = None,
         is_arch_attention_enabled: bool = False,
+        is_regularization_enabled: bool = False,
+        regularization_config: dict | None = None,
     ) -> None:
         self.sampler_sample_frequency = sampler_sample_frequency
         self.tau_min = tau_min
@@ -126,6 +132,8 @@ class GDASProfile(BaseProfile, ABC):
             prune_epochs,
             prune_num_keeps,
             is_arch_attention_enabled,
+            is_regularization_enabled,
+            regularization_config,
         )
         self.sampler_type = str.lower(self.PROFILE_TYPE)
 
@@ -177,6 +185,8 @@ class SNASProfile(BaseProfile, ABC):
         prune_epochs: list[int] | None = None,
         prune_num_keeps: list[int] | None = None,
         is_arch_attention_enabled: bool = False,
+        is_regularization_enabled: bool = False,
+        regularization_config: dict | None = None,
     ) -> None:
         PROFILE_TYPE = "SNAS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -204,6 +214,8 @@ class SNASProfile(BaseProfile, ABC):
             prune_epochs,
             prune_num_keeps,
             is_arch_attention_enabled,
+            is_regularization_enabled,
+            regularization_config,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
@@ -249,6 +261,8 @@ class DRNASProfile(BaseProfile, ABC):
         prune_epochs: list[int] | None = None,
         prune_num_keeps: list[int] | None = None,
         is_arch_attention_enabled: bool = False,
+        is_regularization_enabled: bool = False,
+        regularization_config: dict | None = None,
     ) -> None:
         PROFILE_TYPE = "DRNAS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -272,6 +286,8 @@ class DRNASProfile(BaseProfile, ABC):
             prune_epochs,
             prune_num_keeps,
             is_arch_attention_enabled,
+            is_regularization_enabled,
+            regularization_config,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
