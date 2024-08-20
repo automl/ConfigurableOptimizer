@@ -32,7 +32,7 @@ class DARTSProfile(BaseProfile, ABC):
         oles: bool = False,
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
-        prune_num_keeps: list[int] | None = None,
+        prune_fractions: list[float] | None = None,
         is_arch_attention_enabled: bool = False,
     ) -> None:
         PROFILE_TYPE = "DARTS"
@@ -55,7 +55,7 @@ class DARTSProfile(BaseProfile, ABC):
             oles,
             calc_gm_score,
             prune_epochs,
-            prune_num_keeps,
+            prune_fractions,
             is_arch_attention_enabled,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
@@ -100,7 +100,7 @@ class GDASProfile(BaseProfile, ABC):
         oles: bool = False,
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
-        prune_num_keeps: list[int] | None = None,
+        prune_fractions: list[float] | None = None,
         is_arch_attention_enabled: bool = False,
     ) -> None:
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -124,7 +124,7 @@ class GDASProfile(BaseProfile, ABC):
             oles,
             calc_gm_score,
             prune_epochs,
-            prune_num_keeps,
+            prune_fractions,
             is_arch_attention_enabled,
         )
         self.sampler_type = str.lower(self.PROFILE_TYPE)
@@ -175,7 +175,7 @@ class SNASProfile(BaseProfile, ABC):
         oles: bool = False,
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
-        prune_num_keeps: list[int] | None = None,
+        prune_fractions: list[float] | None = None,
         is_arch_attention_enabled: bool = False,
     ) -> None:
         PROFILE_TYPE = "SNAS"
@@ -202,7 +202,7 @@ class SNASProfile(BaseProfile, ABC):
             oles,
             calc_gm_score,
             prune_epochs,
-            prune_num_keeps,
+            prune_fractions,
             is_arch_attention_enabled,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
@@ -247,7 +247,7 @@ class DRNASProfile(BaseProfile, ABC):
         oles: bool = False,
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
-        prune_num_keeps: list[int] | None = None,
+        prune_fractions: list[float] | None = None,
         is_arch_attention_enabled: bool = False,
     ) -> None:
         PROFILE_TYPE = "DRNAS"
@@ -270,7 +270,7 @@ class DRNASProfile(BaseProfile, ABC):
             oles,
             calc_gm_score,
             prune_epochs,
-            prune_num_keeps,
+            prune_fractions,
             is_arch_attention_enabled,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
