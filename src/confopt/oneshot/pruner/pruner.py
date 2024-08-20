@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import warnings
-
 from confopt.oneshot.base_component import OneShotComponent
 from confopt.searchspace import SearchSpace
 
@@ -17,14 +15,6 @@ class Pruner(OneShotComponent):
         self.prune_epochs = prune_epochs
         self.searchspace = searchspace
         self.use_prune = True
-        # TODO Remove after merge of refactor PR or add a PruningSupport hook
-        if not hasattr(searchspace, "prune"):
-            warnings.warn(
-                f"The searchspace {type(searchspace)} does not have "
-                + "prune functionality",
-                stacklevel=1,
-            )
-            self.use_prune = False
 
         self.prune_epoch_to_fraction = {}
         assert len(prune_fractions) == len(prune_epochs)
