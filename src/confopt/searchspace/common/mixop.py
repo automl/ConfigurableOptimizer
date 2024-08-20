@@ -23,8 +23,6 @@ class OperationChoices(nn.Module):
         ), "Number of operations and architectural weights do not match"
         states = []
         for op, alpha in zip(self.ops, alphas):
-            if hasattr(op, "is_pruned") and op.is_pruned:
-                continue
             states.append(op(x) * alpha)
 
         return sum(states)  # type: ignore
@@ -78,17 +76,12 @@ class OperationBlock(nn.Module):
             argmax = torch.argmax(alphas)
 
             for i, op in enumerate(ops):
-                if hasattr(op, "is_pruned") and op.is_pruned:
-                    continue
-
                 if i == argmax:
                     states.append(alphas[i] * op(x))
                 else:
                     states.append(alphas[i])
         else:
             for op, alpha in zip(ops, alphas):
-                if hasattr(op, "is_pruned") and op.is_pruned:
-                    continue
                 states.append(op(x) * alpha)
 
         return sum(states)
