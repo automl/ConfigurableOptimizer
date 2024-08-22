@@ -406,7 +406,9 @@ class ConfigurableTrainer:
             base_loss = criterion(logits, base_targets)
             base_loss.backward()
 
-            if isinstance(unwrapped_network, OperationStatisticsSupport):
+            if isinstance(unwrapped_network, OperationStatisticsSupport) and (
+                layer_alignment_scores is not None
+            ):
                 (
                     score_normal,
                     score_reduce,

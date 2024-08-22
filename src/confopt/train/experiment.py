@@ -935,8 +935,6 @@ class Experiment:
             trainer,
             config["pt_selection"].get("projection_criteria", "acc"),
             config["pt_selection"].get("projection_interval", 10),
-            edge_decision="random",
-            searchspace_type=self.search_space_str.value,
             is_wandb_log=is_wandb_log,
         )
         arch_selector.select_architecture()
