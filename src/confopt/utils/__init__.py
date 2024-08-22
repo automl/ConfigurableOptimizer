@@ -256,17 +256,27 @@ def prune(
     mask: torch.Tensor | None = None,
     reset: bool = False,
 ) -> torch.Tensor:
+    """This function prunes the alpha based on number of operations to keep
+    and optionally a previous mask.
+
+     Parameters:
+        alpha (torch.Tensor): The tensor to prune
+        num_keep (int): number of operations to keep in alpha.
+        mask (torch.Tensor | None): Previous Mask or None
+        reset (bool): If set True, resets the alpha to random values. deafults to False.
+
+    Returns:
+        torch.Tensor: Boolean mask tensor where True represent the operations to keep
+        and False represent operations to prune.
+    """
     if mask is not None:
         alpha.data[~mask] -= 1000000
     src, index = alpha.topk(k=num_keep, dim=-1)
-    if not reset:
-        alpha.data.copy_(torch.zeros_like(alpha).scatter(dim=1, index=index, src=src))
-    else:
-        alpha.data.copy_(
-            torch.zeros_like(alpha).scatter(
-                dim=1, index=index, src=1e-3 * torch.randn_like(src)
-            )
-        )
+
+    if reset:
+        src = 1e-3 * torch.randn_like(src)
+
+    alpha.data.copy_(torch.zeros_like(alpha).scatter(dim=1, index=index, src=src))
     mask = torch.zeros_like(alpha, dtype=torch.bool).scatter(
         dim=1, index=index, src=torch.ones_like(src, dtype=torch.bool)
     )
