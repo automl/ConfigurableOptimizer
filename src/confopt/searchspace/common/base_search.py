@@ -200,14 +200,13 @@ class ArchSelectionSupport(ModelWrapper):
             list: list of candidate flags
         """
 
-    def get_nodes_to_edge_mapping(  # type: ignore
+    def get_edges_at_node(  # type: ignore
         self, selected_node: int  # noqa: ARG002
-    ) -> dict:
-        """Get a dictionary of nodes to edge mapping.
+    ) -> list:
+        """Get a list of edges at a node.
 
         Returns:
-            dict: A dictionary with nodes as key and incoming edges to that
-            node as values.
+            list: list of outgoing edges from the selected node.
         """
         assert (
             self.is_topology_supported()
