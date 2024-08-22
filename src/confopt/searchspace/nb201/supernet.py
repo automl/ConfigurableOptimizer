@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from functools import partial
+from typing import Literal
 
 import torch
 from torch import nn
 
 from confopt.searchspace.common.base_search import (
     ArchAttentionSupport,
+    ArchSelectionSupport,
     GradientMatchingScoreSupport,
     LayerAlignmentScoreSupport,
     OperationStatisticsSupport,
@@ -30,6 +32,7 @@ class NASBench201SearchSpace(
     GradientMatchingScoreSupport,
     OperationStatisticsSupport,
     LayerAlignmentScoreSupport,
+    ArchSelectionSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
         """Initialize the custom search model of NASBench201SearchSpace.
@@ -126,28 +129,19 @@ class NASBench201SearchSpace(
         return self.model.num_edges
 
     def get_num_nodes(self) -> int:
-        raise NotImplementedError(
-            "get_num_nodes is not implemented for NB201SearchSpace"
-        )
+        return self.model.num_nodes
 
-    def get_candidate_flags(self, topology: bool = False) -> list:
-        assert topology is False
+    def get_candidate_flags(self, cell_type: Literal["normal", "reduce"]) -> list:
+        assert cell_type == "normal"
         return self.model.candidate_flags
-
-    def get_nodes_to_edge_mapping(self, selected_node: int) -> dict:  # type: ignore
-        raise NotImplementedError(
-            "get_nodes_to_edge_mapping is not implemented for NB201SearchSpace"
-        )
 
     def remove_from_projected_weights(
         self,
         selected_edge: int,
         selected_op: int | None,
-        cell_type: str | None = None,
-        topology: bool = False,
+        cell_type: Literal["normal", "reduce"],
     ) -> None:
-        assert topology is False
-        assert cell_type is None
+        assert cell_type == "normal"
         assert selected_op is not None
         self.model.remove_from_projected_weights(selected_edge, selected_op)
 
@@ -155,23 +149,16 @@ class NASBench201SearchSpace(
         self,
         selected_edge: int,
         selected_op: int,
-        cell_type: str | None = None,
+        cell_type: Literal["normal", "reduce"],
     ) -> None:
-        assert cell_type is None
+        assert cell_type == "normal"
         self.model.mark_projected_op(selected_edge, selected_op)
-
-    def mark_projected_edge(  # type: ignore
-        self,
-        selected_node: int,
-        selected_edges: list[int],
-        cell_type: str | None = None,
-    ) -> None:
-        raise NotImplementedError(
-            "mark_projected_edge is not implemented for NB201SearchSpace"
-        )
 
     def set_projection_mode(self, value: bool) -> None:
         self.model.projection_mode = value
 
     def set_projection_evaluation(self, value: bool) -> None:
         self.model.projection_evaluation = value
+
+    def is_topology_supported(self) -> bool:
+        return False

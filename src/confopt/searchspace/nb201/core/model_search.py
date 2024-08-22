@@ -132,6 +132,9 @@ class NB201SearchModel(nn.Module):
             1e-3 * torch.randn(num_edge)  # type: ignore
         )
         self.weights: dict[str, list[torch.Tensor]] = {}
+        self.num_edges = num_edge
+        self.num_nodes = max_nodes - 1
+        self.num_ops = len(search_space)
         self._initialize_projection_params()
 
         # Multi-head attention for architectural parameters
@@ -448,10 +451,8 @@ class NB201SearchModel(nn.Module):
         return list(params)
 
     def _initialize_projection_params(self) -> None:
-        self.num_edges = len(self.arch_parameters)  # type: ignore
-        self.num_ops = len(self.arch_parameters[0])  # type: ignore
         self.candidate_flags = torch.tensor(
-            len(self.arch_parameters) * [True],  # type: ignore
+            self.num_edges * [True],  # type: ignore
             requires_grad=False,
             dtype=torch.bool,
         ).to(DEVICE)
@@ -468,8 +469,14 @@ class NB201SearchModel(nn.Module):
     def get_projected_weights(self) -> torch.Tensor:
         if self.projection_evaluation:
             return self.removed_projected_weights
-        weights = torch.softmax(self.arch_parameters, dim=-1)
-        for eid in range(len(self.arch_parameters)):  # type: ignore
+
+        if self.is_arch_attention_enabled:
+            arch_parameters = self._compute_arch_attention(self.arch_parameters)
+        else:
+            arch_parameters = self.arch_parameters
+
+        weights = torch.softmax(arch_parameters, dim=-1)
+        for eid in range(len(arch_parameters)):  # type: ignore
             if not self.candidate_flags[eid]:
                 weights[eid].data.copy_(self.proj_weights[eid])
 
