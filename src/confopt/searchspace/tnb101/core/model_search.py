@@ -247,16 +247,13 @@ class TNB101SearchModel(nn.Module):
         Args:
             prune_fraction (float): Number of operations to keep.
         """
-        assert prune_fraction < 1
-        assert prune_fraction >= 0
+        assert prune_fraction < 1, "Prune fraction should be less than 1"
+        assert prune_fraction >= 0, "Prune fraction greater or equal to 0"
 
         num_ops = len(self.op_names)
         top_k = num_ops - int(num_ops * prune_fraction)
 
-        if self.mask is not None:
-            self.mask = prune(self._arch_parameters, top_k, self.mask)
-        else:
-            self.mask = prune(self._arch_parameters, top_k, None)
+        self.mask = prune(self._arch_parameters, top_k, self.mask)
 
         for cell in self.cells:
             cell.prune_ops(self.mask)

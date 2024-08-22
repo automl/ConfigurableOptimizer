@@ -544,8 +544,8 @@ class Network(nn.Module):
         Args:
             prune_fraction (float): Fraction of operations to remove.
         """
-        assert prune_fraction < 1
-        assert prune_fraction >= 0
+        assert prune_fraction < 1, "Prune fraction should be less than 1"
+        assert prune_fraction >= 0, "Prune fraction greater or equal to 0"
 
         num_ops = len(self.primitives)
         top_k = int(num_ops * (1 - prune_fraction))
@@ -555,7 +555,7 @@ class Network(nn.Module):
 
         # Calculate masks
         for i, p in enumerate(self._arch_parameters):
-            if i + 1 <= len(self.mask):
+            if i < len(self.mask):
                 self.mask[i] = prune(p, top_k, self.mask[i])
             else:
                 mask = prune(p, top_k, None)
