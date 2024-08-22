@@ -173,6 +173,12 @@ class TestBabyDARTS(unittest.TestCase):
         masks = search_space.model.mask
         _check_prune_mask(masks, num_keep=1)
 
+        # Check for prune fraction = 0
+        search_space.prune(prune_fraction=0)
+        masks = search_space.model.mask
+        assert masks[0].sum() == masks[0].numel()
+        assert masks[1].sum() == masks[1].numel()
+
         out = search_space(x)
 
         assert isinstance(out, tuple)
@@ -308,6 +314,7 @@ class TestNASBench201SearchSpace(unittest.TestCase):
         search_space = NASBench201SearchSpace(edge_normalization=True)
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
         num_ops = 5
+
         for num_keep in range(1, num_ops - 1):
             proxy_search_space = copy.deepcopy(search_space)
             prune_fraction = 1 - (num_keep / num_ops)
@@ -342,6 +349,11 @@ class TestNASBench201SearchSpace(unittest.TestCase):
             assert isinstance(out[1], torch.Tensor)
             assert out[0].shape == torch.Size([2, 64])
             assert out[1].shape == torch.Size([2, 10])
+
+        # Check for prune fraction = 0
+        search_space.prune(prune_fraction=0)
+        masks = search_space.model.mask
+        assert masks.sum() == masks.numel()
 
     def test_optim_forward_pass(self) -> None:
         search_space = NASBench201SearchSpace(edge_normalization=True)
@@ -483,6 +495,12 @@ class TestDARTSSearchSpace(unittest.TestCase):
             assert isinstance(out[1], torch.Tensor)
             assert out[0].shape == torch.Size([2, 256])
             assert out[1].shape == torch.Size([2, 10])
+
+        # Check for prune fraction = 0
+        search_space.prune(prune_fraction=0)
+        masks = search_space.model.mask
+        assert masks[0].sum() == masks[0].numel()
+        assert masks[1].sum() == masks[1].numel()
 
     def test_discretize_supernet(self) -> None:
         # TODO: check to have one operation on each edge of the search space
