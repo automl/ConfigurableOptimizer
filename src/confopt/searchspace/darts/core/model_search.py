@@ -491,10 +491,17 @@ class Network(nn.Module):
         the neural cell.
         """
         k = sum(1 for i in range(self._steps) for n in range(2 + i))
-        num_ops = len(self.primitives)
+        self.num_ops = len(self.primitives)
+        self.num_edges = k
 
-        self.alphas_normal = nn.Parameter(1e-3 * torch.randn(k, num_ops).to(DEVICE))
-        self.alphas_reduce = nn.Parameter(1e-3 * torch.randn(k, num_ops).to(DEVICE))
+        self.num_nodes = self._steps - 1
+
+        self.alphas_normal = nn.Parameter(
+            1e-3 * torch.randn(k, self.num_ops).to(DEVICE)
+        )
+        self.alphas_reduce = nn.Parameter(
+            1e-3 * torch.randn(k, self.num_ops).to(DEVICE)
+        )
         self._arch_parameters = [
             self.alphas_normal,
             self.alphas_reduce,
@@ -679,9 +686,6 @@ class Network(nn.Module):
         return list(params)
 
     def _initialize_projection_params(self) -> None:
-        k = sum(1 for i in range(self._steps) for n in range(2 + i))
-        self.num_edges = k
-        self.num_ops = len(self.alphas_normal[0])
         self.proj_weights = {  # for hard/soft assignment after project
             "normal": torch.zeros_like(self.alphas_normal),
             "reduce": torch.zeros_like(self.alphas_reduce),
@@ -703,11 +707,29 @@ class Network(nn.Module):
                 3 * [True], requires_grad=False, dtype=torch.bool
             ).to(DEVICE),
         }
-        self.nid2eids = {0: [2, 3, 4], 1: [5, 6, 7, 8], 2: [9, 10, 11, 12, 13]}
-        self.nid2selected_eids = {  # type: ignore
-            "normal": {0: [], 1: [], 2: []},
-            "reduce": {0: [], 1: [], 2: []},
+
+        # for outgoing edges
+        self.nid2eids: dict[int, list[int]] = {}
+        offset = 2  # 2 inital edges to node 0
+        num_states = 3  # 2 initial states and 1 incoming edge to node 0
+
+        for i in range(self.num_nodes):
+            for j in range(num_states):
+                if i not in self.nid2eids:
+                    self.nid2eids[i] = [offset + j]
+                else:
+                    self.nid2eids[i].append(offset + j)
+            offset += num_states
+            num_states += 1
+
+        self.nid2selected_eids: dict[str, dict[int, list[int]]] = {
+            "normal": {},
+            "reduce": {},
         }
+        for i in range(self.num_nodes):
+            self.nid2selected_eids["normal"][i] = []
+            self.nid2selected_eids["reduce"][i] = []
+
         self.projection_mode = False
         self.projection_evaluation = False
         self.removal_cell_type: Literal["normal", "reduce"] | None = None
@@ -767,10 +789,18 @@ class Network(nn.Module):
         if self.projection_evaluation and self.removal_cell_type == cell_type:
             return self.removed_projected_weights[cell_type]
 
-        if cell_type == "normal":
-            weights = torch.softmax(self.alphas_normal, dim=-1)
+        if self.is_arch_attention_enabled:
+            alphas_normal, alphas_reduce = self._compute_arch_attention(
+                self.alphas_normal, self.alphas_reduce
+            )
         else:
-            weights = torch.softmax(self.alphas_reduce, dim=-1)
+            alphas_normal = self.alphas_normal
+            alphas_reduce = self.alphas_reduce
+
+        if cell_type == "normal":
+            weights = torch.softmax(alphas_normal, dim=-1)
+        else:
+            weights = torch.softmax(alphas_reduce, dim=-1)
 
         ## proj op
         for eid in range(self.num_edges):

@@ -8,6 +8,7 @@ from torch import nn
 
 from confopt.searchspace.common.base_search import (
     ArchAttentionSupport,
+    ArchSelectionSupport,
     GradientMatchingScoreSupport,
     LayerAlignmentScoreSupport,
     OperationStatisticsSupport,
@@ -29,6 +30,7 @@ class DARTSSearchSpace(
     GradientMatchingScoreSupport,
     OperationStatisticsSupport,
     LayerAlignmentScoreSupport,
+    ArchSelectionSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
         """DARTS Search Space for Neural Architecture Search.
@@ -113,6 +115,9 @@ class DARTSSearchSpace(
             self.model.alphas_reduce,
         ]
 
+    def get_cell_types(self) -> list[str]:
+        return ["normal", "reduce"]
+
     def discretize(self) -> nn.Module:
         return self.model.discretize()  # type: ignore
 
@@ -158,14 +163,18 @@ class DARTSSearchSpace(
         return self.model.num_edges
 
     def get_num_nodes(self) -> int:
-        return len(self.model.nid2eids.keys())
+        return self.model.num_nodes
 
-    def get_candidate_flags(self, topology: bool = False) -> list:
-        if topology:
-            return self.model.candidate_flags_edge
-        return self.model.candidate_flags
+    def get_candidate_flags(self, cell_type: Literal["normal", "reduce"]) -> list:
+        if self.topology is None:
+            self.set_topology(False)
 
-    def get_nodes_to_edge_mapping(self, selected_node: int) -> dict:
+        if self.topology:
+            return self.model.candidate_flags_edge[cell_type]
+
+        return self.model.candidate_flags[cell_type]
+
+    def get_edges_at_node(self, selected_node: int) -> list:
         return self.model.nid2eids[selected_node]
 
     def remove_from_projected_weights(
@@ -173,10 +182,12 @@ class DARTSSearchSpace(
         selected_edge: int,
         selected_op: int | None,
         cell_type: Literal["normal", "reduce"],
-        topology: bool = False,
     ) -> None:
+        if self.topology is None:
+            self.set_topology(False)
+
         self.model.remove_from_projected_weights(
-            cell_type, selected_edge, selected_op, topology
+            cell_type, selected_edge, selected_op, self.topology
         )
 
     def mark_projected_operation(
@@ -200,3 +211,6 @@ class DARTSSearchSpace(
 
     def set_projection_evaluation(self, value: bool) -> None:
         self.model.projection_evaluation = value
+
+    def is_topology_supported(self) -> bool:
+        return True
