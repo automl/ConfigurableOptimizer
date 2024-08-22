@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 import torch
 import torch.nn as nn  # noqa: PLR0402
@@ -34,6 +34,9 @@ class SearchSpace(ModelWrapper):
     @abstractmethod
     def set_arch_parameters(self, arch_parameters: list[nn.Parameter]) -> None:
         pass
+
+    def get_cell_types(self) -> list[str]:
+        return ["normal"]
 
     def set_sample_function(self, sample_function: Callable) -> None:
         self.model.sample = sample_function
@@ -149,3 +152,113 @@ class OperationStatisticsSupport(ModelWrapper):
         # all_stats.update(other_stats) # Add other stats here
 
         return all_stats
+
+    @abstractmethod
+    def get_num_ops(self) -> int:
+        """Get number of operations in an edge of a cell of the model.
+
+        Returns:
+            int: Number of operations
+        """
+
+    @abstractmethod
+    def get_num_edges(self) -> int:
+        """Get number of edges in a cell of the model.
+
+        Returns:
+            int: Number of rdges
+        """
+
+    @abstractmethod
+    def get_num_nodes(self) -> int:
+        """Get number of nodes in a cell of the model.
+
+        Returns:
+            int: Number of nodes
+        """
+
+
+class ArchSelectionSupport(ModelWrapper):
+    @abstractmethod
+    def is_topology_supported(self) -> bool:
+        """Returns:
+        bool: Whether topology search is supported or not for the SearchSpace.
+        """
+
+    def set_topology(self, value: bool) -> None:
+        """Set whether toplogy search is active for model or not."""
+        self.topology = value
+
+    @abstractmethod
+    def get_candidate_flags(self, cell_type: Literal["normal", "reduce"]) -> list:
+        """Get a list of candidate flags for selecting architecture.
+
+        The candidate flags can be for edges or operations depending on whether
+        topology is active or not.
+
+        Returns:
+            list: list of candidate flags
+        """
+
+    def get_nodes_to_edge_mapping(  # type: ignore
+        self, selected_node: int  # noqa: ARG002
+    ) -> dict:
+        """Get a dictionary of nodes to edge mapping.
+
+        Returns:
+            dict: A dictionary with nodes as key and incoming edges to that
+            node as values.
+        """
+        assert (
+            self.is_topology_supported()
+        ), "Topology should be supported for this function"
+
+    @abstractmethod
+    def remove_from_projected_weights(
+        self,
+        selected_edge: int,
+        selected_op: int | None,
+        cell_type: Literal["normal", "reduce"] = "normal",
+    ) -> None:
+        """Remove an operation or a edge (depending on topology) from the
+        projected weights.
+        """
+
+    @abstractmethod
+    def mark_projected_operation(
+        self,
+        selected_edge: int,
+        selected_op: int,
+        cell_type: Literal["normal", "reduce"],
+    ) -> None:
+        """Mark an operation on a given edge (of the cell type) in the candidate flags
+        and projected weights to be already projected.
+        """
+
+    def mark_projected_edge(  # type: ignore
+        self,
+        selected_node: int,  # noqa: ARG002
+        selected_edges: list[int],  # noqa: ARG002
+        cell_type: str | None = None,  # noqa: ARG002
+    ) -> None:
+        """Mark an operation on a given edge (of the cell type) in the candidate flags
+        and projected weights to be already projected.
+        """
+        assert (
+            self.is_topology_supported()
+        ), "Topology should be supported for this function"
+
+    @abstractmethod
+    def set_projection_mode(self, value: bool) -> None:
+        """Set the model into projection mode.
+
+        When projection mode is True, the weights used in forward are candidate weights.
+        """
+
+    @abstractmethod
+    def set_projection_evaluation(self, value: bool) -> None:
+        """Set the model into projection mode.
+
+        When projection mode is True, the weights used in forward are the
+        projected weights.
+        """
