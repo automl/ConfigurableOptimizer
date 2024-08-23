@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from typing import Literal
 import warnings
 
 import torch
@@ -34,7 +35,9 @@ class BaseProfile:
         oles: bool = False,
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
-        prune_num_keeps: list[int] | None = None,
+        prune_fractions: list[float] | None = None,
+        is_arch_attention_enabled: bool = False,
+        pt_select_architecture: bool = False,
     ) -> None:
         self.config_type = config_type
         self.epochs = epochs
@@ -55,25 +58,41 @@ class BaseProfile:
         self._set_perturb(perturbation, perturbator_sample_frequency)
         self.entangle_op_weights = entangle_op_weights
         self._set_oles_configs(oles, calc_gm_score)
-        self._set_pruner_configs(prune_epochs, prune_num_keeps)
+        self._set_pruner_configs(prune_epochs, prune_fractions)
+        self._set_pt_select_configs(pt_select_architecture)
         PROFILE_TYPE = "BASE"
         self.sampler_type = str.lower(PROFILE_TYPE)
+        self.is_arch_attention_enabled = is_arch_attention_enabled
+
+    def _set_pt_select_configs(
+        self,
+        pt_select_architecture: bool = False,
+        pt_projection_criteria: Literal["acc", "loss"] = "acc",
+        pt_projection_interval: int = 10,
+    ) -> None:
+        if pt_select_architecture:
+            self.pt_select_configs = {
+                "projection_interval": pt_projection_interval,
+                "projection_criteria": pt_projection_criteria,
+            }
+        else:
+            self.pt_select_configs = None  # type: ignore
 
     def _set_pruner_configs(
         self,
         prune_epochs: list[int] | None = None,
-        prune_num_keeps: list[int] | None = None,
+        prune_fractions: list[float] | None = None,
     ) -> None:
         if prune_epochs is not None:
             assert (
-                prune_num_keeps is not None
-            ), "Please provide epochs numkeeps to prune with"
-            assert len(prune_num_keeps) == len(
+                prune_fractions is not None
+            ), "Please provide epochs prune-fractions to prune with"
+            assert len(prune_fractions) == len(
                 prune_epochs
-            ), "Length of both prune_epochs and prune_num_keeps must be same"
+            ), "Length of both prune_epochs and prune_fractions must be same"
             self.pruner_config = {
                 "prune_epochs": prune_epochs,
-                "prune_num_keeps": prune_num_keeps,
+                "prune_fractions": prune_fractions,
             }
 
     def _set_lora_configs(
@@ -153,6 +172,8 @@ class BaseProfile:
             "searchspace_str": self.searchspace_str,
             "weight_type": weight_type,
             "oles": self.oles_config,
+            "pt_selection": self.pt_select_configs,
+            "is_arch_attention_enabled": self.is_arch_attention_enabled,
         }
 
         if hasattr(self, "pruner_config"):
@@ -300,6 +321,15 @@ class BaseProfile:
             ), f"{config_key} not a valid configuration for the oles config"
             self.oles_config[config_key] = kwargs[config_key]
 
+    def configure_pt_selection(self, **kwargs) -> None:  # type: ignore
+        for config_key in kwargs:
+            assert config_key in self.pt_select_configs, (
+                f"{config_key} not a valid configuration for the"
+                + "perturbation based selection config"
+            )
+            self.pt_select_configs[config_key] = kwargs[config_key]
+
+    @abstractmethod
     def set_searchspace_config(self, config: dict) -> None:
         if not hasattr(self, "searchspace_config"):
             self.searchspace_config = config

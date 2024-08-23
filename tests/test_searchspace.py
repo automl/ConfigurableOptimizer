@@ -169,9 +169,15 @@ class TestBabyDARTS(unittest.TestCase):
     def test_prune(self) -> None:
         search_space = BabyDARTSSearchSpace(edge_normalization=True)
         x = torch.randn(2, 3, 64, 64).to(DEVICE)
-        search_space.prune(num_keep=1)
+        search_space.prune(prune_fraction=0.4)
         masks = search_space.model.mask
         _check_prune_mask(masks, num_keep=1)
+
+        # Check for prune fraction = 0
+        search_space.prune(prune_fraction=0)
+        masks = search_space.model.mask
+        assert masks[0].sum() == masks[0].numel()
+        assert masks[1].sum() == masks[1].numel()
 
         out = search_space(x)
 
@@ -306,23 +312,18 @@ class TestNASBench201SearchSpace(unittest.TestCase):
 
     def test_prune(self) -> None:
         search_space = NASBench201SearchSpace(edge_normalization=True)
-        arch_params = search_space.arch_parameters
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
         num_ops = 5
+
         for num_keep in range(1, num_ops - 1):
             proxy_search_space = copy.deepcopy(search_space)
-            proxy_search_space.prune(num_keep)
+            prune_fraction = 1 - (num_keep / num_ops)
+            proxy_search_space.prune(prune_fraction)
+
+            _check_pruned_alphas(proxy_search_space.arch_parameters, num_keep)
+
             mask = proxy_search_space.model.mask
             _check_prune_mask([mask], num_keep)
-
-            # Check pruned alphas
-            pruned_alphas = proxy_search_space.model.sample_with_mask()
-            _check_pruned_alphas([pruned_alphas], num_keep)
-
-            # Check that arch params are untampered with
-            proxy_arch_params = proxy_search_space.arch_parameters
-            for p, p_ in zip(arch_params, proxy_arch_params):
-                assert (p == p_).all()
 
             # Check that operations are freezed
             out = proxy_search_space(x)
@@ -348,6 +349,11 @@ class TestNASBench201SearchSpace(unittest.TestCase):
             assert isinstance(out[1], torch.Tensor)
             assert out[0].shape == torch.Size([2, 64])
             assert out[1].shape == torch.Size([2, 10])
+
+        # Check for prune fraction = 0
+        search_space.prune(prune_fraction=0)
+        masks = search_space.model.mask
+        assert masks.sum() == masks.numel()
 
     def test_optim_forward_pass(self) -> None:
         search_space = NASBench201SearchSpace(edge_normalization=True)
@@ -454,23 +460,19 @@ class TestDARTSSearchSpace(unittest.TestCase):
         search_space = DARTSSearchSpace(edge_normalization=True)
         x = torch.randn(2, 3, 64, 64).to(DEVICE)
         num_ops = 8
-        arch_params = search_space.arch_parameters
         for num_keep in range(1, num_ops - 1):
             proxy_search_space = copy.deepcopy(search_space)
-            proxy_search_space.prune(num_keep)
+
+            prune_fraction = 1 - (num_keep / num_ops)
+            proxy_search_space.prune(prune_fraction)
 
             # Check mask shapes
             masks = proxy_search_space.model.mask
             _check_prune_mask(masks, num_keep)
 
             # Check pruned alphas
-            pruned_alphas = proxy_search_space.model.sample_with_mask()
+            pruned_alphas = proxy_search_space.arch_parameters
             _check_pruned_alphas(pruned_alphas, num_keep)
-
-            # Check that arch params are untampered with
-            proxy_arch_params = proxy_search_space.arch_parameters
-            for p, p_ in zip(arch_params, proxy_arch_params):
-                assert (p == p_).all()
 
             # Check that operations are freezed
             for cell in proxy_search_space.model.cells:
@@ -478,7 +480,7 @@ class TestDARTSSearchSpace(unittest.TestCase):
                 for operation_block, edge_mask in zip(cell._ops, mask):
                     zero_indices = torch.nonzero(edge_mask == 0).flatten()
                     for i in zero_indices:
-                        print(i, operation_block.ops[i])
+                        # print(i, operation_block.ops[i])
                         params = [
                             p.requires_grad for p in operation_block.ops[i].parameters()
                         ]
@@ -493,6 +495,12 @@ class TestDARTSSearchSpace(unittest.TestCase):
             assert isinstance(out[1], torch.Tensor)
             assert out[0].shape == torch.Size([2, 256])
             assert out[1].shape == torch.Size([2, 10])
+
+        # Check for prune fraction = 0
+        search_space.prune(prune_fraction=0)
+        masks = search_space.model.mask
+        assert masks[0].sum() == masks[0].numel()
+        assert masks[1].sum() == masks[1].numel()
 
     def test_discretize_supernet(self) -> None:
         # TODO: check to have one operation on each edge of the search space
@@ -707,22 +715,18 @@ class TestTransNASBench101SearchSpace(unittest.TestCase):
 
     def test_prune(self) -> None:
         search_space = TransNASBench101SearchSpace(edge_normalization=True)
-        arch_params = search_space.arch_parameters
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
         num_ops = 4
         for num_keep in range(1, num_ops - 1):
             proxy_search_space = copy.deepcopy(search_space)
-            proxy_search_space.prune(num_keep)
+            prune_fraction = 1 - (num_keep / num_ops)
+            proxy_search_space.prune(prune_fraction)
 
             mask = proxy_search_space.model.mask
             _check_prune_mask([mask], num_keep)
 
-            pruned_alphas = proxy_search_space.model.sample_with_mask()
-            _check_pruned_alphas([pruned_alphas], num_keep)
-
-            proxy_arch_params = proxy_search_space.arch_parameters
-            for p, p_ in zip(arch_params, proxy_arch_params):
-                assert (p == p_).all()
+            pruned_alphas = proxy_search_space.arch_parameters
+            _check_pruned_alphas(pruned_alphas, num_keep)
 
             for cell in proxy_search_space.model.cells:
                 for k in range(1, cell.max_nodes):

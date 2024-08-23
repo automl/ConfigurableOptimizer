@@ -1,20 +1,37 @@
 from __future__ import annotations
 
 from functools import partial
+from typing import Literal
 
 import torch
 from torch import nn
 
-from confopt.searchspace.common.base_search import SearchSpace
+from confopt.searchspace.common.base_search import (
+    ArchAttentionSupport,
+    GradientMatchingScoreSupport,
+    LayerAlignmentScoreSupport,
+    OperationStatisticsSupport,
+    PerturbationArchSelectionSupport,
+    SearchSpace,
+)
+from confopt.searchspace.darts.core.operations import OLES_OPS
+from confopt.utils import update_gradient_matching_scores
 
 from .core import DARTSSearchModel
 from .core.genotypes import DARTSGenotype
-from .core.model_search import check_grads_cosine, preserve_grads
+from .core.model_search import preserve_grads
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
-class DARTSSearchSpace(SearchSpace):
+class DARTSSearchSpace(
+    SearchSpace,
+    ArchAttentionSupport,
+    GradientMatchingScoreSupport,
+    OperationStatisticsSupport,
+    LayerAlignmentScoreSupport,
+    PerturbationArchSelectionSupport,
+):
     def __init__(self, *args, **kwargs):  # type: ignore
         """DARTS Search Space for Neural Architecture Search.
 
@@ -98,8 +115,8 @@ class DARTSSearchSpace(SearchSpace):
             self.model.alphas_reduce,
         ]
 
-    def prune(self, num_keep: int) -> None:
-        self.model.prune(num_keep)  # type: ignore
+    def get_cell_types(self) -> list[str]:
+        return ["normal", "reduce"]
 
     def discretize(self) -> nn.Module:
         return self.model.discretize()  # type: ignore
@@ -110,29 +127,90 @@ class DARTSSearchSpace(SearchSpace):
     def preserve_grads(self) -> None:
         self.model.apply(preserve_grads)
 
-    def check_grads_cosine(self, oles: bool = False) -> None:
-        check_grads_cosine_part = partial(check_grads_cosine, oles=oles)
-        self.model.apply(check_grads_cosine_part)
-
-    def calc_avg_gm_score(self) -> float:
-        sim_avg = []
-        for module in self.model.modules():
-            if hasattr(module, "running_sim"):
-                sim_avg.append(module.running_sim.avg)
-        if len(sim_avg) == 0:
-            return 0
-        avg_gm_score = sum(sim_avg) / len(sim_avg)
-        return avg_gm_score
+    def update_gradient_matching_scores(
+        self,
+        early_stop: bool = False,
+        early_stop_frequency: int = 20,
+        early_stop_threshold: float = 0.4,
+    ) -> None:
+        partial_fn = partial(
+            update_gradient_matching_scores,
+            oles_ops=OLES_OPS,
+            early_stop=early_stop,
+            early_stop_frequency=early_stop_frequency,
+            early_stop_threshold=early_stop_threshold,
+        )
+        self.model.apply(partial_fn)
 
     def get_mean_layer_alignment_score(self) -> tuple[float, float]:
         return self.model._get_mean_layer_alignment_score()
 
-    def reset_gm_scores(self) -> None:
-        for module in self.model.modules():
-            if hasattr(module, "running_sim"):
-                module.running_sim.reset()
-
-    def get_num_skip_ops(self) -> tuple[int, int]:
+    def get_num_skip_ops(self) -> dict[str, int]:
         alphas_normal, alphas_reduce = self.model.arch_parameters()
         count_skip = lambda alphas: sum(alphas[:, 1:].argmax(dim=1) == 2)
-        return count_skip(alphas_normal), count_skip(alphas_reduce)
+
+        stats = {
+            "skip_connections/normal": count_skip(alphas_normal),
+            "skip_connections/reduce": count_skip(alphas_reduce),
+        }
+
+        return stats
+
+    def get_num_ops(self) -> int:
+        return self.model.num_ops
+
+    def get_num_edges(self) -> int:
+        return self.model.num_edges
+
+    def get_num_nodes(self) -> int:
+        return self.model.num_nodes
+
+    def get_candidate_flags(self, cell_type: Literal["normal", "reduce"]) -> list:
+        if self.topology is None:
+            self.set_topology(False)
+
+        if self.topology:
+            return self.model.candidate_flags_edge[cell_type]
+
+        return self.model.candidate_flags[cell_type]
+
+    def get_edges_at_node(self, selected_node: int) -> list:
+        return self.model.nid2eids[selected_node]
+
+    def remove_from_projected_weights(
+        self,
+        selected_edge: int,
+        selected_op: int | None,
+        cell_type: Literal["normal", "reduce"],
+    ) -> None:
+        if self.topology is None:
+            self.set_topology(False)
+
+        self.model.remove_from_projected_weights(
+            cell_type, selected_edge, selected_op, self.topology
+        )
+
+    def mark_projected_operation(
+        self,
+        selected_edge: int,
+        selected_op: int,
+        cell_type: Literal["normal", "reduce"],
+    ) -> None:
+        self.model.mark_projected_op(selected_edge, selected_op, cell_type)
+
+    def mark_projected_edge(
+        self,
+        selected_node: int,
+        selected_edges: list[int],
+        cell_type: Literal["normal", "reduce"],
+    ) -> None:
+        self.model.mark_projected_edges(selected_node, selected_edges, cell_type)
+
+    def set_projection_mode(self, value: bool) -> None:
+        self.model.projection_mode = value
+
+    def set_projection_evaluation(self, value: bool) -> None:
+        self.model.projection_evaluation = value
+
+    def is_topology_supported(self) -> bool:
+        return True
