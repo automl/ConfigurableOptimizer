@@ -269,7 +269,8 @@ class BaseProfile:
                 config_key
             ]
 
-        self.set_searchspace_config({"k": kwargs["k"]})
+        if kwargs.get("k"):
+            self.set_searchspace_config({"k": kwargs["k"]})
 
     def configure_trainer(self, **kwargs) -> None:  # type: ignore
         for config_key in kwargs:
