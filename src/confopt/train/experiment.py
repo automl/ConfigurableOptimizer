@@ -409,7 +409,7 @@ class Experiment:
             self.pruner = Pruner(
                 searchspace=self.search_space,
                 prune_epochs=config.get("prune_epochs", []),
-                prune_num_keeps=config.get("prune_num_keeps", []),
+                prune_fractions=config.get("prune_fractions", []),
             )
         else:
             self.pruner = None
