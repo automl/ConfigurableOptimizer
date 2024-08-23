@@ -51,12 +51,6 @@ class OperationBlock(nn.Module):
     ) -> None:
         super().__init__()
         self.device = device
-        if partial_connector:
-            for op in ops:
-                if not (isinstance(op, (nn.AvgPool2d, nn.MaxPool2d))) and hasattr(
-                    op, "__post__init__"
-                ):
-                    op.__post__init__()
 
         self.ops = ops
         self.partial_connector = partial_connector
@@ -113,3 +107,5 @@ class OperationBlock(nn.Module):
         for op in self.ops:
             if not (isinstance(op, (nn.AvgPool2d, nn.MaxPool2d))):
                 op.change_channel_size(k=1 / wider, device=self.device)  # type: ignore
+                if hasattr(op, "__post__init__"):
+                    op.__post__init__()
