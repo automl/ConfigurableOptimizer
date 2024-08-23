@@ -178,7 +178,7 @@ class OperationStatisticsSupport(ModelWrapper):
         """
 
 
-class ArchSelectionSupport(ModelWrapper):
+class PerturbationArchSelectionSupport(ModelWrapper):
     @abstractmethod
     def is_topology_supported(self) -> bool:
         """Returns:

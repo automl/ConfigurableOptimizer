@@ -9,8 +9,8 @@ import torch.utils
 from confopt.oneshot.archsampler.darts.sampler import DARTSSampler
 from confopt.searchspace import SearchSpace
 from confopt.searchspace.common.base_search import (
-    ArchSelectionSupport,
     OperationStatisticsSupport,
+    PerturbationArchSelectionSupport,
 )
 from confopt.train import ConfigurableTrainer, SearchSpaceHandler
 from confopt.utils import unwrap_model
@@ -169,7 +169,8 @@ class PerturbationArchSelection:
         unwrapped_network = self.model
 
         assert isinstance(
-            unwrapped_network, (ArchSelectionSupport, OperationStatisticsSupport)
+            unwrapped_network,
+            (PerturbationArchSelectionSupport, OperationStatisticsSupport),
         )
 
         train_queue, valid_queue, _ = self.trainer.data.get_dataloaders(
