@@ -64,7 +64,6 @@ class NAS201SearchCell(nn.Module):
         self.max_nodes = max_nodes
         self.in_dim = C_in
         self.out_dim = C_out
-        self.k = k
         for i in range(1, max_nodes):
             for j in range(i):
                 node_str = f"{i}<-{j}"
