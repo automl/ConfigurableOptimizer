@@ -10,6 +10,7 @@ dependencies = [
     "protobuf==3.20.*",
     "wandb",
     "fvcore",
+    "reinmax",
 ]
 requires-python = ">=3.8"
 authors = [{ name = "Arjun Krishnakumar", email = "arjun.krishnakumar.mec@gmail.com" }]

@@ -1,4 +1,4 @@
-from .configurable_trainer import ConfigurableTrainer  # noqa: I001
+from .configurable_trainer import ConfigurableTrainer, DEBUG_STEPS  # noqa: I001
 from .discrete_trainer import DiscreteTrainer
 from .search_space_handler import SearchSpaceHandler
 from .experiment import (
@@ -11,6 +11,7 @@ from .experiment import (
 
 __all__ = [
     "ConfigurableTrainer",
+    "DEBUG_STEPS",
     "DiscreteTrainer",
     "SearchSpaceHandler",
     "Experiment",

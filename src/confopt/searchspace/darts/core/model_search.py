@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import copy
 import math
 from typing import Literal
+import warnings
 
 import torch
 from torch import nn
@@ -9,10 +11,9 @@ import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
 from confopt.utils import (
-    AverageMeter,
     calc_layer_alignment_score,
-    freeze,
     preserve_gradients_in_module,
+    prune,
     set_ops_to_prune,
 )
 from confopt.utils.normalize_params import normalize_params
@@ -262,6 +263,13 @@ class Network(nn.Module):
         self.classifier = nn.Linear(C_prev, num_classes)
         self.weights: dict[str, list[torch.Tensor]] = {}
 
+        # Multi-head attention for architectural parameters
+        self.is_arch_attention_enabled = False  # disabled by default
+        self.multihead_attention = nn.MultiheadAttention(
+            embed_dim=len(self.primitives), num_heads=1
+        )
+
+        # mask for pruning
         self._initialize_parameters()
 
     def new(self) -> Network:
@@ -297,73 +305,27 @@ class Network(nn.Module):
                 weights.retain_grad()
         self.weights[weight_type].append(weights)
 
-    def remove_pruned_alphas(
-        self, weights_normal: torch.Tensor, weights_reduce: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        assert (
-            self.mask is not None
-        ), "This function requires a prior call to prune function"
+    def sample_weights(self) -> tuple[torch.Tensor, torch.Tensor]:
+        if self.projection_mode:
+            weights_normal, weights_reduce = (
+                self.get_projected_weights("normal"),
+                self.get_projected_weights("reduce"),
+            )
+            return weights_normal, weights_reduce
 
-        def _prune_alpha(weight: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-            weight = weight[mask]
-            weight = weight.reshape(mask.shape[0], mask[0].sum())
-            return weight
-
-        weights_normal = _prune_alpha(weights_normal, self.mask[0])
-        weights_reduce = _prune_alpha(weights_reduce, self.mask[1])
-
-        return weights_normal, weights_reduce
-
-    def restore_pruned_alpha_shape(
-        self, weights_normal: torch.Tensor, weights_reduce: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        assert (
-            self.mask is not None
-        ), "This function requires a prior call to prune function"
-
-        def _restore_weight_shape(
-            weight: list[torch.Tensor] | torch.Tensor,
-            reference_weight: torch.Tensor,
-            mask: torch.Tensor,
-        ) -> torch.Tensor:
-            if isinstance(weight, list):
-                weight = torch.stack(weight)
-            weight_full = torch.zeros_like(reference_weight)
-            weight_full[mask] = weight.view(-1)
-            return weight_full
-
-        weights_normal = _restore_weight_shape(
-            weights_normal, self.alphas_normal, self.mask[0]
-        )
-        weights_reduce = _restore_weight_shape(
-            weights_reduce, self.alphas_reduce, self.mask[1]
-        )
-
-        return weights_normal, weights_reduce
-
-    def sample_with_mask(self) -> tuple[torch.Tensor, torch.Tensor]:
         weights_normal_to_sample = self.alphas_normal
         weights_reduce_to_sample = self.alphas_reduce
 
-        if self.mask is not None:
-            # The shape of weights will change
-            # If num_keep was 6
-            # The shape should be (14, 6)
+        if self.is_arch_attention_enabled:
             (
                 weights_normal_to_sample,
                 weights_reduce_to_sample,
-            ) = self.remove_pruned_alphas(
+            ) = self._compute_arch_attention(
                 weights_normal_to_sample, weights_reduce_to_sample
             )
 
         weights_normal = self.sample(weights_normal_to_sample)
         weights_reduce = self.sample(weights_reduce_to_sample)
-
-        if self.mask is not None:
-            # Revert back to original shape of (14, 8)
-            weights_normal, weights_reduce = self.restore_pruned_alpha_shape(
-                weights_normal, weights_reduce
-            )
 
         return weights_normal, weights_reduce
 
@@ -387,7 +349,7 @@ class Network(nn.Module):
         self.weights["normal"] = []
         self.weights["reduce"] = []
 
-        weights_normal, weights_reduce = self.sample_with_mask()
+        weights_normal, weights_reduce = self.sample_weights()
 
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
@@ -415,7 +377,7 @@ class Network(nn.Module):
         self.weights["normal"] = []
         self.weights["reduce"] = []
 
-        weights_normal, weights_reduce = self.sample_with_mask()
+        weights_normal, weights_reduce = self.sample_weights()
 
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
@@ -473,10 +435,17 @@ class Network(nn.Module):
         the neural cell.
         """
         k = sum(1 for i in range(self._steps) for n in range(2 + i))
-        num_ops = len(self.primitives)
+        self.num_ops = len(self.primitives)
+        self.num_edges = k
 
-        self.alphas_normal = nn.Parameter(1e-3 * torch.randn(k, num_ops).to(DEVICE))
-        self.alphas_reduce = nn.Parameter(1e-3 * torch.randn(k, num_ops).to(DEVICE))
+        self.num_nodes = self._steps - 1
+
+        self.alphas_normal = nn.Parameter(
+            1e-3 * torch.randn(k, self.num_ops).to(DEVICE)
+        )
+        self.alphas_reduce = nn.Parameter(
+            1e-3 * torch.randn(k, self.num_ops).to(DEVICE)
+        )
         self._arch_parameters = [
             self.alphas_normal,
             self.alphas_reduce,
@@ -488,6 +457,8 @@ class Network(nn.Module):
             self.betas_normal,
             self.betas_reduce,
         ]
+
+        self._initialize_projection_params()
 
     def arch_parameters(self) -> list[torch.nn.Parameter]:
         """Get a list containing the architecture parameters or alphas.
@@ -543,8 +514,16 @@ class Network(nn.Module):
                 n += 1
             return gene
 
-        gene_normal = _parse(F.softmax(self.alphas_normal, dim=-1).data.cpu().numpy())
-        gene_reduce = _parse(F.softmax(self.alphas_reduce, dim=-1).data.cpu().numpy())
+        if self.is_arch_attention_enabled:
+            alphas_normal, alphas_reduce = self._compute_arch_attention(
+                self.alphas_normal, self.alphas_reduce
+            )
+        else:
+            alphas_normal = self.alphas_normal
+            alphas_reduce = self.alphas_reduce
+
+        gene_normal = _parse(F.softmax(alphas_normal, dim=-1).data.cpu().numpy())
+        gene_reduce = _parse(F.softmax(alphas_reduce, dim=-1).data.cpu().numpy())
 
         concat = range(2 + self._steps - self._multiplier, self._steps + 2)
         genotype = DARTSGenotype(
@@ -584,36 +563,34 @@ class Network(nn.Module):
             mean_score_reduce = 0
         return mean_score_normal, mean_score_reduce
 
-    def prune(self, num_keep: int) -> None:
+    def prune(self, prune_fraction: float) -> None:
         """Discretize architecture parameters to enforce sparsity.
 
         Args:
-            num_keep (float): Number of operations to keep.
+            prune_fraction (float): Fraction of operations to remove.
         """
-        self.mask = []
+        assert prune_fraction < 1, "Prune fraction should be less than 1"
+        assert prune_fraction >= 0, "Prune fraction greater or equal to 0"
 
-        top_k = num_keep
+        num_ops = len(self.primitives)
+        top_k = int(num_ops * (1 - prune_fraction))
+
+        if self.mask is None:
+            self.mask = []
 
         # Calculate masks
         for i, p in enumerate(self._arch_parameters):
-            data_to_sort = p.data.clone()
-            if len(self.last_mask) != 0:
-                last_mask = self.last_mask[i]
-                temp = float("-inf") * torch.ones_like(data_to_sort)
-                data_to_sort[~last_mask] = temp[~last_mask]
-
-            sorted_arch_params, _ = torch.sort(data_to_sort, dim=1, descending=True)
-            thresholds = sorted_arch_params[:, top_k - 1].unsqueeze(1)
-            mask = data_to_sort >= thresholds
-            self.mask.append(mask)
+            if i < len(self.mask):
+                self.mask[i] = prune(p, top_k, self.mask[i])
+            else:
+                mask = prune(p, top_k, None)
+                self.mask.append(mask)
 
         for cell in self.cells:
             if cell.reduction:
                 cell.prune_ops(self.mask[1])
             else:
                 cell.prune_ops(self.mask[0])
-
-        self.last_mask = self.mask
 
     def discretize(self) -> NetworkCIFAR | NetworkImageNet:
         genotype = self.genotype()
@@ -650,6 +627,150 @@ class Network(nn.Module):
             params -= set(self.alphas_normal)
         return list(params)
 
+    def _initialize_projection_params(self) -> None:
+        self.proj_weights = {  # for hard/soft assignment after project
+            "normal": torch.zeros_like(self.alphas_normal),
+            "reduce": torch.zeros_like(self.alphas_reduce),
+        }
+
+        self.candidate_flags = {
+            "normal": torch.tensor(
+                self.num_edges * [True], requires_grad=False, dtype=torch.bool
+            ).to(DEVICE),
+            "reduce": torch.tensor(
+                self.num_edges * [True], requires_grad=False, dtype=torch.bool
+            ).to(DEVICE),
+        }
+        self.candidate_flags_edge = {
+            "normal": torch.tensor(
+                3 * [True], requires_grad=False, dtype=torch.bool
+            ).to(DEVICE),
+            "reduce": torch.tensor(
+                3 * [True], requires_grad=False, dtype=torch.bool
+            ).to(DEVICE),
+        }
+
+        # for outgoing edges
+        self.nid2eids: dict[int, list[int]] = {}
+        offset = 2  # 2 inital edges to node 0
+        num_states = 3  # 2 initial states and 1 incoming edge to node 0
+
+        for i in range(self.num_nodes):
+            for j in range(num_states):
+                if i not in self.nid2eids:
+                    self.nid2eids[i] = [offset + j]
+                else:
+                    self.nid2eids[i].append(offset + j)
+            offset += num_states
+            num_states += 1
+
+        self.nid2selected_eids: dict[str, dict[int, list[int]]] = {
+            "normal": {},
+            "reduce": {},
+        }
+        for i in range(self.num_nodes):
+            self.nid2selected_eids["normal"][i] = []
+            self.nid2selected_eids["reduce"][i] = []
+
+        self.projection_mode = False
+        self.projection_evaluation = False
+        self.removal_cell_type: Literal["normal", "reduce"] | None = None
+        self.removed_projected_weights = {
+            "normal": None,
+            "reduce": None,
+        }
+
+    def remove_from_projected_weights(
+        self,
+        cell_type: Literal["normal", "reduce"],
+        selected_edge: int,
+        selected_op: int | None,
+        topology: bool = False,
+    ) -> None:
+        weights = self.get_projected_weights(cell_type)
+        proj_mask = torch.ones_like(weights[selected_edge])
+        if topology:
+            if selected_op is not None:
+                warnings.warn(
+                    "selected_op should be set to None in case of topology search",
+                    stacklevel=1,
+                )
+            weights[selected_edge].data.fill_(0)
+        else:
+            proj_mask[selected_op] = 0
+
+        weights[selected_edge] = weights[selected_edge] * proj_mask
+
+        self.removed_projected_weights = {
+            "normal": None,
+            "reduce": None,
+        }
+        self.removal_cell_type = cell_type
+        self.removed_projected_weights[cell_type] = weights
+
+    def mark_projected_op(
+        self, eid: int, opid: int, cell_type: Literal["normal", "reduce"]
+    ) -> None:
+        self.proj_weights[cell_type][eid][opid] = 1
+        self.candidate_flags[cell_type][eid] = False
+
+    def mark_projected_edges(
+        self, nid: int, eids: list[int], cell_type: Literal["normal", "reduce"]
+    ) -> None:
+        for eid in self.nid2eids[nid]:
+            if eid not in eids:  # not top2
+                self.proj_weights[cell_type][eid].data.fill_(0)
+        self.nid2selected_eids[cell_type][nid] = copy.deepcopy(eids)
+        self.candidate_flags_edge[cell_type][nid] = False
+
+    def get_projected_weights(
+        self, cell_type: Literal["normal", "reduce"]
+    ) -> torch.Tensor:
+        assert cell_type in ["normal", "reduce"]
+
+        if self.projection_evaluation and self.removal_cell_type == cell_type:
+            return self.removed_projected_weights[cell_type]
+
+        if self.is_arch_attention_enabled:
+            alphas_normal, alphas_reduce = self._compute_arch_attention(
+                self.alphas_normal, self.alphas_reduce
+            )
+        else:
+            alphas_normal = self.alphas_normal
+            alphas_reduce = self.alphas_reduce
+
+        if cell_type == "normal":
+            weights = torch.softmax(alphas_normal, dim=-1)
+        else:
+            weights = torch.softmax(alphas_reduce, dim=-1)
+
+        ## proj op
+        for eid in range(self.num_edges):
+            if not self.candidate_flags[cell_type][eid]:
+                weights[eid].data.copy_(self.proj_weights[cell_type][eid])
+
+        ## proj edge
+        for nid in self.nid2eids:
+            if not self.candidate_flags_edge[cell_type][nid]:  ## projected node
+                for eid in self.nid2eids[nid]:
+                    if eid not in self.nid2selected_eids[cell_type][nid]:
+                        weights[eid].data.copy_(self.proj_weights[cell_type][eid])
+
+        return weights
+
+    def _compute_arch_attention(
+        self, normal_alphas: nn.Parameter, reduce_alphas: nn.Parameter
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        all_arch_params = torch.concat((normal_alphas, reduce_alphas))
+        all_arch_attn, _ = self.multihead_attention(
+            all_arch_params, all_arch_params, all_arch_params, need_weights=False
+        )
+        num_edges_normal = normal_alphas.shape[0]
+        attn_normal = all_arch_attn[:num_edges_normal]
+        attn_reduce = all_arch_attn[num_edges_normal:]
+
+        return attn_normal, attn_reduce
+
 
 def preserve_grads(m: nn.Module) -> None:
     ignored_modules = (
@@ -661,50 +782,3 @@ def preserve_grads(m: nn.Module) -> None:
     )
 
     preserve_gradients_in_module(m, ignored_modules, OLES_OPS)
-
-
-# TODO: break function from OLES paper to have less branching.
-def check_grads_cosine(m: nn.Module, oles: bool = False) -> None:  # noqa: C901
-    if (
-        isinstance(m, (OperationBlock, OperationChoices, Cell, MixedOp, Network))
-        or not isinstance(m, tuple(OLES_OPS))
-        or not hasattr(m, "pre_grads")
-        or not m.pre_grads
-    ):
-        return
-
-    i = 0
-    true_i = 0
-    temp = 0
-
-    for param in m.parameters():
-        if param.requires_grad and param.grad is not None:
-            g = param.grad.detach().cpu()
-            if len(g) != 0:
-                temp += torch.cosine_similarity(g, m.pre_grads[i], dim=0).mean()
-                true_i += 1
-            i += 1
-
-    m.pre_grads.clear()
-    if true_i == 0:
-        return
-    sim_avg = temp / true_i
-
-    if not hasattr(m, "avg"):
-        m.avg = 0
-    m.avg += sim_avg
-
-    if not hasattr(m, "running_sim"):
-        m.running_sim = AverageMeter()
-    m.running_sim.update(sim_avg)
-
-    if not hasattr(m, "count"):
-        m.count = 0
-
-    if m.count == 20:
-        if m.avg / m.count < 0.4 and oles:
-            freeze(m)
-        m.count = 0
-        m.avg = 0
-    else:
-        m.count += 1

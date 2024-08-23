@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, Literal
 
 import torch
+from torch import nn
 
 from .checkpoints import (
     copy_checkpoint,
@@ -19,6 +20,33 @@ from .distributed import (
 from .logger import Logger, prepare_logger
 from .normalize_params import normalize_params
 from .time import get_runtime, get_time_as_string
+
+
+class ExperimentCheckpointLoader:
+    @classmethod
+    def load_checkpoint(
+        cls,
+        logger: Logger,
+        src: Literal["last", "best", "epoch"],
+        epoch: int | None = None,
+    ) -> nn.Module:
+        assert src in [
+            "last",
+            "best",
+            "epoch",
+        ], "src must be 'last', 'best', or 'epoch'"
+
+        if src == "best":
+            path = logger.path("best_model")
+        elif src == "last":
+            path = logger.path("last_checkpoint")
+        elif src == "epoch":
+            assert epoch is not None, "epoch argument must be given when src is 'epoch'"
+            path = logger.path("checkpoints")
+            path = "{}/{}_{:07d}.pth".format(path, "model", epoch)
+
+        logger.log(f"Loading checkpoint {path}")
+        return torch.load(path, map_location=torch.device("cpu"))
 
 
 class AverageMeter:
@@ -85,7 +113,7 @@ def get_num_classes(dataset: str) -> int:
         num_classes = 10
     elif dataset == "cifar100":
         num_classes = 100
-    elif dataset == "imgnet16_120" or dataset == "imgnet16":
+    elif dataset in ("imgnet16_120", "imgnet16"):
         num_classes = 120
     else:
         raise ValueError("dataset is not defined.")
@@ -161,9 +189,98 @@ def set_ops_to_prune(model: torch.nn.Module, mask: torch.Tensor) -> None:
 
 
 def unwrap_model(model: torch.nn.Module) -> torch.nn.Module:
-    if isinstance(model, torch.nn.DataParallel):
+    if isinstance(
+        model, (torch.nn.DataParallel, torch.nn.parallel.DistributedDataParallel)
+    ):
         return model.module
     return model
+
+
+def _init_grad_match_metrics(m: nn.Module) -> None:
+    if not hasattr(m, "avg"):
+        m.avg = 0
+    if not hasattr(m, "running_sim"):
+        m.running_sim = AverageMeter()
+    if not hasattr(m, "count"):
+        m.count = 0
+
+
+def update_gradient_matching_scores(
+    m: nn.Module,
+    oles_ops: list[nn.Module],
+    early_stop: bool = False,
+    early_stop_frequency: int = 20,
+    early_stop_threshold: float = 0.4,
+) -> None:
+    if (
+        not isinstance(m, tuple(oles_ops))
+        or not hasattr(m, "pre_grads")
+        or not m.pre_grads
+    ):
+        return
+
+    i = 0
+    true_i = 0
+    temp = 0
+
+    for param in m.parameters():
+        if param.requires_grad and param.grad is not None:
+            g = param.grad.detach().cpu()
+            if len(g) != 0:
+                temp += torch.cosine_similarity(g, m.pre_grads[i], dim=0).mean()
+                true_i += 1
+            i += 1
+
+    m.pre_grads.clear()
+    if true_i == 0:
+        return
+    sim_avg = temp / true_i
+
+    _init_grad_match_metrics(m)
+
+    m.avg += sim_avg
+    m.running_sim.update(sim_avg)
+
+    if m.count == early_stop_frequency:
+        if m.avg / m.count < early_stop_threshold and early_stop:
+            freeze(m)
+        m.count = 0
+        m.avg = 0
+    else:
+        m.count += 1
+
+
+def prune(
+    alpha: torch.Tensor,
+    num_keep: int,
+    mask: torch.Tensor | None = None,
+    reset: bool = False,
+) -> torch.Tensor:
+    """This function prunes the alpha based on number of operations to keep
+    and optionally a previous mask.
+
+     Parameters:
+        alpha (torch.Tensor): The tensor to prune
+        num_keep (int): number of operations to keep in alpha.
+        mask (torch.Tensor | None): Previous Mask or None
+        reset (bool): If set True, resets the alpha to random values. deafults to False.
+
+    Returns:
+        torch.Tensor: Boolean mask tensor where True represent the operations to keep
+        and False represent operations to prune.
+    """
+    if mask is not None:
+        alpha.data[~mask] -= 1000000
+    src, index = alpha.topk(k=num_keep, dim=-1)
+
+    if reset:
+        src = 1e-3 * torch.randn_like(src)
+
+    alpha.data.copy_(torch.zeros_like(alpha).scatter(dim=1, index=index, src=src))
+    mask = torch.zeros_like(alpha, dtype=torch.bool).scatter(
+        dim=1, index=index, src=torch.ones_like(src, dtype=torch.bool)
+    )
+    return mask
 
 
 __all__ = [
@@ -187,4 +304,5 @@ __all__ = [
     "calc_layer_alignment_score",
     "reset_gm_score_attributes",
     "set_ops_to_prune",
+    "update_gradient_matching_scores",
 ]

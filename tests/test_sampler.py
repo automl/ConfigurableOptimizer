@@ -1,7 +1,7 @@
 import unittest
 
 import torch
-from confopt.oneshot.archsampler import DARTSSampler, GDASSampler, DRNASSampler, BaseSampler
+from confopt.oneshot.archsampler import DARTSSampler, GDASSampler, DRNASSampler, BaseSampler, ReinMaxSampler
 
 
 def _test_arch_combine_fn_default(sampler: BaseSampler, alphas: list[torch.Tensor]) -> None:
@@ -70,6 +70,25 @@ class TestGDASSampler(unittest.TestCase):
         # wouldn't really make a difference, considering that only one operation
         # is chosen per edge
         _test_arch_combine_fn_default(sampler, alphas)
+
+class TestReinmaxSampler(unittest.TestCase):
+    def test_post_sample_fn_default(self) -> None:
+        alphas = [torch.randn(14, 8), torch.randn(14, 8)]
+        sampler = ReinMaxSampler(
+            alphas, sample_frequency="epoch", arch_combine_fn="default"
+        )
+        _test_arch_combine_fn_default(sampler, alphas)
+
+    def test_post_sample_fn_sigmoid(self) -> None:
+        alphas = [torch.randn(14, 8), torch.randn(14, 8)]
+        sampler = ReinMaxSampler(
+            alphas, sample_frequency="epoch", arch_combine_fn="sigmoid"
+        )
+        # Reinmax must ignore the "sigmoid" arch_combine_fn since it respecting it
+        # wouldn't really make a difference, considering that only one operation
+        # is chosen per edge
+        _test_arch_combine_fn_default(sampler, alphas)
+
 
 
 if __name__ == "__main__":

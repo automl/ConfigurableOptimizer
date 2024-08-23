@@ -32,7 +32,9 @@ class DARTSProfile(BaseProfile, ABC):
         oles: bool = False,
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
-        prune_num_keeps: list[int] | None = None,
+        prune_fractions: list[float] | None = None,
+        is_arch_attention_enabled: bool = False,
+        pt_select_architecture: bool = False,
     ) -> None:
         PROFILE_TYPE = "DARTS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -54,7 +56,9 @@ class DARTSProfile(BaseProfile, ABC):
             oles,
             calc_gm_score,
             prune_epochs,
-            prune_num_keeps,
+            prune_fractions,
+            is_arch_attention_enabled,
+            pt_select_architecture,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
@@ -73,6 +77,8 @@ class DARTSProfile(BaseProfile, ABC):
 
 
 class GDASProfile(BaseProfile, ABC):
+    PROFILE_TYPE = "GDAS"
+
     def __init__(
         self,
         epochs: int,
@@ -96,14 +102,15 @@ class GDASProfile(BaseProfile, ABC):
         oles: bool = False,
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
-        prune_num_keeps: list[int] | None = None,
+        prune_fractions: list[float] | None = None,
+        is_arch_attention_enabled: bool = False,
+        pt_select_architecture: bool = False,
     ) -> None:
-        PROFILE_TYPE = "GDAS"
         self.sampler_sample_frequency = sampler_sample_frequency
         self.tau_min = tau_min
         self.tau_max = tau_max
         super().__init__(
-            PROFILE_TYPE,
+            self.PROFILE_TYPE,
             epochs,
             is_partial_connection,
             dropout,
@@ -120,9 +127,11 @@ class GDASProfile(BaseProfile, ABC):
             oles,
             calc_gm_score,
             prune_epochs,
-            prune_num_keeps,
+            prune_fractions,
+            is_arch_attention_enabled,
+            pt_select_architecture,
         )
-        self.sampler_type = str.lower(PROFILE_TYPE)
+        self.sampler_type = str.lower(self.PROFILE_TYPE)
 
         if partial_connector_config is not None:
             self.configure_partial_connector(**partial_connector_config)
@@ -138,6 +147,10 @@ class GDASProfile(BaseProfile, ABC):
             "tau_max": self.tau_max,
         }
         self.sampler_config = gdas_config  # type: ignore
+
+
+class ReinMaxProfile(GDASProfile):
+    PROFILE_TYPE = "REINMAX"
 
 
 class SNASProfile(BaseProfile, ABC):
@@ -166,7 +179,9 @@ class SNASProfile(BaseProfile, ABC):
         oles: bool = False,
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
-        prune_num_keeps: list[int] | None = None,
+        prune_fractions: list[float] | None = None,
+        is_arch_attention_enabled: bool = False,
+        pt_select_architecture: bool = False,
     ) -> None:
         PROFILE_TYPE = "SNAS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -192,7 +207,9 @@ class SNASProfile(BaseProfile, ABC):
             oles,
             calc_gm_score,
             prune_epochs,
-            prune_num_keeps,
+            prune_fractions,
+            is_arch_attention_enabled,
+            pt_select_architecture,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 
@@ -236,7 +253,9 @@ class DRNASProfile(BaseProfile, ABC):
         oles: bool = False,
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
-        prune_num_keeps: list[int] | None = None,
+        prune_fractions: list[float] | None = None,
+        is_arch_attention_enabled: bool = False,
+        pt_select_architecture: bool = False,
     ) -> None:
         PROFILE_TYPE = "DRNAS"
         self.sampler_sample_frequency = sampler_sample_frequency
@@ -258,7 +277,9 @@ class DRNASProfile(BaseProfile, ABC):
             oles,
             calc_gm_score,
             prune_epochs,
-            prune_num_keeps,
+            prune_fractions,
+            is_arch_attention_enabled,
+            pt_select_architecture,
         )
         self.sampler_type = str.lower(PROFILE_TYPE)
 

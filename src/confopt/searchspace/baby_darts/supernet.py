@@ -39,8 +39,5 @@ class BabyDARTSSearchSpace(SearchSpace):
             self.model.alphas_reduce,
         ]
 
-    def prune(self, num_keep: int) -> None:
-        self.model.prune(num_keep)  # type: ignore
-
     def discretize(self) -> nn.Module:
         return self.model._discretize()  # type: ignore

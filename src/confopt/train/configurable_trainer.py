@@ -16,12 +16,18 @@ from torch.utils.data import DataLoader
 
 from confopt.dataset import AbstractData
 from confopt.searchspace import SearchSpace
+from confopt.searchspace.common.base_search import (
+    GradientMatchingScoreSupport,
+    OperationStatisticsSupport,
+)
 from confopt.utils import (
     AverageMeter,
+    ExperimentCheckpointLoader,
     Logger,
     calc_accuracy,
     clear_grad_cosine,
     get_device,
+    unwrap_model,
 )
 
 from .search_space_handler import SearchSpaceHandler
@@ -76,6 +82,46 @@ class ConfigurableTrainer:
         self.query_dataset = query_dataset
         self.benchmark_api = benchmark_api
 
+    def _init_experiment_state(self, setup_new_run: bool = True) -> None:
+        """Initializes the state of the experiment.
+
+        If training is to continue from a previous checkpoint, then the state
+        is laoded from the checkpoint. Else, empty states are initialized for
+        the run.
+
+        Also instantiates the Checkpointer objects used throughout training.
+        """
+        if self.load_saved_model or self.load_best_model or self.start_epoch != 0:
+            assert (
+                sum([self.start_epoch > 0, self.load_best_model, self.load_saved_model])
+                == 1
+            )
+            epoch = None
+            if self.load_best_model is True:
+                src = "best"
+            elif self.load_saved_model is True:
+                src = "last"
+            else:
+                src = "epoch"
+                epoch = self.start_epoch
+
+            checkpoint = ExperimentCheckpointLoader.load_checkpoint(
+                self.logger, src, epoch
+            )
+            self._load_checkpoint(checkpoint)
+            if setup_new_run:
+                self.logger.set_up_new_run()
+        else:
+            self._init_empty_exp_state_info()
+
+        self.checkpointer = self._set_up_checkpointer(mode="checkpoints")
+        self.periodic_checkpointer = PeriodicCheckpointer(
+            checkpointer=self.checkpointer,
+            period=self.checkpointing_freq,
+            max_iter=self.epochs,
+        )
+        self.best_model_checkpointer = self._set_up_checkpointer(mode=None)
+
     def train(  # noqa: C901, PLR0915, PLR0912
         self,
         search_space_handler: SearchSpaceHandler,
@@ -85,19 +131,15 @@ class ConfigurableTrainer:
         calc_gm_score: bool = False,
     ) -> None:
         search_space_handler.adapt_search_space(self.model)
+        self._init_experiment_state()
 
-        if self.load_saved_model or self.load_best_model or self.start_epoch != 0:
-            self._load_model_state_if_exists()
-        else:
-            self._init_empty_model_state_info()
-
-        if self.use_data_parallel:
-            network, criterion = self._load_onto_data_parallel(
-                self.model, self.criterion
-            )
-        else:
-            network: nn.Module = self.model  # type: ignore
-            criterion = self.criterion
+        network = (
+            self._load_onto_data_parallel(self.model)
+            if self.use_data_parallel
+            else self.model
+        )
+        unwrapped_network = self.model
+        criterion = self.criterion
 
         start_time = time.time()
         search_time, epoch_time = AverageMeter(), AverageMeter()
@@ -186,11 +228,10 @@ class ConfigurableTrainer:
             self.logger.update_wandb_logs(arch_values_dict)
 
             # Log GM scores
-            if calc_gm_score:
-                if self.use_data_parallel:
-                    gm_score = network.module.calc_avg_gm_score()
-                else:
-                    gm_score = network.calc_avg_gm_score()
+            if calc_gm_score and isinstance(
+                unwrapped_network, GradientMatchingScoreSupport
+            ):
+                gm_score = unwrapped_network.calc_avg_gm_score()
                 gm_metrics = {
                     "gm_scores/mean_gm": gm_score,
                     "gm_scores/epochs": epoch,
@@ -200,18 +241,9 @@ class ConfigurableTrainer:
                 # Add for all modules
                 self.logger.update_wandb_logs(gm_metrics)
 
-            # Count skip connections in this epoch
-            normal_cell_n_skip, reduce_cell_n_skip = (
-                network.module.get_num_skip_ops()
-                if self.use_data_parallel
-                else network.get_num_skip_ops()
-            )
-
-            n_skip_connections = {
-                "skip_connections/normal": normal_cell_n_skip,
-                "skip_connections/reduce": reduce_cell_n_skip,
-            }
-            self.logger.update_wandb_logs(n_skip_connections)
+            if isinstance(unwrapped_network, OperationStatisticsSupport):
+                ops_stats = unwrapped_network.get_op_stats()
+                self.logger.update_wandb_logs(ops_stats)
 
             # Log Layer Alignment scores
             self.logger.log(
@@ -278,17 +310,16 @@ class ConfigurableTrainer:
                         self.logger.log(f"alpha {i} is {alpha}")
 
             # Reset GM Scores
-            if calc_gm_score:
-                if self.use_data_parallel:
-                    network.module.reset_gm_scores()
-                else:
-                    network.reset_gm_scores()
+            if calc_gm_score and isinstance(
+                unwrapped_network, GradientMatchingScoreSupport
+            ):
+                unwrapped_network.reset_gm_scores()
 
             # measure elapsed time
             epoch_time.update(time.time() - start_time)
             start_time = time.time()
 
-    def _train_epoch(  # noqa: PLR0912, PLR0915, C901
+    def _train_epoch(  # noqa: PLR0915, C901
         self,
         search_space_handler: SearchSpaceHandler,
         train_loader: DataLoader,
@@ -315,9 +346,12 @@ class ConfigurableTrainer:
             AverageMeter(),
         )
         network.train()
+        unwrapped_network = unwrap_model(network)
         end = time.time()
-        layer_alignment_scores[0].reset()  # type: ignore
-        layer_alignment_scores[1].reset()  # type: ignore
+
+        if layer_alignment_scores is not None:
+            layer_alignment_scores[0].reset()  # type: ignore
+            layer_alignment_scores[1].reset()  # type: ignore
 
         for step, (base_inputs, base_targets) in enumerate(train_loader):
             # FIXME: What was the point of this? and is it safe to remove?
@@ -346,10 +380,7 @@ class ConfigurableTrainer:
                 arch_loss.backward()
                 arch_optimizer.step()
 
-                if self.use_data_parallel:
-                    search_space_handler.perturb_parameter(network.module)
-                else:
-                    search_space_handler.perturb_parameter(network)
+                search_space_handler.perturb_parameter(unwrapped_network)
 
                 self._update_meters(
                     inputs=arch_inputs,
@@ -362,11 +393,10 @@ class ConfigurableTrainer:
                 )
 
             # calculate gm_score
-            if calc_gm_score:
-                if self.use_data_parallel:
-                    network.module.check_grads_cosine(oles)  # type: ignore
-                else:
-                    network.check_grads_cosine(oles)  # type: ignore
+            if calc_gm_score and isinstance(
+                unwrapped_network, GradientMatchingScoreSupport
+            ):
+                unwrapped_network.update_gradient_matching_scores(early_stop=oles)
 
             # update the model weights
             w_optimizer.zero_grad()
@@ -376,30 +406,27 @@ class ConfigurableTrainer:
             base_loss = criterion(logits, base_targets)
             base_loss.backward()
 
-            network_module = network.module if self.use_data_parallel else network
-            if hasattr(network_module, "get_mean_layer_alignment_score"):
+            if isinstance(unwrapped_network, OperationStatisticsSupport) and (
+                layer_alignment_scores is not None
+            ):
                 (
                     score_normal,
                     score_reduce,
-                ) = network_module.get_mean_layer_alignment_score()
+                ) = unwrapped_network.get_mean_layer_alignment_score()
                 layer_alignment_scores[0].update(val=score_normal)  # type: ignore
                 layer_alignment_scores[1].update(val=score_reduce)  # type: ignore
 
-            if self.use_data_parallel:
-                torch.nn.utils.clip_grad_norm_(
-                    network.module.model_weight_parameters(), 5
-                )
-            else:
-                torch.nn.utils.clip_grad_norm_(network.model_weight_parameters(), 5)
+            torch.nn.utils.clip_grad_norm_(
+                unwrapped_network.model_weight_parameters(), 5
+            )
 
             w_optimizer.step()
 
-            # save grads of operations
-            if calc_gm_score:
-                if self.use_data_parallel:
-                    network.module.preserve_grads()  # type: ignore
-                else:
-                    network.preserve_grads()  # type: ignore
+            # save grads of operations for gm_score
+            if calc_gm_score and isinstance(
+                unwrapped_network, GradientMatchingScoreSupport
+            ):
+                unwrapped_network.preserve_grads()  # type: ignore
 
             w_optimizer.zero_grad()
             if not is_warm_epoch:
@@ -488,18 +515,13 @@ class ConfigurableTrainer:
 
         return network, criterion
 
-    def _load_onto_data_parallel(
-        self, network: nn.Module, criterion: Loss
-    ) -> tuple[nn.Module, Loss]:
+    def _load_onto_data_parallel(self, network: nn.Module) -> tuple[nn.Module, Loss]:
         if torch.cuda.is_available():
-            network, criterion = (
-                DataParallel(self.model).cuda(),
-                criterion.cuda(),
-            )
+            network = DataParallel(self.model).cuda()
 
-        return network, criterion
+        return network
 
-    def _init_empty_model_state_info(self) -> None:
+    def _init_empty_exp_state_info(self) -> None:
         self.start_epoch = 0
         self.search_losses: dict[int, float] = {}
         self.search_accs_top1: dict[int, float] = {}
@@ -508,30 +530,22 @@ class ConfigurableTrainer:
         self.valid_accs_top1: dict[int | str, float | int] = {"best": -1}
         self.valid_accs_top5: dict[int, float] = {}
 
-        self._init_periodic_checkpointer()
-        self.best_model_checkpointer = self._set_up_checkpointer(mode=None)
-        # TODO: this is needed?
-        # self.logger.set_up_run()
-
     def _set_up_checkpointer(self, mode: str | None) -> Checkpointer:
-        checkpoint_dir = self.logger.path(mode=mode)  # todo: check this
-        # checkpointables = self._get_checkpointables(self.start_epoch)
-        # todo: return scheduler and optimizers that do have state_dict()
-        # checkpointables = {
-        #     "w_scheduler": self.scheduler,
-        #     "w_optimizer": self.model_optimizer,
-        #     "arch_optimizer": self.arch_optimizer,
-        # }
+        checkpointables = {
+            "w_scheduler": self.scheduler,
+            "w_optimizer": self.model_optimizer,
+        }
+
         checkpointer = Checkpointer(
             model=self.model,
-            save_dir=checkpoint_dir,
+            save_dir=self.logger.path(mode=mode),
             save_to_disk=True,
-            # **checkpointables,
+            **checkpointables,
         )
-        checkpointer.add_checkpointable("w_scheduler", self.scheduler)
-        checkpointer.add_checkpointable("w_optimizer", self.model_optimizer)
+
         if self.arch_optimizer is not None:
             checkpointer.add_checkpointable("arch_optimizer", self.arch_optimizer)
+
         return checkpointer
 
     def _init_periodic_checkpointer(self) -> None:
@@ -553,54 +567,21 @@ class ConfigurableTrainer:
             "valid_accs_top5": self.valid_accs_top5,
         }
 
-    def _set_checkpointer_info(self, last_checkpoint: dict) -> None:
-        self.model.load_state_dict(last_checkpoint["model"])
+    def _load_checkpoint(self, checkpoint: dict) -> None:
+        self.model.load_state_dict(checkpoint["model"])
         if self.arch_optimizer:
-            self.arch_optimizer.load_state_dict(last_checkpoint["arch_optimizer"])
-        self.model_optimizer.load_state_dict(last_checkpoint["w_optimizer"])
-        self.scheduler.load_state_dict(last_checkpoint["w_scheduler"])
-        last_checkpoint = last_checkpoint["checkpointables"]
-        self.start_epoch = last_checkpoint["epoch"]
-        self.search_losses = last_checkpoint["search_losses"]
-        self.search_accs_top1 = last_checkpoint["search_accs_top1"]
-        self.search_accs_top5 = last_checkpoint["search_accs_top5"]
-        self.valid_losses = last_checkpoint["valid_losses"]
-        self.valid_accs_top1 = last_checkpoint["valid_accs_top1"]
-        self.valid_accs_top5 = last_checkpoint["valid_accs_top5"]
+            self.arch_optimizer.load_state_dict(checkpoint["arch_optimizer"])
+        self.model_optimizer.load_state_dict(checkpoint["w_optimizer"])
+        self.scheduler.load_state_dict(checkpoint["w_scheduler"])
+        checkpoint = checkpoint["checkpointables"]
+        self.start_epoch = checkpoint["epoch"]
+        self.search_losses = checkpoint["search_losses"]
+        self.search_accs_top1 = checkpoint["search_accs_top1"]
+        self.search_accs_top5 = checkpoint["search_accs_top5"]
+        self.valid_losses = checkpoint["valid_losses"]
+        self.valid_accs_top1 = checkpoint["valid_accs_top1"]
+        self.valid_accs_top5 = checkpoint["valid_accs_top5"]
         self.logger.log(f"start with {self.start_epoch}-th epoch.")
-
-    def _load_model_state_if_exists(self) -> None:
-        self.best_model_checkpointer = self._set_up_checkpointer(mode=None)
-        self._init_periodic_checkpointer()
-
-        if self.load_best_model:
-            last_info = self.logger.path("best_model")
-            self.logger.log(
-                f"=> loading checkpoint of the best-model '{last_info}' start"
-            )
-            info = self.best_model_checkpointer._load_file(f=last_info)
-        elif self.start_epoch != 0:
-            last_info = self.logger.path("checkpoints")
-            last_info = "{}/{}_{:07d}.pth".format(last_info, "model", self.start_epoch)
-            info = self.checkpointer._load_file(f=last_info)
-        elif self.load_saved_model:
-            last_info = self.logger.path("last_checkpoint")
-            info = self.checkpointer._load_file(f=last_info)
-            self.logger.log(f"=> loading checkpoint of the last-info {last_info}")
-        else:
-            self.logger.log("=> did not find the any file")
-            return
-
-        self.logger.set_up_new_run()
-        self.best_model_checkpointer.save_dir = self.logger.path(mode=None)
-        self.checkpointer.save_dir = self.logger.path(mode="checkpoints")
-        self._set_checkpointer_info(info)
-
-        self.logger.log(
-            "=> loading checkpoint " + f"start with {self.start_epoch}-th epoch."
-        )
-
-        # Then put checkpoint data into the self and model
 
     def _update_meters(
         self,
@@ -640,11 +621,9 @@ class ConfigurableTrainer:
     ) -> None:
         if self.benchmark_api is None:
             return
-        genotype = (
-            network.module.model.genotype()
-            if self.use_data_parallel
-            else network.model.genotype()
-        )
+
+        genotype = unwrap_model(network).model.genotype()
+
         result_train, rusult_valid, result_test = self.benchmark_api.query(
             genotype, dataset=self.query_dataset
         )
@@ -678,10 +657,10 @@ class ConfigurableTrainer:
             + " Conv2DLoRA module"
         )
         # clear OLES_OPS from pre_grads, avg and count
-        if self.use_data_parallel:
-            network.module.apply(clear_grad_cosine)
-        else:
-            network.apply(clear_grad_cosine)
+        unwrapped_network = unwrap_model(network)
+        unwrapped_network.apply(
+            clear_grad_cosine
+        )  # TODO-AK: to wrap or not to wrap, that is the question
         # reinitialize optimizer
         optimizer_hyperparameters = self.model_optimizer.defaults
         old_param_lrs = []
@@ -691,11 +670,7 @@ class ConfigurableTrainer:
             old_initial_lrs.append(param_group["initial_lr"])
 
         self.model_optimizer = type(self.model_optimizer)(
-            (
-                network.module.model_weight_parameters()  # type: ignore
-                if self.use_data_parallel
-                else network.model_weight_parameters()  # type: ignore
-            ),
+            unwrapped_network.model_weight_parameters(),
             **optimizer_hyperparameters,
         )
         # change the lr for optimizer
@@ -726,15 +701,14 @@ class ConfigurableTrainer:
             **scheduler_config,
         )
 
-        if is_gm_score_enabled:
-            if self.use_data_parallel:
-                network.module.reset_gm_score_attributes()
-            else:
-                network.reset_gm_score_attributes()
+        if is_gm_score_enabled and isinstance(network, GradientMatchingScoreSupport):
+            unwrapped_network.reset_gm_score_attributes()
 
     def get_all_running_mean_scores(self, network: torch.nn.Module) -> dict:
         running_sim_dict = {}
-        model = network.module if self.use_data_parallel else network
+        model = unwrap_model(
+            network
+        )  # TODO-AK: to wrap or not to wrap, that is the question
         for name, module in model.named_modules():
             if hasattr(module, "running_sim"):
                 running_sim_dict[f"gm_scores/{name}"] = module.running_sim.avg
