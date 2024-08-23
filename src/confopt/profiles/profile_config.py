@@ -192,7 +192,11 @@ class BaseProfile:
 
     @abstractmethod
     def _initialize_partial_connector_config(self) -> None:
-        partial_connector_config = {"k": 4} if self.is_partial_connection else None
+        if self.is_partial_connection:
+            partial_connector_config = {"k": 4}
+            self.set_searchspace_config({"k": 4})
+        else:
+            partial_connector_config = None
         self.partial_connector_config = partial_connector_config
 
     @abstractmethod
