@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 import math
+from typing import Callable
 
 import torch
 from torch import nn
@@ -134,7 +135,7 @@ class NB201SearchModel(nn.Module):
         self.beta_parameters = nn.Parameter(
             1e-3 * torch.randn(num_edge)  # type: ignore
         )
-        self.weights: dict[str, list[torch.Tensor]] = {}
+        self.weights_grad: list[torch.Tensor] = []
         self.num_edges = num_edge
         self.num_nodes = max_nodes - 1
         self.num_ops = len(search_space)
@@ -272,6 +273,20 @@ class NB201SearchModel(nn.Module):
         weights = self.sample(weights_to_sample)
         return weights
 
+    def save_gradient(self) -> Callable:
+        def hook(grad: torch.Tensor) -> None:
+            self.weights_grad.append(grad)
+
+        return hook
+
+    def save_weight_grads(
+        self,
+        weights: torch.Tensor,
+    ) -> None:
+        if not self.training:
+            return
+        weights.register_hook(self.save_gradient())
+
     def forward(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the model.
 
@@ -286,24 +301,16 @@ class NB201SearchModel(nn.Module):
         if self.edge_normalization:
             return self.edge_normalization_forward(inputs)
 
-        self.weights["alphas"] = []
+        self.weights_grad = []
 
         weights = self.sample_weights()
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
             if isinstance(cell, SearchCell):
-                # TODO fix layer alignment
-                alphas = weights
+                alphas = weights.clone()
                 # Retain Grads for weights
-                if self.training:
-                    if isinstance(alphas, list):
-                        for alpha in alphas:
-                            alpha.retain_grad()
-                    else:
-                        assert isinstance(alphas, torch.Tensor)
-                        alphas.retain_grad()
-                    self.weights["alphas"].append(alphas)
+                self.save_weight_grads(alphas)
                 if self.mask is not None:
                     alphas = normalize_params(alphas, self.mask)
                 feature = cell(feature, alphas)
@@ -321,14 +328,15 @@ class NB201SearchModel(nn.Module):
         self,
         inputs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        self.weights["alphas"] = []
+        self.weights_grad = []
+
         weights = self.sample_weights()
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
             if isinstance(cell, SearchCell):
-                # TODO fix layer alignment
-                alphas = weights
+                alphas = weights.clone()
+                self.save_weight_grads(alphas)
                 betas = torch.empty((0,)).to(alphas[0].device)  # type: ignore
                 for v in range(1, self.max_nodes):
                     idx_nodes = []
@@ -339,15 +347,6 @@ class NB201SearchModel(nn.Module):
                         self.beta_parameters[idx_nodes], dim=-1
                     )
                     betas = torch.cat([betas, beta_node_v], dim=0)
-                # Retain Grads for weights
-                if self.training:
-                    if isinstance(alphas, list):
-                        for alpha in alphas:
-                            alpha.retain_grad()
-                    else:
-                        assert isinstance(alphas, torch.Tensor)
-                        alphas.retain_grad()
-                    self.weights["alphas"].append(alphas)
 
                 if self.mask is not None:
                     alphas = normalize_params(alphas, self.mask)
@@ -364,12 +363,8 @@ class NB201SearchModel(nn.Module):
 
     def get_arch_grads(self) -> list[torch.Tensor]:
         grads = []
-        for alphas in self.weights["alphas"]:
-            if isinstance(alphas, list):
-                alphas_grads = [alpha.grad.data.clone().detach() for alpha in alphas]
-                grads.append(torch.stack(alphas_grads).detach().reshape(-1))
-            else:
-                grads.append(alphas.grad.data.clone().detach().reshape(-1))
+        for alphas in self.weights_grad:
+            grads.append(alphas.reshape(-1))
 
         return grads
 
