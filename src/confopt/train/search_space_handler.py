@@ -88,7 +88,7 @@ class SearchSpaceHandler:
             search_space.set_arch_parameters(self.perturbation.perturbed_alphas)
 
     def update_sample_function_from_sampler(self, search_space: SearchSpace) -> None:
-        search_space.set_sample_function(self.sampler.sample_alphas)
+        search_space.set_sample_function(self.sampler.sample)
 
     def default_sample_function(self, alphas: torch.Tensor) -> torch.Tensor:
         return torch.nn.functional.softmax(alphas, dim=-1)

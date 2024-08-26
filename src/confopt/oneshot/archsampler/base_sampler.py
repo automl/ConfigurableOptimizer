@@ -32,6 +32,10 @@ class BaseSampler(OneShotComponent):
     ) -> list[torch.Tensor] | None:
         pass
 
+    @abstractmethod
+    def sample(self, alpha: torch.Tensor) -> torch.Tensor:
+        pass
+
     def _sample_and_update_alphas(self) -> None:  # type: ignore
         sampled_alphas = self.sample_alphas(self.arch_parameters)
         # print(sampled_alphas)

@@ -42,11 +42,11 @@ class GDASSampler(BaseSampler):
         sampled_hardwt = []
         for alpha in arch_parameters:
             sampled_alpha = self.sample(alpha)
-            hardwt, index = sampled_alpha[0], sampled_alpha[1]  # noqa: F841
+            hardwt = sampled_alpha
             sampled_hardwt.append(hardwt)
         return sampled_hardwt
 
-    def sample(self, alpha: torch.Tensor) -> tuple:
+    def sample(self, alpha: torch.Tensor) -> torch.Tensor:
         tau = self.tau_curr.to(alpha.device)  # type: ignore
         while True:
             gumbels = -torch.empty_like(alpha, device=alpha.device).exponential_().log()
@@ -64,7 +64,7 @@ class GDASSampler(BaseSampler):
             ):
                 break
 
-        return hardwts, index
+        return hardwts
 
     def new_epoch(self) -> None:
         self.tau_curr = self.tau_max - (self.tau_max - self.tau_min) * self._epoch / (

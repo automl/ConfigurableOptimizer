@@ -32,3 +32,11 @@ class DARTSSampler(BaseSampler):
 
             sampled_alphas.append(sampled_alpha)
         return sampled_alphas
+
+    def sample(self, alpha: torch.Tensor) -> torch.Tensor:
+        if self.arch_combine_fn == "default":
+            sampled_alpha = torch.nn.functional.softmax(alpha, dim=-1)
+        elif self.arch_combine_fn == "sigmoid":
+            sampled_alpha = torch.nn.functional.sigmoid(alpha)
+
+        return sampled_alpha
