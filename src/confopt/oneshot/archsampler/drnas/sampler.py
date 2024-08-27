@@ -28,10 +28,14 @@ class DRNASSampler(BaseSampler):
         return sampled_alphas
 
     def sample(self, alpha: torch.Tensor) -> torch.Tensor:
-        beta = F.elu(alpha) + 1
-        weights = torch.distributions.dirichlet.Dirichlet(beta).rsample()
+        weights_list = []
+        for alpha_edge in alpha:
+            beta = F.elu(alpha_edge) + 1
+            weights = torch.distributions.dirichlet.Dirichlet(beta).rsample()
 
-        if self.arch_combine_fn == "sigmoid":
-            weights = torch.nn.functional.sigmoid(weights)
+            if self.arch_combine_fn == "sigmoid":
+                weights = torch.nn.functional.sigmoid(weights)
+            weights_list.append(weights)
 
-        return weights  # type: ignore
+        weights = torch.stack(weights_list)
+        return weights
