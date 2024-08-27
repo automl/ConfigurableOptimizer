@@ -536,11 +536,17 @@ class Network(nn.Module):
         )
         return genotype
 
-    def get_arch_grads(self) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+    def get_arch_grads(
+        self, only_first_and_last: bool = False
+    ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
         def get_grads(alphas_grads_list: list[torch.Tensor]) -> list[torch.Tensor]:
             grads = []
-            for alphas_grad in alphas_grads_list:
-                grads.append(alphas_grad.reshape(-1))
+            if only_first_and_last:
+                grads.append(alphas_grads_list[0].reshape(-1))
+                grads.append(alphas_grads_list[-1].reshape(-1))
+            else:
+                for alphas_grad in alphas_grads_list:
+                    grads.append(alphas_grad.reshape(-1))
 
             return grads
 
@@ -548,8 +554,10 @@ class Network(nn.Module):
         grads_reduce = get_grads(self.weights_grad["reduce"])
         return grads_normal, grads_reduce
 
-    def _get_mean_layer_alignment_score(self) -> tuple[float, float]:
-        grads_normal, grads_reduce = self.get_arch_grads()
+    def _get_mean_layer_alignment_score(
+        self, only_first_and_last: bool = False
+    ) -> tuple[float, float]:
+        grads_normal, grads_reduce = self.get_arch_grads(only_first_and_last)
         mean_score_normal = calc_layer_alignment_score(grads_normal)
         mean_score_reduce = calc_layer_alignment_score(grads_reduce)
 

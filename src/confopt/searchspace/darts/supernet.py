@@ -145,6 +145,9 @@ class DARTSSearchSpace(
     def get_mean_layer_alignment_score(self) -> tuple[float, float]:
         return self.model._get_mean_layer_alignment_score()
 
+    def get_first_and_last_layer_alignment_score(self) -> tuple[float, float]:
+        return self.model._get_mean_layer_alignment_score(only_first_and_last=True)
+
     def get_num_skip_ops(self) -> dict[str, int]:
         alphas_normal, alphas_reduce = self.model.arch_parameters()
         count_skip = lambda alphas: sum(alphas[:, 1:].argmax(dim=1) == 2)
