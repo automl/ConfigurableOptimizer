@@ -491,15 +491,15 @@ class Experiment:
         if scheduler == SchedulerType.CosineAnnealingLR:
             return torch.optim.lr_scheduler.CosineAnnealingLR(
                 optimizer=optimizer,
-                T_max=config.get("T_max", num_epochs),
-                eta_min=config.get("eta_min", eta_min),
+                T_max=num_epochs,
+                eta_min=eta_min,
             )
         elif scheduler == SchedulerType.CosineAnnealingWarmRestart:  # noqa: RET505
             return torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
                 optimizer=optimizer,
                 T_0=config.get("T_0", 10),
                 T_mult=config.get("T_mult", 1),
-                eta_min=config.get("eta_min", eta_min),
+                eta_min=eta_min,
             )
         return None
 
