@@ -272,6 +272,10 @@ class ConfigurableTrainer:
 
             if self.scheduler is not None:
                 self.scheduler.step()
+                lr_stats = {
+                    "lr": self.scheduler.get_last_lr()[0],
+                }
+                self.logger.update_wandb_logs(lr_stats)
 
             checkpointables = self._get_checkpointables(epoch=epoch)
             self.periodic_checkpointer.step(
