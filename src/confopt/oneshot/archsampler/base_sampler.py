@@ -27,17 +27,13 @@ class BaseSampler(OneShotComponent):
         self.arch_combine_fn = arch_combine_fn
 
     @abstractmethod
-    def sample_alphas(
-        self, arch_parameters: list[torch.Tensor]
-    ) -> list[torch.Tensor] | None:
-        pass
-
-    @abstractmethod
     def sample(self, alpha: torch.Tensor) -> torch.Tensor:
         pass
 
     def _sample_and_update_alphas(self) -> None:  # type: ignore
-        sampled_alphas = self.sample_alphas(self.arch_parameters)
+        sampled_alphas = []
+        for arch_param in self.arch_parameters:
+            sampled_alphas.append(self.sample(arch_param))
         # print(sampled_alphas)
         if sampled_alphas is not None:
             self.sampled_alphas = sampled_alphas

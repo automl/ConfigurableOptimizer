@@ -21,12 +21,6 @@ class DRNASSampler(BaseSampler):
             arch_combine_fn=arch_combine_fn,
         )
 
-    def sample_alphas(self, arch_parameters: torch.Tensor) -> list[torch.Tensor]:
-        sampled_alphas = []
-        for alpha in arch_parameters:
-            sampled_alphas.append(self.sample(alpha))
-        return sampled_alphas
-
     def sample(self, alpha: torch.Tensor) -> torch.Tensor:
         weights_list = []
         for alpha_edge in alpha:
