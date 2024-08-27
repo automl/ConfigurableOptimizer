@@ -238,6 +238,7 @@ class BaseProfile:
                 "weight_decay": 1e-3,
             },
             "scheduler": "cosine_annealing_warm_restart",
+            "scheduler_config": {},
             "criterion": "cross_entropy",
             "batch_size": 64,
             "learning_rate_min": 0.0,
