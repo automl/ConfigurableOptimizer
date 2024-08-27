@@ -327,6 +327,10 @@ class Network(nn.Module):
         weights_normal = self.sample(weights_normal_to_sample)
         weights_reduce = self.sample(weights_reduce_to_sample)
 
+        if self.mask is not None:
+            weights_normal = normalize_params(weights_normal, self.mask[0])
+            weights_reduce = normalize_params(weights_reduce, self.mask[1])
+
         return weights_normal, weights_reduce
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -355,13 +359,9 @@ class Network(nn.Module):
             if cell.reduction:
                 weights = weights_reduce.clone()
                 self.save_weight_grads(weights, cell_type="reduce")
-                if self.mask is not None:
-                    weights = normalize_params(weights, self.mask[1])
             else:
                 weights = weights_normal.clone()
                 self.save_weight_grads(weights, cell_type="normal")
-                if self.mask is not None:
-                    weights = normalize_params(weights, self.mask[0])
 
             s0, s1 = s1, cell(s0, s1, weights)
 
@@ -385,8 +385,6 @@ class Network(nn.Module):
             if cell.reduction:
                 weights = weights_reduce.clone()
                 self.save_weight_grads(weights, cell_type="reduce")
-                if self.mask is not None:
-                    weights = normalize_params(weights, self.mask[1])
                 n = 3
                 start = 2
                 weights2 = F.softmax(self.betas_reduce[0:2], dim=-1)
@@ -399,8 +397,6 @@ class Network(nn.Module):
             else:
                 weights = weights_normal.clone()
                 self.save_weight_grads(weights, cell_type="normal")
-                if self.mask is not None:
-                    weights = normalize_params(weights, self.mask[0])
                 n = 3
                 start = 2
                 weights2 = F.softmax(self.betas_normal[0:2], dim=-1)

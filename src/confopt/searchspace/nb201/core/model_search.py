@@ -271,6 +271,10 @@ class NB201SearchModel(nn.Module):
             weights_to_sample = self._compute_arch_attention(weights_to_sample)
 
         weights = self.sample(weights_to_sample)
+
+        if self.mask is not None:
+            weights = normalize_params(weights, self.mask)
+
         return weights
 
     def save_gradient(self) -> Callable:
@@ -309,10 +313,7 @@ class NB201SearchModel(nn.Module):
         for _i, cell in enumerate(self.cells):
             if isinstance(cell, SearchCell):
                 alphas = weights.clone()
-                # Retain Grads for weights
                 self.save_weight_grads(alphas)
-                if self.mask is not None:
-                    alphas = normalize_params(alphas, self.mask)
                 feature = cell(feature, alphas)
             else:
                 feature = cell(feature)
@@ -348,8 +349,6 @@ class NB201SearchModel(nn.Module):
                     )
                     betas = torch.cat([betas, beta_node_v], dim=0)
 
-                if self.mask is not None:
-                    alphas = normalize_params(alphas, self.mask)
                 feature = cell(feature, alphas, betas)
             else:
                 feature = cell(feature)
