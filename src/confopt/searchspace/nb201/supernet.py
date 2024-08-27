@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import partial
+from typing import Literal
 
 import torch
 from torch import nn
@@ -10,6 +11,7 @@ from confopt.searchspace.common import (
     GradientMatchingScoreSupport,
     LayerAlignmentScoreSupport,
     OperationStatisticsSupport,
+    PerturbationArchSelectionSupport,
     SearchSpace,
 )
 from confopt.searchspace.nb201.core.operations import OLES_OPS
@@ -30,6 +32,7 @@ class NASBench201SearchSpace(
     GradientMatchingScoreSupport,
     OperationStatisticsSupport,
     LayerAlignmentScoreSupport,
+    PerturbationArchSelectionSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
         """Initialize the custom search model of NASBench201SearchSpace.
@@ -118,3 +121,44 @@ class NASBench201SearchSpace(
         }
 
         return stats
+
+    def get_num_ops(self) -> int:
+        return self.model.num_ops
+
+    def get_num_edges(self) -> int:
+        return self.model.num_edges
+
+    def get_num_nodes(self) -> int:
+        return self.model.num_nodes
+
+    def get_candidate_flags(self, cell_type: Literal["normal", "reduce"]) -> list:
+        assert cell_type == "normal"
+        return self.model.candidate_flags
+
+    def remove_from_projected_weights(
+        self,
+        selected_edge: int,
+        selected_op: int | None,
+        cell_type: Literal["normal", "reduce"],
+    ) -> None:
+        assert cell_type == "normal"
+        assert selected_op is not None
+        self.model.remove_from_projected_weights(selected_edge, selected_op)
+
+    def mark_projected_operation(
+        self,
+        selected_edge: int,
+        selected_op: int,
+        cell_type: Literal["normal", "reduce"],
+    ) -> None:
+        assert cell_type == "normal"
+        self.model.mark_projected_op(selected_edge, selected_op)
+
+    def set_projection_mode(self, value: bool) -> None:
+        self.model.projection_mode = value
+
+    def set_projection_evaluation(self, value: bool) -> None:
+        self.model.projection_evaluation = value
+
+    def is_topology_supported(self) -> bool:
+        return False

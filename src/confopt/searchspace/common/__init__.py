@@ -5,6 +5,7 @@ from .base_search import (
     GradientMatchingScoreSupport,
     LayerAlignmentScoreSupport,
     OperationStatisticsSupport,
+    PerturbationArchSelectionSupport,
     SearchSpace,
 )
 from .lora_layers import Conv2DLoRA, ConvLoRA, LoRALayer
@@ -17,6 +18,7 @@ __all__ = [
     "Conv2DLoRA",
     "ConvLoRA",
     "LoRALayer",
+    "PerturbationArchSelectionSupport",
     "DrNASRegTermSupport",
     "FLOPSRegTermSupport",
     "GradientMatchingScoreSupport",

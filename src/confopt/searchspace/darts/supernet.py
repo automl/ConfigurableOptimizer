@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import partial
+from typing import Literal
 
 import torch
 from torch import nn
@@ -12,6 +13,7 @@ from confopt.searchspace.common import (
     GradientMatchingScoreSupport,
     LayerAlignmentScoreSupport,
     OperationStatisticsSupport,
+    PerturbationArchSelectionSupport,
     SearchSpace,
 )
 from confopt.searchspace.darts.core.operations import OLES_OPS
@@ -32,6 +34,7 @@ class DARTSSearchSpace(
     LayerAlignmentScoreSupport,
     DrNASRegTermSupport,
     FLOPSRegTermSupport,
+    PerturbationArchSelectionSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
         """DARTS Search Space for Neural Architecture Search.
@@ -116,6 +119,9 @@ class DARTSSearchSpace(
             self.model.alphas_reduce,
         ]
 
+    def get_cell_types(self) -> list[str]:
+        return ["normal", "reduce"]
+
     def discretize(self) -> nn.Module:
         return self.model.discretize()  # type: ignore
 
@@ -162,3 +168,62 @@ class DARTSSearchSpace(
         ### Computed the FLOPS of the model, weighted by the architectural parameters
 
         return torch.tensor(0.0)
+
+    def get_num_ops(self) -> int:
+        return self.model.num_ops
+
+    def get_num_edges(self) -> int:
+        return self.model.num_edges
+
+    def get_num_nodes(self) -> int:
+        return self.model.num_nodes
+
+    def get_candidate_flags(self, cell_type: Literal["normal", "reduce"]) -> list:
+        if self.topology is None:
+            self.set_topology(False)
+
+        if self.topology:
+            return self.model.candidate_flags_edge[cell_type]
+
+        return self.model.candidate_flags[cell_type]
+
+    def get_edges_at_node(self, selected_node: int) -> list:
+        return self.model.nid2eids[selected_node]
+
+    def remove_from_projected_weights(
+        self,
+        selected_edge: int,
+        selected_op: int | None,
+        cell_type: Literal["normal", "reduce"],
+    ) -> None:
+        if self.topology is None:
+            self.set_topology(False)
+
+        self.model.remove_from_projected_weights(
+            cell_type, selected_edge, selected_op, self.topology
+        )
+
+    def mark_projected_operation(
+        self,
+        selected_edge: int,
+        selected_op: int,
+        cell_type: Literal["normal", "reduce"],
+    ) -> None:
+        self.model.mark_projected_op(selected_edge, selected_op, cell_type)
+
+    def mark_projected_edge(
+        self,
+        selected_node: int,
+        selected_edges: list[int],
+        cell_type: Literal["normal", "reduce"],
+    ) -> None:
+        self.model.mark_projected_edges(selected_node, selected_edges, cell_type)
+
+    def set_projection_mode(self, value: bool) -> None:
+        self.model.projection_mode = value
+
+    def set_projection_evaluation(self, value: bool) -> None:
+        self.model.projection_evaluation = value
+
+    def is_topology_supported(self) -> bool:
+        return True

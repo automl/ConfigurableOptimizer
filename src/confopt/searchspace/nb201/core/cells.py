@@ -55,6 +55,7 @@ class NAS201SearchCell(nn.Module):
         op_names: list[str],
         affine: bool = False,
         track_running_stats: bool = True,
+        k: int = 1,
     ):
         super().__init__()
 
@@ -70,8 +71,8 @@ class NAS201SearchCell(nn.Module):
                     xlists = nn.ModuleList(
                         [
                             OPS[op_name](
-                                C_in,
-                                C_out,
+                                C_in // k,
+                                C_out // k,
                                 stride,
                                 affine,
                                 track_running_stats,
@@ -82,7 +83,9 @@ class NAS201SearchCell(nn.Module):
                 else:
                     xlists = nn.ModuleList(
                         [
-                            OPS[op_name](C_in, C_out, 1, affine, track_running_stats)
+                            OPS[op_name](
+                                C_in // k, C_out // k, 1, affine, track_running_stats
+                            )
                             for op_name in op_names
                         ]
                     )

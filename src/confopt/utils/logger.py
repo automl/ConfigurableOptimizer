@@ -56,6 +56,7 @@ class Logger:
         runtime: str | None = None,
         use_supernet_checkpoint: bool = False,
         last_run: bool = False,
+        arch_selection: bool = False,
     ) -> None:
         self.log_dir = log_dir
         self.exp_name = exp_name
@@ -63,6 +64,10 @@ class Logger:
         self.dataset = dataset
         self.seed = str(seed)
         self.use_supernet_checkpoint = use_supernet_checkpoint
+        self.arch_selection = arch_selection
+        self.supernet_str = "supernet"
+        if self.arch_selection:
+            self.supernet_str = "arch_selection"
         self.last_run = last_run
 
         assert sum([last_run, runtime is not None]) <= 1
@@ -111,7 +116,7 @@ class Logger:
             self.search_space,
             self.dataset,
             self.seed,
-            "supernet" if self.use_supernet_checkpoint else "discrete",
+            self.supernet_str if self.use_supernet_checkpoint else "discrete",
         ]
         expr_log_path_str = "/".join(path_componenets)
         return Path(expr_log_path_str)

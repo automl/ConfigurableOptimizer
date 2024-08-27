@@ -82,7 +82,7 @@ class ConfigurableTrainer:
         self.query_dataset = query_dataset
         self.benchmark_api = benchmark_api
 
-    def _init_experiment_state(self) -> None:
+    def _init_experiment_state(self, setup_new_run: bool = True) -> None:
         """Initializes the state of the experiment.
 
         If training is to continue from a previous checkpoint, then the state
@@ -109,7 +109,8 @@ class ConfigurableTrainer:
                 self.logger, src, epoch
             )
             self._load_checkpoint(checkpoint)
-            self.logger.set_up_new_run()
+            if setup_new_run:
+                self.logger.set_up_new_run()
         else:
             self._init_empty_exp_state_info()
 
@@ -157,6 +158,7 @@ class ConfigurableTrainer:
             ), "Value of r should be greater than 0"
             is_warm_epoch = True
         warm_epochs = lora_warm_epochs
+
         if search_space_handler.partial_connector:
             warm_epochs = max(
                 search_space_handler.partial_connector.num_warm_epoch, lora_warm_epochs
@@ -164,7 +166,6 @@ class ConfigurableTrainer:
             is_warm_epoch = True
 
         layer_alignment_scores = (AverageMeter(), AverageMeter())
-
         for epoch in range(self.start_epoch + 1, self.epochs + 1):
             epoch_str = f"{epoch:03d}-{self.epochs:03d}"
             if epoch == warm_epochs + 1:
@@ -318,7 +319,7 @@ class ConfigurableTrainer:
             epoch_time.update(time.time() - start_time)
             start_time = time.time()
 
-    def _train_epoch(  # noqa: PLR0915
+    def _train_epoch(  # noqa: PLR0915, C901
         self,
         search_space_handler: SearchSpaceHandler,
         train_loader: DataLoader,
@@ -347,8 +348,10 @@ class ConfigurableTrainer:
         network.train()
         unwrapped_network = unwrap_model(network)
         end = time.time()
-        layer_alignment_scores[0].reset()  # type: ignore
-        layer_alignment_scores[1].reset()  # type: ignore
+
+        if layer_alignment_scores is not None:
+            layer_alignment_scores[0].reset()  # type: ignore
+            layer_alignment_scores[1].reset()  # type: ignore
 
         for step, (base_inputs, base_targets) in enumerate(train_loader):
             # FIXME: What was the point of this? and is it safe to remove?
@@ -407,7 +410,9 @@ class ConfigurableTrainer:
             base_loss = search_space_handler.add_reg_terms(unwrapped_network, base_loss)
             base_loss.backward()
 
-            if isinstance(unwrapped_network, OperationStatisticsSupport):
+            if isinstance(unwrapped_network, OperationStatisticsSupport) and (
+                layer_alignment_scores is not None
+            ):
                 (
                     score_normal,
                     score_reduce,

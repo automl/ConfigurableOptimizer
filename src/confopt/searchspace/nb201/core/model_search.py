@@ -15,6 +15,7 @@ from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
 from confopt.utils import (
     calc_layer_alignment_score,
     preserve_gradients_in_module,
+    prune,
 )
 from confopt.utils.normalize_params import normalize_params
 
@@ -72,6 +73,7 @@ class NB201SearchModel(nn.Module):
         affine: bool = False,
         track_running_stats: bool = False,
         edge_normalization: bool = False,
+        k: int = 1,
     ):
         super().__init__()
         self._C = C
@@ -106,6 +108,7 @@ class NB201SearchModel(nn.Module):
                     search_space,
                     affine,
                     track_running_stats,
+                    k=k,
                 )
 
                 if num_edge is None:
@@ -132,6 +135,10 @@ class NB201SearchModel(nn.Module):
             1e-3 * torch.randn(num_edge)  # type: ignore
         )
         self.weights: dict[str, list[torch.Tensor]] = {}
+        self.num_edges = num_edge
+        self.num_nodes = max_nodes - 1
+        self.num_ops = len(search_space)
+        self._initialize_projection_params()
 
         # Multi-head attention for architectural parameters
         self.is_arch_attention_enabled = False  # disabled by default
@@ -252,40 +259,17 @@ class NB201SearchModel(nn.Module):
         # Replace this function on the fly to change the sampling method
         return torch.nn.functional.softmax(alphas, dim=-1)
 
-    def remove_pruned_alphas(self, weights: torch.Tensor) -> torch.Tensor:
-        assert (
-            self.mask is not None
-        ), "This function requires a prior call to prune function"
-        weights = weights[self.mask]
-        weights = weights.reshape(self.mask.shape[0], self.mask[0].sum())
+    def sample_weights(self) -> torch.Tensor:
+        if self.projection_mode:
+            weights = self.get_projected_weights()
+            return weights
 
-        return weights
-
-    def restore_pruned_alpha_shape(self, weights: torch.Tensor) -> torch.Tensor:
-        assert (
-            self.mask is not None
-        ), "This function requires a prior call to prune function"
-        if isinstance(weights, list):
-            weights = torch.stack(weights)
-        weights_full = torch.zeros_like(self.arch_parameters)
-        weights_full[self.mask] = weights.view(-1)
-        weights = weights_full
-        return weights
-
-    def sample_with_mask(self) -> torch.Tensor:
         weights_to_sample = self.arch_parameters
 
         if self.is_arch_attention_enabled:
             weights_to_sample = self._compute_arch_attention(weights_to_sample)
 
-        if self.mask is not None:
-            weights_to_sample = self.remove_pruned_alphas(weights_to_sample)
-
         weights = self.sample(weights_to_sample)
-
-        if self.mask is not None:
-            weights = self.restore_pruned_alpha_shape(weights)
-
         return weights
 
     def forward(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -304,7 +288,7 @@ class NB201SearchModel(nn.Module):
 
         self.weights["alphas"] = []
 
-        weights = self.sample_with_mask()
+        weights = self.sample_weights()
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
@@ -338,7 +322,7 @@ class NB201SearchModel(nn.Module):
         inputs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         self.weights["alphas"] = []
-        weights = self.sample_with_mask()
+        weights = self.sample_weights()
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
@@ -398,24 +382,19 @@ class NB201SearchModel(nn.Module):
 
         return mean_score
 
-    def prune(self, num_keep: int) -> None:
+    def prune(self, prune_fraction: float) -> None:
         """Masks architecture parameters to enforce sparsity.
 
         Args:
-            num_keep (int): Number of operations to keep.
+            prune_fraction (float): Number of operations to keep.
         """
-        data_to_sort = self.arch_parameters.data.clone()  # type: ignore
-        if self.mask is not None:
-            last_mask = self.mask
-            temp = float("-inf") * torch.ones_like(data_to_sort)
-            data_to_sort[~last_mask] = temp[~last_mask]
+        assert prune_fraction < 1, "Prune fraction should be less than 1"
+        assert prune_fraction >= 0, "Prune fraction greater or equal to 0"
 
-        sorted_arch_params, _ = torch.sort(
-            data_to_sort, dim=1, descending=True  # type: ignore
-        )
-        top_k = num_keep
-        thresholds = sorted_arch_params[:, top_k - 1].unsqueeze(1)
-        self.mask = data_to_sort >= thresholds  # type: ignore
+        num_ops = len(self.op_names)
+        top_k = num_ops - int(num_ops * prune_fraction)
+
+        self.mask = prune(self.arch_parameters, top_k, self.mask)
 
         for cell in self.cells:
             if isinstance(cell, SearchCell):
@@ -439,6 +418,48 @@ class NB201SearchModel(nn.Module):
         if self.arch_parameters is not None:
             params -= set(self.arch_parameters)
         return list(params)
+
+    def _initialize_projection_params(self) -> None:
+        self.candidate_flags = torch.tensor(
+            self.num_edges * [True],  # type: ignore
+            requires_grad=False,
+            dtype=torch.bool,
+        ).to(DEVICE)
+        self.proj_weights = torch.zeros_like(self.arch_parameters)
+
+        self.projection_mode = False
+        self.projection_evaluation = False
+        self.removed_projected_weights = None
+
+    def mark_projected_op(self, eid: int, opid: int) -> None:
+        self.proj_weights[eid][opid] = 1
+        self.candidate_flags[eid] = False
+
+    def get_projected_weights(self) -> torch.Tensor:
+        if self.projection_evaluation:
+            return self.removed_projected_weights
+
+        if self.is_arch_attention_enabled:
+            arch_parameters = self._compute_arch_attention(self.arch_parameters)
+        else:
+            arch_parameters = self.arch_parameters
+
+        weights = torch.softmax(arch_parameters, dim=-1)
+        for eid in range(len(arch_parameters)):  # type: ignore
+            if not self.candidate_flags[eid]:
+                weights[eid].data.copy_(self.proj_weights[eid])
+
+        return weights
+
+    def remove_from_projected_weights(
+        self, selected_edge: int, selected_op: int
+    ) -> None:
+        weights = self.get_projected_weights()
+        proj_mask = torch.ones_like(weights[selected_edge])
+        proj_mask[selected_op] = 0
+
+        weights[selected_edge] = weights[selected_edge] * proj_mask
+        self.removed_projected_weights = weights
 
     def _compute_arch_attention(self, alphas: nn.Parameter) -> torch.Tensor:
         attn_alphas, _ = self.multihead_attention(alphas, alphas, alphas)
