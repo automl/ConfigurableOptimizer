@@ -20,6 +20,14 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 
 class TestArchSamplers(unittest.TestCase):
+    def _sample_alphas(
+        self, sampler: BaseSampler, alphas: list[torch.Tensor]
+    ) -> list[torch.Tensor]:
+        sampled_alphas = []
+        for alpha in alphas:
+            sampled_alphas.append(sampler.sample(alpha))
+        return sampled_alphas
+
     def _sampler_new_step_or_epoch(
         self, sampler: BaseSampler, sample_frequency: str
     ) -> None:
@@ -40,7 +48,7 @@ class TestArchSamplers(unittest.TestCase):
         sampler = DARTSSampler(arch_parameters=searchspace.arch_parameters)
 
         alphas_before = searchspace.arch_parameters
-        alphas_after = sampler.sample_alphas(alphas_before)
+        alphas_after = self._sample_alphas(sampler, alphas_before)
 
         # assert that the tensors are close
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
@@ -72,7 +80,7 @@ class TestArchSamplers(unittest.TestCase):
         sampler = GDASSampler(arch_parameters=searchspace.arch_parameters)
 
         alphas_before = searchspace.arch_parameters
-        alphas_after = sampler.sample_alphas(alphas_before)
+        alphas_after = self._sample_alphas(sampler, alphas_before)
 
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
             assert not torch.allclose(arch_param_before, arch_param_after)
@@ -104,7 +112,7 @@ class TestArchSamplers(unittest.TestCase):
         sampler = ReinMaxSampler(arch_parameters=searchspace.arch_parameters)
 
         alphas_before = searchspace.arch_parameters
-        alphas_after = sampler.sample_alphas(alphas_before)
+        alphas_after = self._sample_alphas(sampler, alphas_before)
 
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
             assert not torch.allclose(arch_param_before, arch_param_after)
@@ -136,7 +144,7 @@ class TestArchSamplers(unittest.TestCase):
         sampler = DRNASSampler(arch_parameters=searchspace.arch_parameters)
 
         alphas_before = searchspace.arch_parameters
-        alphas_after = sampler.sample_alphas(alphas_before)
+        alphas_after = self._sample_alphas(sampler, alphas_before)
 
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
             assert not torch.allclose(arch_param_before, arch_param_after)
@@ -172,7 +180,7 @@ class TestArchSamplers(unittest.TestCase):
         sampler = SNASSampler(arch_parameters=searchspace.arch_parameters)
 
         alphas_before = searchspace.arch_parameters
-        alphas_after = sampler.sample_alphas(alphas_before)
+        alphas_after = self._sample_alphas(sampler, alphas_before)
 
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
             assert not torch.allclose(arch_param_before, arch_param_after)
