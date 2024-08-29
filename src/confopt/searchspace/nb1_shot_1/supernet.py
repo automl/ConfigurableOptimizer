@@ -64,9 +64,7 @@ class NASBench1Shot1SearchSpace(SearchSpace):
 
 
 if __name__ == "__main__":
-    search_space = NASBench1Shot1SearchSpace(
-        "S1", C=16, num_classes=10, layers=9, output_weights=None  # type: ignore
-    )
+    search_space = NASBench1Shot1SearchSpace("S1")
     print(search_space.arch_parameters)
     print(search_space.beta_parameters)
 

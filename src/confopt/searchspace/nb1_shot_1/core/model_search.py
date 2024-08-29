@@ -151,11 +151,11 @@ class Cell(nn.Module):
 class Network(nn.Module):
     def __init__(
         self,
-        C: int,
-        num_classes: int,
-        layers: int,
-        output_weights: torch.Tensor,
         search_space: SearchSpace,
+        C: int = 16,
+        num_classes: int = 10,
+        layers: int = 9,
+        output_weights: bool = False,
         steps: int = 4,
     ) -> None:
         super().__init__()
@@ -200,12 +200,12 @@ class Network(nn.Module):
 
     def new(self) -> Network:
         model_new = Network(
+            self.search_space,
             self._C,
             self._num_classes,
             self._layers,
             steps=self.search_space.num_intermediate_nodes,
             output_weights=self._output_weights,
-            search_space=self.search_space,
         ).cuda()
         for x, y in zip(model_new.arch_parameters(), self.arch_parameters()):
             x.data.copy_(y.data)
