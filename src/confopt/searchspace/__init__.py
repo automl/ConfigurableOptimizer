@@ -3,7 +3,7 @@ from .common.base_search import ArchAttentionSupport, SearchSpace
 from .darts.core import DARTSImageNetModel, DARTSModel  # type: ignore
 from .darts.core.genotypes import DARTSGenotype
 from .darts.supernet import DARTSSearchSpace  # type: ignore
-from .nb1shot1.supernet import NASBench1Shot1SearchSpace  # type: ignore
+from .nb1_shot_1.supernet import NASBench1Shot1SearchSpace  # type: ignore
 from .nb201.core import NASBench201Model  # type: ignore
 from .nb201.core.genotypes import Structure as NAS201Genotype
 from .nb201.supernet import NASBench201SearchSpace  # type: ignore

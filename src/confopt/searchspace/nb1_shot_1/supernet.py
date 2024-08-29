@@ -9,22 +9,18 @@ from confopt.searchspace.common import SearchSpace
 from confopt.searchspace.nb1_shot_1.core import (
     Network as NASBench1Shot1Network,
 )
-from confopt.searchspace.nb1_shot_1.core import (  # noqa: N814
-    SearchSpace1 as S1,
-)
-from confopt.searchspace.nb1_shot_1.core import (  # noqa: N814
-    SearchSpace2 as S2,
-)
-from confopt.searchspace.nb1_shot_1.core import (  # noqa: N814
-    SearchSpace3 as S3,
+from confopt.searchspace.nb1_shot_1.core import (
+    SearchSpace1,
+    SearchSpace2,
+    SearchSpace3,
 )
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 search_space_map = {
-    "S1": S1,
-    "S2": S2,
-    "S3": S3,
+    "S1": SearchSpace1,
+    "S2": SearchSpace2,
+    "S3": SearchSpace3,
 }
 
 
