@@ -215,28 +215,7 @@ class Network(nn.Module):
         # Replace this function on the fly to change the sampling method
         return F.softmax(alphas, dim=-1)
 
-    def _preprocess_op(
-        self, x: torch.Tensor, discrete: bool, normalize: bool
-    ) -> torch.Tensor:
-        if discrete and normalize:
-            raise ValueError("architecture can't be discrete and normalized")
-        # If using discrete architecture from random_ws search with weight sharing
-        # then pass through architecture weights directly.
-        if discrete:
-            return x
-
-        if normalize:
-            arch_sum = torch.sum(x, dim=-1)
-            if arch_sum > 0:
-                return x / arch_sum
-            return x
-
-        # Normal search softmax over the inputs and mixed ops.
-        return F.softmax(x, dim=-1)
-
-    def forward(
-        self, x: torch.Tensor, discrete: bool = False, normalize: bool = False
-    ) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         # NASBench only has one input to each cell
         s0 = self.stem(x)
         for i, cell in enumerate(self.cells):
@@ -245,22 +224,16 @@ class Network(nn.Module):
                 # Equivalent to https://github.com/google-research/nasbench/blob/master/nasbench/lib/model_builder.py#L68
                 s0 = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)(s0)
 
-            # Normalize mixed_op weights for the choice blocks in the graph
-            mixed_op_weights = self._preprocess_op(
-                self._arch_parameters[0], discrete=discrete, normalize=False
+            # Sample mixed_op weights for the choice blocks in the graph
+            mixed_op_weights = self.sample(self._arch_parameters[0])
+
+            # Sample the output weights (if applicable)
+            output_weights = (
+                self.sample(self._arch_parameters[1]) if self._output_weights else None
             )
 
-            # Normalize the output weights
-            output_weights = (
-                self._preprocess_op(self._arch_parameters[1], discrete, normalize)
-                if self._output_weights
-                else None
-            )
-            # Normalize the input weights for the nodes in the cell
-            input_weights = [
-                self._preprocess_op(alpha, discrete, normalize)
-                for alpha in self._arch_parameters[2:]
-            ]
+            # Sample the input weights for the nodes in the cell
+            input_weights = [self.sample(alpha) for alpha in self._arch_parameters[2:]]
             s0 = cell(s0, mixed_op_weights, output_weights, input_weights)
 
         # Include one more preprocessing step here
