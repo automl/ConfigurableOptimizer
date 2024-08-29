@@ -6,8 +6,9 @@ from torch.autograd import Variable
 import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common import OperationChoices
+from confopt.searchspace.darts.core.operations import ReLUConvBN
 
-from .operations import OPS, ConvBnRelu, ReLUConvBN
+from .operations import OPS, ConvBnRelu
 from .search_spaces.genotypes import PRIMITIVES
 from .search_spaces.search_space import SearchSpace
 from .search_spaces.search_space_1 import SearchSpace1
@@ -99,7 +100,7 @@ class Cell(nn.Module):
         self,
         s0: torch.Tensor,
         weights: torch.Tensor,
-        output_weights: torch.Tensor,
+        output_weights: torch.Tensor | None,
         input_weights: torch.Tensor,
     ) -> torch.Tensor:
         # Adaption to NASBench
