@@ -8,7 +8,7 @@ from torch import nn
 from confopt.searchspace.common import Conv2DLoRA
 import confopt.utils.reduce_channels as rc
 
-TRANS_NAS_BENCH_101 = ["none", "nor_conv_1x1", "skip_connect", "nor_conv_3x3"]
+TRANS_NAS_BENCH_101 = ["none", "skip_connect", "nor_conv_1x1", "nor_conv_3x3"]
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 # OPS defines operations for micro cell structures

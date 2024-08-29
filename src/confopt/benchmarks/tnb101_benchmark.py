@@ -56,9 +56,9 @@ if __name__ == "__main__":
     tnb101_api = TNB101Benchmark()
     genotype = Genotype(
         node_edge_dict={
-            1: [("nor_conv_1x1", 0)],
-            2: [("none", 0), ("skip_connect", 1)],
-            3: [("nor_conv_3x3", 0), ("skip_connect", 1), ("skip_connect", 2)],
+            1: [("skip_connect", 0)],
+            2: [("none", 0), ("nor_conv_1x1", 1)],
+            3: [("nor_conv_3x3", 0), ("nor_conv_1x1", 1), ("nor_conv_1x1", 2)],
         },
         op_idx_list=[1, 0, 2, 3, 2, 2],
     )
