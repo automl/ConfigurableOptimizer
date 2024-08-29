@@ -33,7 +33,7 @@ BN_EPSILON = 1e-5
 """NASBench OPS"""
 
 
-class ConvBnRelu(ConvolutionalWEModule):
+class ConvBnRelu(nn.Module):
     """Equivalent to conv_bn_relu
     https://github.com/google-research/nasbench/blob/master/nasbench/lib/base_ops.py#L32.
     """
@@ -59,9 +59,6 @@ class ConvBnRelu(ConvolutionalWEModule):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.op(x)
-
-    def mark_entanglement_weights(self) -> None:
-        self.op[0].can_entangle_weight = True
 
     def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
         """Change the number of input and output channels in the block.
@@ -89,7 +86,7 @@ class ConvBnRelu(ConvolutionalWEModule):
         self.op[0].toggle_lora()
 
 
-class Conv3x3BnRelu(ConvBnRelu):
+class Conv3x3BnRelu(ConvBnRelu, ConvolutionalWEModule):
     """Equivalent to Conv3x3BnRelu
     https://github.com/google-research/nasbench/blob/master/nasbench/lib/base_ops.py#L96.
     """
@@ -97,14 +94,20 @@ class Conv3x3BnRelu(ConvBnRelu):
     def __init__(self, channels: int, stride: int) -> None:
         super().__init__(channels, channels, 3, stride=stride, padding=1)
 
+    def mark_entanglement_weights(self) -> None:
+        self.op[0].can_entangle_weight = True
 
-class Conv1x1BnRelu(ConvBnRelu):
+
+class Conv1x1BnRelu(ConvBnRelu, ConvolutionalWEModule):
     """Equivalent to Conv1x1BnRelu
     https://github.com/google-research/nasbench/blob/master/nasbench/lib/base_ops.py#L107.
     """
 
     def __init__(self, channels: int, stride: int) -> None:
         super().__init__(channels, channels, 1, stride=stride, padding=0)
+
+    def mark_entanglement_weights(self) -> None:
+        self.op[0].can_entangle_weight = True
 
 
 class MaxPool2d(nn.Module):
