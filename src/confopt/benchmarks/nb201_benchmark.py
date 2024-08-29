@@ -39,13 +39,19 @@ class NB201Benchmark(BenchmarkBase):
             "cifar10", "cifar100", "imagenet16"
         ] = "cifar10",
         **api_kwargs: str,  # noqa: ARG002
-    ) -> tuple[float, float, float]:
+    ) -> dict:
         result = self.api.query_by_arch(genotype, hp="200")
         result_train, result_valid, result_test = self._distill_result(  # type: ignore
             result, dataset
         )
 
-        return result_train, result_valid, result_test
+        results_metric = {
+            "benchmark/train_top1": result_train,
+            "benchmark/valid_top1": result_valid,
+            "benchmark/test_top1": result_test,
+        }
+
+        return results_metric
 
     def _distill_result(
         self,
