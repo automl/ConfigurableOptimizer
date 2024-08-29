@@ -15,7 +15,7 @@ def change_channel_size_conv(
     index: torch.Tensor | None = None,
     device: torch.device = DEVICE,
 ) -> tuple[nn.Conv2d | Conv2DLoRA, torch.Tensor | None]:
-    if k and k >= 1:
+    if k is not None and k >= 1:
         return reduce_conv_channels(conv, k=k, device=device), index
 
     return increase_conv_channels(
@@ -113,7 +113,7 @@ def increase_conv_channels(
 ) -> tuple[Conv2DLoRA, torch.Tensor]:
     if not isinstance(conv, (nn.Conv2d, Conv2DLoRA)):
         raise TypeError("Input must be a nn.Conv2d or a LoRA wrapped conv2d layer.")
-    if k:
+    if k is not None:
         num_channels_to_add = conv.in_channels * int(1 / k - 1)
     assert num_channels_to_add
     increased_conv, _ = increase_in_channel_size_conv(conv, num_channels_to_add)
@@ -198,7 +198,7 @@ def change_features_bn(
     index: torch.Tensor | None = None,
     device: torch.device = DEVICE,
 ) -> tuple[nn.BatchNorm2d, torch.Tensor | None]:
-    if k and k >= 1:
+    if k is not None and k >= 1:
         return reduce_bn_features(batchnorm_layer, k, device), index
 
     return increase_bn_features(
@@ -252,7 +252,7 @@ def increase_bn_features(
 ) -> tuple[nn.BatchNorm2d, torch.Tensor]:
     if not isinstance(bn, nn.BatchNorm2d):
         raise TypeError("Input must be a nn.BatchNorm2d layer.")
-    if k:
+    if k is not None:
         num_channels_to_add = bn.num_features * int(1 / k - 1)
     assert num_channels_to_add
     wider_bn, index = increase_num_features_bn(bn, num_channels_to_add, index, device)
