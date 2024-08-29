@@ -9,17 +9,17 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 
 def change_channel_size_conv(
-    conv: Conv2DLoRA,
+    conv_lora: Conv2DLoRA,
     k: float | None = None,
     num_channels_to_add: int | None = None,
     index: torch.Tensor | None = None,
     device: torch.device = DEVICE,
 ) -> tuple[nn.Conv2d | Conv2DLoRA, torch.Tensor | None]:
     if k is not None and k >= 1:
-        return reduce_conv_channels(conv, k=k, device=device), index
+        return reduce_conv_channels(conv_lora, k=k, device=device), index
 
     return increase_conv_channels(
-        conv,
+        conv_lora,
         k=k,
         num_channels_to_add=num_channels_to_add,
         device=device,
@@ -27,70 +27,70 @@ def change_channel_size_conv(
 
 
 def reduce_conv_channels(
-    conv2d_layer: Conv2DLoRA, k: float, device: torch.device = DEVICE
+    conv_lora: Conv2DLoRA, k: float, device: torch.device = DEVICE
 ) -> Conv2DLoRA:
-    assert isinstance(conv2d_layer, Conv2DLoRA)
+    assert isinstance(conv_lora, Conv2DLoRA)
 
     # Get the number of input and output channels of the original conv2d
-    in_channels = conv2d_layer.in_channels
-    out_channels = conv2d_layer.out_channels
+    in_channels = conv_lora.in_channels
+    out_channels = conv_lora.out_channels
 
     # Calculate the new number of output channels
     new_in_channels = int(max(1, in_channels // k))
     new_out_channels = int(max(1, out_channels // k))
     # Create a new conv2d layer with the reduced number of channels
-    new_groups = new_in_channels if conv2d_layer.conv.groups != 1 else 1
+    new_groups = new_in_channels if conv_lora.conv.groups != 1 else 1
     reduced_conv2d = Conv2DLoRA(
         new_in_channels,
         new_out_channels,
-        conv2d_layer.kernel_size,
-        stride=conv2d_layer.conv.stride,
-        padding=conv2d_layer.conv.padding,
-        dilation=conv2d_layer.conv.dilation,
+        conv_lora.kernel_size,
+        stride=conv_lora.conv.stride,
+        padding=conv_lora.conv.padding,
+        dilation=conv_lora.conv.dilation,
         groups=new_groups,
-        bias=conv2d_layer.conv.bias is not None,
+        bias=conv_lora.conv.bias is not None,
     ).to(device)
-    if conv2d_layer.r > 0:
+    if conv_lora.r > 0:
         reduced_conv2d.activate_lora(
-            r=conv2d_layer.r,
-            lora_alpha=conv2d_layer.lora_alpha,
-            lora_dropout_rate=conv2d_layer.lora_dropout_p,
-            merge_weights=conv2d_layer.merge_weights,
+            r=conv_lora.r,
+            lora_alpha=conv_lora.lora_alpha,
+            lora_dropout_rate=conv_lora.lora_dropout_p,
+            merge_weights=conv_lora.merge_weights,
         )
 
     # Copy the weights and bias of conv2d layer and LoRA layers
     reduced_conv2d.conv.weight.data[
         :new_out_channels, :new_in_channels, :, :
-    ] = conv2d_layer.conv.weight.data[:new_out_channels, :new_in_channels, :, :].clone()
-    if conv2d_layer.conv.bias is not None:
-        reduced_conv2d.conv.bias.data[:new_out_channels] = conv2d_layer.conv.bias.data[
+    ] = conv_lora.conv.weight.data[:new_out_channels, :new_in_channels, :, :].clone()
+    if conv_lora.conv.bias is not None:
+        reduced_conv2d.conv.bias.data[:new_out_channels] = conv_lora.conv.bias.data[
             :new_out_channels
         ].clone()
 
-    if conv2d_layer.r > 0:
-        kernel_size = conv2d_layer.kernel_size
+    if conv_lora.r > 0:
+        kernel_size = conv_lora.kernel_size
         reduced_conv2d.lora_A.data[
             :, : new_in_channels * kernel_size
-        ] = conv2d_layer.lora_A.data[:, : new_in_channels * kernel_size].clone()
+        ] = conv_lora.lora_A.data[:, : new_in_channels * kernel_size].clone()
         reduced_conv2d.lora_B.data[
             : new_out_channels * kernel_size, :
-        ] = conv2d_layer.lora_B.data[: new_out_channels * kernel_size, :].clone()
+        ] = conv_lora.lora_B.data[: new_out_channels * kernel_size, :].clone()
 
     return reduced_conv2d
 
 
 def increase_conv_channels(
-    conv: Conv2DLoRA,
+    conv_lora: Conv2DLoRA,
     k: float | None = None,
     num_channels_to_add: int | None = None,
     device: torch.device = DEVICE,
 ) -> tuple[Conv2DLoRA, torch.Tensor]:
-    assert isinstance(conv, Conv2DLoRA)
+    assert isinstance(conv_lora, Conv2DLoRA)
 
     if k is not None:
-        num_channels_to_add = conv.in_channels * int(1 / k - 1)
+        num_channels_to_add = conv_lora.in_channels * int(1 / k - 1)
     assert num_channels_to_add
-    increased_conv, _ = increase_in_channel_size_conv(conv, num_channels_to_add)
+    increased_conv, _ = increase_in_channel_size_conv(conv_lora, num_channels_to_add)
     increased_conv, out_index = increase_out_channel_size_conv(
         increased_conv, num_channels_to_add
     )
@@ -98,72 +98,72 @@ def increase_conv_channels(
 
 
 def increase_in_channel_size_conv(
-    conv: Conv2DLoRA,
+    conv_lora: Conv2DLoRA,
     num_channels_to_add: int,
     index: None | torch.Tensor = None,
     device: torch.device = DEVICE,
 ) -> tuple[Conv2DLoRA, torch.Tensor]:
-    assert isinstance(conv, Conv2DLoRA)
-    conv_weights = conv.conv.weight
+    assert isinstance(conv_lora, Conv2DLoRA)
+    conv_weights = conv_lora.conv.weight
     in_channels = conv_weights.size(1)
 
-    if not torch.is_tensor(index):
+    if index is None:
         index = torch.randint(low=0, high=in_channels, size=(num_channels_to_add,))
 
-    conv.conv.weight = nn.Parameter(
+    conv_lora.conv.weight = nn.Parameter(
         torch.cat([conv_weights, conv_weights[:, index, :, :].clone()], dim=1),
         requires_grad=True,
     )
-    conv.weight = conv.conv.weight
-    conv.in_channels += num_channels_to_add
-    conv.conv.in_channels += num_channels_to_add
+    conv_lora.weight = conv_lora.conv.weight
+    conv_lora.in_channels += num_channels_to_add
+    conv_lora.conv.in_channels += num_channels_to_add
     if hasattr(conv_weights, "in_index"):
-        conv.weight.in_index.append(index)
+        conv_lora.weight.in_index.append(index)
     else:
-        conv.weight.in_index = [index]
+        conv_lora.weight.in_index = [index]
 
-    conv.weight.t = "conv"
+    conv_lora.weight.t = "conv"
     if hasattr(conv_weights, "out_index"):
-        conv.weight.out_index = conv_weights.out_index
-    conv.weight.raw_id = (
+        conv_lora.weight.out_index = conv_weights.out_index
+    conv_lora.weight.raw_id = (
         conv_weights.raw_id if hasattr(conv_weights, "raw_id") else id(conv_weights)
     )
-    return conv.to(device=device), index
+    return conv_lora.to(device=device), index
 
 
 def increase_out_channel_size_conv(
-    conv: Conv2DLoRA,
+    conv_lora: Conv2DLoRA,
     num_channels_to_add: int,
     index: torch.Tensor | None = None,
     device: torch.device = DEVICE,
 ) -> tuple[Conv2DLoRA, torch.Tensor]:
-    assert isinstance(conv, Conv2DLoRA)
+    assert isinstance(conv_lora, Conv2DLoRA)
 
-    conv_weight = conv.weight
+    conv_weight = conv_lora.weight
     out_channels = conv_weight.size(0)
 
-    if not torch.is_tensor(index):
+    if index is None:
         index = torch.randint(low=0, high=out_channels, size=(num_channels_to_add,))
 
-    conv.conv.weight = nn.Parameter(
+    conv_lora.conv.weight = nn.Parameter(
         torch.cat([conv_weight, conv_weight[index, :, :, :].clone()], dim=0),
         requires_grad=True,
     )
 
-    conv.weight = conv.conv.weight
-    conv.out_channels += num_channels_to_add
-    conv.conv.out_channels += num_channels_to_add
+    conv_lora.weight = conv_lora.conv.weight
+    conv_lora.out_channels += num_channels_to_add
+    conv_lora.conv.out_channels += num_channels_to_add
     if hasattr(conv_weight, "out_index"):
-        conv.weight.out_index.append(index)
+        conv_lora.weight.out_index.append(index)
     else:
-        conv.weight.out_index = [index]
-    conv.weight.t = "conv"
+        conv_lora.weight.out_index = [index]
+    conv_lora.weight.t = "conv"
     if hasattr(conv_weight, "in_index"):
-        conv.weight.in_index = conv_weight.in_index
-    conv.weight.raw_id = (
+        conv_lora.weight.in_index = conv_weight.in_index
+    conv_lora.weight.raw_id = (
         conv_weight.raw_id if hasattr(conv_weight, "raw_id") else id(conv_weight)
     )
-    return conv.to(device=device), index
+    return conv_lora.to(device=device), index
 
 
 def change_features_bn(
