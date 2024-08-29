@@ -29,6 +29,9 @@ class TransNASBench101SearchSpace(SearchSpace, ArchAttentionSupport):
     def discretize(self) -> nn.Module:
         return self.model._discretize()  # type: ignore
 
+    def get_genotype(self) -> str:
+        return self.model.genotype()
+
 
 if __name__ == "__main__":
     searchspace = TransNASBench101SearchSpace()
