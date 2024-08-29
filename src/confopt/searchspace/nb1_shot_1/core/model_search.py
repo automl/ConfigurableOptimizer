@@ -273,7 +273,7 @@ class Network(nn.Module):
         ]
 
         # TODO-ICLR: Beta parameters for edge normalization
-        self._beta_parameters = None
+        self._beta_parameters = [None]
 
     def arch_parameters(self) -> list[torch.Tensor]:
         return self._arch_parameters
