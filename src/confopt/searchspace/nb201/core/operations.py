@@ -867,7 +867,7 @@ class FactorizedReduce(nn.Module):
             convolutional layers and BatchNorm.
         """
         if k > 1:
-            if self.stride == 2 and k > 1:
+            if self.stride == 2:
                 for i in range(2):
                     self.convs[i] = ch.reduce_conv_channels(
                         self.convs[i], k=k, device=device
