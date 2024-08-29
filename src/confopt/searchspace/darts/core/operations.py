@@ -129,8 +129,8 @@ class ReLUConvBN(nn.Module):
             device=device,
         )
         if k is not None:
-            self.C_in *= int(k)
-            self.C_out *= int(k)
+            self.C_in = int(k * self.C_in)
+            self.C_out = int(k * self.C_out)
 
     def increase_in_channel_size(
         self, num_channels_to_add: int, device: torch.device = DEVICE
