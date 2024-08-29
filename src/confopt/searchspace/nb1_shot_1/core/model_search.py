@@ -5,8 +5,10 @@ from torch import nn
 from torch.autograd import Variable
 import torch.nn.functional as F  # noqa: N812
 
-from .genotypes import PRIMITIVES
+from confopt.searchspace.common import OperationChoices
+
 from .operations import OPS, ConvBnRelu, ReLUConvBN
+from .search_spaces.genotypes import PRIMITIVES
 from .search_spaces.search_space import SearchSpace
 from .search_spaces.search_space_1 import SearchSpace1
 
@@ -38,7 +40,8 @@ class ChoiceBlock(nn.Module):
     def __init__(self, C_in: int) -> None:
         super().__init__()
         # Pre-processing 1x1 convolution at the beginning of each choice block.
-        self.mixed_op = MixedOp(C_in, stride=1)
+        ops = MixedOp(C_in, stride=1)._ops
+        self.mixed_op = OperationChoices(ops)
 
     def forward(
         self,
@@ -55,7 +58,7 @@ class ChoiceBlock(nn.Module):
         input_to_mixed_op = sum(inputs)
 
         # Apply Mixed Op
-        output = self.mixed_op(input_to_mixed_op, weights=weights)
+        output = self.mixed_op(input_to_mixed_op, alphas=weights)
         return output
 
 
@@ -132,13 +135,15 @@ class Cell(nn.Module):
 
         if output_weights is None:
             tensor_list = states
+            input_to_output_weight = 1.0
         else:
             # Create weighted concatenation at the output of the cell
             tensor_list = [w * t for w, t in zip(output_weights[0][1:], states)]
+            input_to_output_weight = output_weights[0][0]
 
         # Concatenate to form output tensor
         # https://github.com/google-research/nasbench/blob/master/nasbench/lib/model_builder.py#L325
-        return output_weights[0][0] * input_to_output_edge + torch.cat(
+        return input_to_output_weight * input_to_output_edge + torch.cat(
             tensor_list, dim=1
         )
 
@@ -149,7 +154,6 @@ class Network(nn.Module):
         C: int,
         num_classes: int,
         layers: int,
-        criterion: nn._Loss,
         output_weights: torch.Tensor,
         search_space: SearchSpace,
         steps: int = 4,
@@ -158,7 +162,6 @@ class Network(nn.Module):
         self._C = C
         self._num_classes = num_classes
         self._layers = layers
-        self._criterion = criterion
         self._steps = steps
         self._output_weights = output_weights
         self.search_space = search_space
@@ -200,7 +203,6 @@ class Network(nn.Module):
             self._C,
             self._num_classes,
             self._layers,
-            self._criterion,
             steps=self.search_space.num_intermediate_nodes,
             output_weights=self._output_weights,
             search_space=self.search_space,
@@ -208,6 +210,10 @@ class Network(nn.Module):
         for x, y in zip(model_new.arch_parameters(), self.arch_parameters()):
             x.data.copy_(y.data)
         return model_new
+
+    def sample(self, alphas: torch.Tensor) -> torch.Tensor:
+        # Replace this function on the fly to change the sampling method
+        return F.softmax(alphas, dim=-1)
 
     def _preprocess_op(
         self, x: torch.Tensor, discrete: bool, normalize: bool
@@ -266,10 +272,6 @@ class Network(nn.Module):
         logits = self.classifier(out.view(out.size(0), -1))
         return logits
 
-    def _loss(self, x: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        logits = self(x)
-        return self._criterion(logits, target)
-
     def _initialize_alphas(self) -> None:
         # Initializes the weights for the mixed ops.
         num_ops = len(PRIMITIVES)
@@ -297,5 +299,11 @@ class Network(nn.Module):
             *self.alphas_inputs,
         ]
 
+        # TODO-ICLR: Beta parameters for edge normalization
+        self._beta_parameters = None
+
     def arch_parameters(self) -> list[torch.Tensor]:
         return self._arch_parameters
+
+    def beta_parameters(self) -> list[torch.Tensor] | None:
+        return self._beta_parameters

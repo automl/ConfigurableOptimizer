@@ -6,15 +6,12 @@ import os
 import re
 import typing
 
-import ConfigSpace
 from nasbench import api
 import networkx as nx
 import numpy as np
 import seaborn as sns
 
-from confopt.searchspace.common.base_search import SearchSpace
-
-from .search_space_3 import SearchSpace3
+# from .search_space_3 import SearchSpace3
 
 sns.set_style("whitegrid")
 
@@ -251,25 +248,27 @@ class Model:
         self.training_time = nasbench_data["training_time"]
         self.budget = budget
 
-    def query_nasbench(
-        self, search_space: SearchSpace, nasbench: api.NASBench, sample: bool
-    ) -> None:
-        config = ConfigSpace.Configuration(
-            search_space.get_configuration_space(), vector=sample
-        )
-        (
-            adjacency_matrix,
-            node_list,
-        ) = search_space.convert_config_to_nasbench_format(config)
-        if type(search_space) == SearchSpace3:
-            node_list = [INPUT, *node_list, OUTPUT]
-        else:
-            node_list = [INPUT, *node_list, CONV1X1, OUTPUT]
-        adjacency_list = adjacency_matrix.astype(np.int).tolist()
-        model_spec = api.ModelSpec(matrix=adjacency_list, ops=node_list)
+    # def query_nasbench(
+    #     self, search_space: SearchSpace, nasbench: api.NASBench, sample: bool
+    # ) -> None:
+    #     config = ConfigSpace.Configuration(
+    #         search_space.get_configuration_space(), vector=sample
+    #     )
+    #     (
+    #         adjacency_matrix,
+    #         node_list,
+    #     ) = search_space.convert_config_to_nasbench_format(config)
+    #     if type(search_space) == SearchSpace3:
+    #         node_list = [INPUT, *node_list, OUTPUT]
+    #     else:
+    #         node_list = [INPUT, *node_list, CONV1X1, OUTPUT]
+    #     adjacency_list = adjacency_matrix.astype(np.int).tolist()
+    #     model_spec = api.ModelSpec(matrix=adjacency_list, ops=node_list)
 
-        nasbench_data = nasbench.query(model_spec)
-        self.arch = Architecture(adjacency_matrix=adjacency_matrix, node_list=node_list)
-        self.validation_accuracy = nasbench_data["validation_accuracy"]
-        self.test_accuracy = nasbench_data["test_accuracy"]
-        self.training_time = nasbench_data["training_time"]
+    #     nasbench_data = nasbench.query(model_spec)
+    #     self.arch = Architecture(
+    #       adjacency_matrix=adjacency_matrix, node_list=node_list
+    #     )
+    #     self.validation_accuracy = nasbench_data["validation_accuracy"]
+    #     self.test_accuracy = nasbench_data["test_accuracy"]
+    #     self.training_time = nasbench_data["training_time"]
