@@ -12,11 +12,10 @@ def change_channel_size_conv(
     conv_lora: Conv2DLoRA,
     k: float | None = None,
     num_channels_to_add: int | None = None,
-    index: torch.Tensor | None = None,
     device: torch.device = DEVICE,
-) -> tuple[nn.Conv2d | Conv2DLoRA, torch.Tensor | None]:
+) -> tuple[Conv2DLoRA, torch.Tensor | None]:
     if k is not None and k >= 1:
-        return reduce_conv_channels(conv_lora, k=k, device=device), index
+        return reduce_conv_channels(conv_lora, k=k, device=device), None
 
     return increase_conv_channels(
         conv_lora,
@@ -90,6 +89,7 @@ def increase_conv_channels(
     if k is not None:
         num_channels_to_add = conv_lora.in_channels * int(1 / k - 1)
     assert num_channels_to_add
+
     increased_conv, _ = increase_in_channel_size_conv(conv_lora, num_channels_to_add)
     increased_conv, out_index = increase_out_channel_size_conv(
         increased_conv, num_channels_to_add
@@ -104,6 +104,8 @@ def increase_in_channel_size_conv(
     device: torch.device = DEVICE,
 ) -> tuple[Conv2DLoRA, torch.Tensor]:
     assert isinstance(conv_lora, Conv2DLoRA)
+    assert num_channels_to_add is not None or index is not None
+
     conv_weights = conv_lora.conv.weight
     in_channels = conv_weights.size(1)
 
@@ -138,12 +140,15 @@ def increase_out_channel_size_conv(
     device: torch.device = DEVICE,
 ) -> tuple[Conv2DLoRA, torch.Tensor]:
     assert isinstance(conv_lora, Conv2DLoRA)
+    assert num_channels_to_add is not None or index is not None
 
     conv_weight = conv_lora.weight
     out_channels = conv_weight.size(0)
 
     if index is None:
         index = torch.randint(low=0, high=out_channels, size=(num_channels_to_add,))
+    else:
+        num_channels_to_add = len(index)
 
     conv_lora.conv.weight = nn.Parameter(
         torch.cat([conv_weight, conv_weight[index, :, :, :].clone()], dim=0),
@@ -174,7 +179,7 @@ def change_features_bn(
     device: torch.device = DEVICE,
 ) -> tuple[nn.BatchNorm2d, torch.Tensor | None]:
     if k is not None and k >= 1:
-        return reduce_bn_features(batchnorm_layer, k, device), index
+        return reduce_bn_features(batchnorm_layer, k, device), None
 
     return increase_bn_features(
         batchnorm_layer,
@@ -225,10 +230,11 @@ def increase_bn_features(
     device: torch.device = DEVICE,
 ) -> tuple[nn.BatchNorm2d, torch.Tensor]:
     assert isinstance(bn, nn.BatchNorm2d)
+    assert k is not None or num_channels_to_add is not None
 
     if k is not None:
         num_channels_to_add = bn.num_features * int(1 / k - 1)
-    assert num_channels_to_add
+
     wider_bn, index = increase_num_features_bn(bn, num_channels_to_add, index, device)
 
     return wider_bn.to(device), index
@@ -236,20 +242,25 @@ def increase_bn_features(
 
 def increase_num_features_bn(
     bn: nn.BatchNorm2d,
-    num_features_to_add: int,
+    num_features_to_add: int | None = None,
     index: torch.Tensor | None = None,
     device: torch.device = DEVICE,
 ) -> tuple[nn.BatchNorm2d, torch.Tensor]:
     assert isinstance(bn, nn.BatchNorm2d)
+    num_features = bn.num_features
+
+    if index is None:
+        assert num_features_to_add is not None
+        index = torch.randint(low=0, high=num_features, size=(num_features_to_add,))
+    else:
+        num_features_to_add = len(index)
 
     running_mean = bn.running_mean
     running_var = bn.running_var
     if bn.affine:
         weight = bn.weight
         bias = bn.bias
-    num_features = bn.num_features
-    if index is None:
-        index = torch.randint(low=0, high=num_features, size=(num_features_to_add,))
+
     bn.running_mean = torch.cat([running_mean, running_mean[index].clone()])
     bn.running_var = torch.cat([running_var, running_var[index].clone()])
     if bn.affine:
