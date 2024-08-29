@@ -262,6 +262,7 @@ class Network(nn.Module):
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.classifier = nn.Linear(C_prev, num_classes)
         self.weights_grad: dict[str, list[torch.Tensor]] = {}
+        self.grad_hook_handlers: list[torch.utils.hooks.RemovableHandle] = []
 
         # Multi-head attention for architectural parameters
         self.is_arch_attention_enabled = False  # disabled by default
@@ -291,6 +292,11 @@ class Network(nn.Module):
         # Replace this function on the fly to change the sampling method
         return F.softmax(alphas, dim=-1)
 
+    def reset_hooks(self) -> None:
+        for hook in self.grad_hook_handlers:
+            hook.remove()
+        self.grad_hook_handlers = []
+
     def save_gradient(self, cell_type: Literal["normal", "reduce"]) -> Callable:
         def hook(grad: torch.Tensor) -> None:
             self.weights_grad[cell_type].append(grad)
@@ -303,7 +309,8 @@ class Network(nn.Module):
         assert cell_type in ["reduce", "normal"]
         if not self.training:
             return
-        weights.register_hook(self.save_gradient(cell_type=cell_type))
+        grad_hook = weights.register_hook(self.save_gradient(cell_type=cell_type))
+        self.grad_hook_handlers.append(grad_hook)
 
     def sample_weights(self) -> tuple[torch.Tensor, torch.Tensor]:
         if self.projection_mode:
@@ -346,6 +353,7 @@ class Network(nn.Module):
             - The output tensor after the forward pass.
             - The logits tensor produced by the model.
         """
+        self.reset_hooks()
         if self.edge_normalization:
             return self.edge_normalization_forward(x)
 

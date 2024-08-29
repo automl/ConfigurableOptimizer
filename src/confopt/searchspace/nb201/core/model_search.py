@@ -136,6 +136,8 @@ class NB201SearchModel(nn.Module):
             1e-3 * torch.randn(num_edge)  # type: ignore
         )
         self.weights_grad: list[torch.Tensor] = []
+        self.grad_hook_handlers: list[torch.utils.hooks.RemovableHandle] = []
+
         self.num_edges = num_edge
         self.num_nodes = max_nodes - 1
         self.num_ops = len(search_space)
@@ -277,6 +279,12 @@ class NB201SearchModel(nn.Module):
 
         return weights
 
+    def reset_hooks(self) -> None:
+        for hook in self.grad_hook_handlers:
+            hook.remove()
+
+        self.grad_hook_handlers = []
+
     def save_gradient(self) -> Callable:
         def hook(grad: torch.Tensor) -> None:
             self.weights_grad.append(grad)
@@ -289,7 +297,8 @@ class NB201SearchModel(nn.Module):
     ) -> None:
         if not self.training:
             return
-        weights.register_hook(self.save_gradient())
+        grad_hook = weights.register_hook(self.save_gradient())
+        self.grad_hook_handlers.append(grad_hook)
 
     def forward(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the model.
@@ -302,6 +311,7 @@ class NB201SearchModel(nn.Module):
             - The output tensor after the forward pass.
             - The logits tensor produced by the model.
         """
+        self.reset_hooks()
         if self.edge_normalization:
             return self.edge_normalization_forward(inputs)
 
