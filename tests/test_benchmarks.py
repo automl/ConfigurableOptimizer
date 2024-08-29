@@ -6,6 +6,7 @@ import pytest
 
 from confopt.searchspace.darts.core.genotypes import Genotype as NB301Genotype
 from confopt.searchspace.nb201.core.genotypes import Structure as NB201Genotype
+from confopt.searchspace.tnb101.core.genotypes import TNB101Genotype
 
 nb201_genotype_fail = NB201Genotype(
     [
@@ -75,6 +76,27 @@ nb301_genotype_fail = NB301Genotype(
 
 test_nb301_acc = 94.166695
 test_nb301_fail_acc = 88.165985
+
+tnb101_genotype_fail = TNB101Genotype(
+    node_edge_dict={
+        1: [("none", 0)],
+        2: [("none", 0), ("none", 1)],
+        3: [("none", 0), ("none", 1), ("none", 2)],
+    },
+    op_idx_list=[0, 0, 0, 0, 0, 0],
+)
+
+tnb101_genotype = TNB101Genotype(
+    node_edge_dict={
+        1: [("nor_conv_3x3", 0)],
+        2: [("nor_conv_3x3", 0), ("nor_conv_3x3", 1)],
+        3: [("skip_connect", 0), ("skip_connect", 1), ("nor_conv_1x1", 2)],
+    },
+    op_idx_list=[3, 3, 3, 1, 1, 2],
+)
+
+test_tnb101_acc_top1 = 52.55772399902344
+test_tnb101_fail_acc_top1 = 29.433717727661133
 
 
 class TestBenchmarks(unittest.TestCase):
@@ -152,6 +174,24 @@ class TestBenchmarks(unittest.TestCase):
         query_result = api.query(nb301_genotype_fail, with_noise=False)
 
         assert query_result["benchmark/test_top1"] < 89.0
+
+    @pytest.mark.benchmark()  # type: ignore
+    def test_tnb101_benchmark(self) -> None:
+        from confopt.benchmarks import TNB101Benchmark
+
+        api = TNB101Benchmark()
+        query_result = api.query(tnb101_genotype)
+
+        assert query_result["benchmark/test_top1"] == test_tnb101_acc_top1
+
+    @pytest.mark.benchmark()  # type: ignore
+    def test_tnb101_benchmark_fail(self) -> None:
+        from confopt.benchmarks import TNB101Benchmark
+
+        api = TNB101Benchmark()
+        query_result = api.query(tnb101_genotype_fail)
+
+        assert query_result["benchmark/test_top1"] == test_tnb101_fail_acc_top1
 
 
 if __name__ == "__main__":
