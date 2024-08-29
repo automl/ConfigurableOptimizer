@@ -61,22 +61,22 @@ def reduce_conv_channels(
         )
 
     # Copy the weights and bias of conv2d layer and LoRA layers
-    reduced_conv2d.conv.weight.data[
+    reduced_conv2d.conv.weight.data = conv_lora.conv.weight.data[
         :new_out_channels, :new_in_channels, :, :
-    ] = conv_lora.conv.weight.data[:new_out_channels, :new_in_channels, :, :].clone()
+    ].clone()
     if conv_lora.conv.bias is not None:
-        reduced_conv2d.conv.bias.data[:new_out_channels] = conv_lora.conv.bias.data[
+        reduced_conv2d.conv.bias.data = conv_lora.conv.bias.data[
             :new_out_channels
         ].clone()
 
     if conv_lora.r > 0:
         kernel_size = conv_lora.kernel_size
-        reduced_conv2d.lora_A.data[
+        reduced_conv2d.lora_A.data = conv_lora.lora_A.data[
             :, : new_in_channels * kernel_size
-        ] = conv_lora.lora_A.data[:, : new_in_channels * kernel_size].clone()
-        reduced_conv2d.lora_B.data[
+        ].clone()
+        reduced_conv2d.lora_B.data = conv_lora.lora_B.data[
             : new_out_channels * kernel_size, :
-        ] = conv_lora.lora_B.data[: new_out_channels * kernel_size, :].clone()
+        ].clone()
 
     return reduced_conv2d
 
@@ -220,10 +220,10 @@ def reduce_bn_features(
 
     # Copy the weight and bias from the original BatchNorm2d to the new one
     if batchnorm_layer.affine:
-        reduced_batchnorm.weight.data[:new_num_features] = batchnorm_layer.weight.data[
+        reduced_batchnorm.weight.data = batchnorm_layer.weight.data[
             :new_num_features
         ].clone()
-        reduced_batchnorm.bias.data[:new_num_features] = batchnorm_layer.bias.data[
+        reduced_batchnorm.bias.data = batchnorm_layer.bias.data[
             :new_num_features
         ].clone()
 
