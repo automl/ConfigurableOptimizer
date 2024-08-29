@@ -20,6 +20,7 @@ from .distributed import (
 from .logger import Logger, prepare_logger
 from .normalize_params import normalize_params
 from .time import get_runtime, get_time_as_string
+from .tnb101_api import TransNASBenchAPI
 
 
 class ExperimentCheckpointLoader:
@@ -305,4 +306,5 @@ __all__ = [
     "reset_gm_score_attributes",
     "set_ops_to_prune",
     "update_gradient_matching_scores",
+    "TransNASBenchAPI",
 ]

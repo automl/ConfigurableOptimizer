@@ -353,6 +353,10 @@ class Experiment:
             from confopt.benchmarks import NB301Benchmark
 
             self.benchmark_api = NB301Benchmark(**config)
+        elif search_space == SearchSpaceType.TNB101:
+            from confopt.benchmarks import TNB101Benchmark
+
+            self.benchmark_api = TNB101Benchmark()
         else:
             print(f"Benchmark does not exist for the {search_space.value} searchspace")
             self.benchmark_api = None
