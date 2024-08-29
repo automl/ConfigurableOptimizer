@@ -112,7 +112,7 @@ class OperationBlock(nn.Module):
     ) -> None:
         if not k and not num_channels_to_add:
             k = self.partial_connector.k if self.partial_connector else 1
-        if k and k == 1:
+        if k is not None and k == 1:
             return
 
         for op in self.ops:
