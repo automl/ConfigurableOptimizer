@@ -27,10 +27,9 @@ def change_channel_size_conv(
 
 
 def reduce_conv_channels(
-    conv2d_layer: nn.Conv2d | Conv2DLoRA, k: float, device: torch.device = DEVICE
-) -> nn.Conv2d:
-    if not isinstance(conv2d_layer, (nn.Conv2d, Conv2DLoRA)):
-        raise TypeError("Input must be a nn.Conv2d or a LoRA wrapped conv2d layer.")
+    conv2d_layer: Conv2DLoRA, k: float, device: torch.device = DEVICE
+) -> Conv2DLoRA:
+    assert isinstance(conv2d_layer, Conv2DLoRA)
 
     # Get the number of input and output channels of the original conv2d
     in_channels = conv2d_layer.in_channels
@@ -40,67 +39,42 @@ def reduce_conv_channels(
     new_in_channels = int(max(1, in_channels // k))
     new_out_channels = int(max(1, out_channels // k))
     # Create a new conv2d layer with the reduced number of channels
-    if isinstance(conv2d_layer, Conv2DLoRA):
-        new_groups = new_in_channels if conv2d_layer.conv.groups != 1 else 1
-        reduced_conv2d = Conv2DLoRA(
-            new_in_channels,
-            new_out_channels,
-            conv2d_layer.kernel_size,
-            stride=conv2d_layer.conv.stride,
-            padding=conv2d_layer.conv.padding,
-            dilation=conv2d_layer.conv.dilation,
-            groups=new_groups,
-            bias=conv2d_layer.conv.bias is not None,
-        ).to(device)
-        if conv2d_layer.r > 0:
-            reduced_conv2d.activate_lora(
-                r=conv2d_layer.r,
-                lora_alpha=conv2d_layer.lora_alpha,
-                lora_dropout_rate=conv2d_layer.lora_dropout_p,
-                merge_weights=conv2d_layer.merge_weights,
-            )
+    new_groups = new_in_channels if conv2d_layer.conv.groups != 1 else 1
+    reduced_conv2d = Conv2DLoRA(
+        new_in_channels,
+        new_out_channels,
+        conv2d_layer.kernel_size,
+        stride=conv2d_layer.conv.stride,
+        padding=conv2d_layer.conv.padding,
+        dilation=conv2d_layer.conv.dilation,
+        groups=new_groups,
+        bias=conv2d_layer.conv.bias is not None,
+    ).to(device)
+    if conv2d_layer.r > 0:
+        reduced_conv2d.activate_lora(
+            r=conv2d_layer.r,
+            lora_alpha=conv2d_layer.lora_alpha,
+            lora_dropout_rate=conv2d_layer.lora_dropout_p,
+            merge_weights=conv2d_layer.merge_weights,
+        )
 
-        # Copy the weights and bias of conv2d layer and LoRA layers
-        reduced_conv2d.conv.weight.data[
-            :new_out_channels, :new_in_channels, :, :
-        ] = conv2d_layer.conv.weight.data[
-            :new_out_channels, :new_in_channels, :, :
+    # Copy the weights and bias of conv2d layer and LoRA layers
+    reduced_conv2d.conv.weight.data[
+        :new_out_channels, :new_in_channels, :, :
+    ] = conv2d_layer.conv.weight.data[:new_out_channels, :new_in_channels, :, :].clone()
+    if conv2d_layer.conv.bias is not None:
+        reduced_conv2d.conv.bias.data[:new_out_channels] = conv2d_layer.conv.bias.data[
+            :new_out_channels
         ].clone()
-        if conv2d_layer.conv.bias is not None:
-            reduced_conv2d.conv.bias.data[
-                :new_out_channels
-            ] = conv2d_layer.conv.bias.data[:new_out_channels].clone()
 
-        if conv2d_layer.r > 0:
-            kernel_size = conv2d_layer.kernel_size
-            reduced_conv2d.lora_A.data[
-                :, : new_in_channels * kernel_size
-            ] = conv2d_layer.lora_A.data[:, : new_in_channels * kernel_size].clone()
-            reduced_conv2d.lora_B.data[
-                : new_out_channels * kernel_size, :
-            ] = conv2d_layer.lora_B.data[: new_out_channels * kernel_size, :].clone()
-
-    else:
-        new_groups = new_in_channels if conv2d_layer.groups != 1 else 1
-        reduced_conv2d = nn.Conv2d(
-            new_in_channels,
-            new_out_channels,
-            conv2d_layer.kernel_size,
-            conv2d_layer.stride,
-            conv2d_layer.padding,
-            conv2d_layer.dilation,
-            new_groups,
-            conv2d_layer.bias is not None,
-        ).to(device)
-
-        # Copy the weights and biases from the original conv2d to the new one
-        reduced_conv2d.weight.data[
-            :new_out_channels, :new_in_channels, :, :
-        ] = conv2d_layer.weight.data[:new_out_channels, :new_in_channels, :, :].clone()
-        if conv2d_layer.bias is not None:
-            reduced_conv2d.bias.data[:new_out_channels] = conv2d_layer.bias.data[
-                :new_out_channels
-            ].clone()
+    if conv2d_layer.r > 0:
+        kernel_size = conv2d_layer.kernel_size
+        reduced_conv2d.lora_A.data[
+            :, : new_in_channels * kernel_size
+        ] = conv2d_layer.lora_A.data[:, : new_in_channels * kernel_size].clone()
+        reduced_conv2d.lora_B.data[
+            : new_out_channels * kernel_size, :
+        ] = conv2d_layer.lora_B.data[: new_out_channels * kernel_size, :].clone()
 
     return reduced_conv2d
 
@@ -111,8 +85,8 @@ def increase_conv_channels(
     num_channels_to_add: int | None = None,
     device: torch.device = DEVICE,
 ) -> tuple[Conv2DLoRA, torch.Tensor]:
-    if not isinstance(conv, (nn.Conv2d, Conv2DLoRA)):
-        raise TypeError("Input must be a nn.Conv2d or a LoRA wrapped conv2d layer.")
+    assert isinstance(conv, Conv2DLoRA)
+
     if k is not None:
         num_channels_to_add = conv.in_channels * int(1 / k - 1)
     assert num_channels_to_add
@@ -164,6 +138,7 @@ def increase_out_channel_size_conv(
     device: torch.device = DEVICE,
 ) -> tuple[Conv2DLoRA, torch.Tensor]:
     assert isinstance(conv, Conv2DLoRA)
+
     conv_weight = conv.weight
     out_channels = conv_weight.size(0)
 
@@ -213,8 +188,7 @@ def change_features_bn(
 def reduce_bn_features(
     batchnorm_layer: nn.BatchNorm2d, k: float, device: torch.device = DEVICE
 ) -> nn.BatchNorm2d:
-    if not isinstance(batchnorm_layer, nn.BatchNorm2d):
-        raise TypeError("Input must be a nn.BatchNorm2d layer.")
+    assert isinstance(batchnorm_layer, nn.BatchNorm2d)
 
     # Get the number of features in the original BatchNorm2d
     num_features = batchnorm_layer.num_features
@@ -250,8 +224,8 @@ def increase_bn_features(
     index: torch.Tensor | None = None,
     device: torch.device = DEVICE,
 ) -> tuple[nn.BatchNorm2d, torch.Tensor]:
-    if not isinstance(bn, nn.BatchNorm2d):
-        raise TypeError("Input must be a nn.BatchNorm2d layer.")
+    assert isinstance(bn, nn.BatchNorm2d)
+
     if k is not None:
         num_channels_to_add = bn.num_features * int(1 / k - 1)
     assert num_channels_to_add
@@ -266,6 +240,8 @@ def increase_num_features_bn(
     index: torch.Tensor | None = None,
     device: torch.device = DEVICE,
 ) -> tuple[nn.BatchNorm2d, torch.Tensor]:
+    assert isinstance(bn, nn.BatchNorm2d)
+
     running_mean = bn.running_mean
     running_var = bn.running_var
     if bn.affine:
