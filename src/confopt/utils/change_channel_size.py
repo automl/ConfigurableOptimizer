@@ -14,8 +14,11 @@ def change_channel_size_conv(
     num_channels_to_add: int | None = None,
     device: torch.device = DEVICE,
 ) -> tuple[Conv2DLoRA, torch.Tensor | None]:
-    if k is not None and k >= 1:
-        return reduce_conv_channels(conv_lora, k=k, device=device), None
+    if k is not None:
+        if k > 1:
+            return reduce_conv_channels(conv_lora, k=k, device=device), None
+        if k == 1:
+            return conv_lora, None
 
     return increase_conv_channels(
         conv_lora,
@@ -83,10 +86,12 @@ def increase_conv_channels(
     k: float | None = None,
     num_channels_to_add: int | None = None,
     device: torch.device = DEVICE,
-) -> tuple[Conv2DLoRA, torch.Tensor]:
+) -> tuple[Conv2DLoRA, torch.Tensor | None]:
     assert isinstance(conv_lora, Conv2DLoRA)
 
     if k is not None:
+        if k == 1:
+            return conv_lora, None
         num_channels_to_add = conv_lora.in_channels * int(1 / k - 1)
     assert num_channels_to_add
 
@@ -178,8 +183,11 @@ def change_features_bn(
     index: torch.Tensor | None = None,
     device: torch.device = DEVICE,
 ) -> tuple[nn.BatchNorm2d, torch.Tensor | None]:
-    if k is not None and k >= 1:
-        return reduce_bn_features(batchnorm_layer, k, device), None
+    if k is not None:
+        if k > 1:
+            return reduce_bn_features(batchnorm_layer, k, device), None
+        if k == 1:
+            return batchnorm_layer, None
 
     return increase_bn_features(
         batchnorm_layer,
@@ -228,11 +236,13 @@ def increase_bn_features(
     num_channels_to_add: int | None = None,
     index: torch.Tensor | None = None,
     device: torch.device = DEVICE,
-) -> tuple[nn.BatchNorm2d, torch.Tensor]:
+) -> tuple[nn.BatchNorm2d, torch.Tensor | None]:
     assert isinstance(bn, nn.BatchNorm2d)
     assert k is not None or num_channels_to_add is not None
 
     if k is not None:
+        if k == 1:
+            return bn, None
         num_channels_to_add = bn.num_features * int(1 / k - 1)
 
     wider_bn, index = increase_num_features_bn(bn, num_channels_to_add, index, device)
