@@ -550,7 +550,7 @@ class Network(nn.Module):
         grads_reduce = get_grads(self.weights_grad["reduce"])
         return grads_normal, grads_reduce
 
-    def _get_mean_layer_alignment_score(
+    def get_mean_layer_alignment_score(
         self, only_first_and_last: bool = False
     ) -> tuple[float, float]:
         grads_normal, grads_reduce = self.get_arch_grads(only_first_and_last)

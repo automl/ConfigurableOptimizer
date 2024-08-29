@@ -371,7 +371,7 @@ class NB201SearchModel(nn.Module):
 
         return grads
 
-    def _get_mean_layer_alignment_score(
+    def get_mean_layer_alignment_score(
         self, only_first_and_last: bool = False
     ) -> float:
         grads = self.get_arch_grads(only_first_and_last)
