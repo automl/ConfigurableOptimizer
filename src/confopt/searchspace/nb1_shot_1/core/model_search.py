@@ -243,7 +243,7 @@ class Network(nn.Module):
         # https://github.com/google-research/nasbench/blob/master/nasbench/lib/model_builder.py#L92
         out = s0.view(*s0.shape[:2], -1).mean(-1)
         logits = self.classifier(out.view(out.size(0), -1))
-        return logits
+        return out, logits
 
     def _initialize_alphas(self) -> None:
         # Initializes the weights for the mixed ops.
