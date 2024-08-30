@@ -58,6 +58,9 @@ class NASBench1Shot1SearchSpace(SearchSpace):
             )
             old_params.data = new_params.data
 
+    def get_genotype(self) -> Any:
+        return self.model.get_genotype()
+
 
 if __name__ == "__main__":
     search_space = NASBench1Shot1SearchSpace("S1")

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from typing import Any
+
+import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F  # noqa: N812
@@ -8,9 +11,12 @@ from confopt.searchspace.common import OperationChoices
 from confopt.searchspace.darts.core.operations import ReLUConvBN
 
 from .operations import OPS, ConvBnRelu
-from .search_spaces.genotypes import PRIMITIVES
+from .search_spaces.genotypes import PRIMITIVES, NASBench1Shot1ConfoptGenotype
 from .search_spaces.search_space import NB1Shot1Space
 from .search_spaces.search_space_1 import NB1Shot1Space1
+from .search_spaces.search_space_2 import NB1Shot1Space2
+from .search_spaces.search_space_3 import NB1Shot1Space3
+from .search_spaces.utils import CONV1X1, INPUT, OUTPUT
 
 
 class MixedOp(nn.Module):
@@ -280,3 +286,81 @@ class Network(nn.Module):
 
     def beta_parameters(self) -> list[torch.Tensor] | None:
         return self._beta_parameters
+
+    def get_genotype(self) -> Any:
+        def softmax(weights: torch.Tensor, axis: int = -1) -> np.ndarray:
+            return F.softmax(torch.Tensor(weights), axis).data.cpu().numpy()
+
+        def get_top_k(array: np.ndarray, k: int) -> list:
+            return list(np.argpartition(array[0], -k)[-k:])
+
+        alphas_mixed_op = self.arch_parameters()[0]
+        chosen_node_ops = softmax(alphas_mixed_op, axis=-1).argmax(-1)
+
+        node_list = [PRIMITIVES[i] for i in chosen_node_ops]
+        alphas_output = self.arch_parameters()[1]
+        alphas_inputs = self.arch_parameters()[2:]
+
+        if isinstance(self.search_space, NB1Shot1Space1):
+            num_inputs = list(self.search_space.num_parents_per_node.values())[3:-1]
+            parents_node_3, parents_node_4 = (
+                get_top_k(softmax(alpha, axis=1), num_input)
+                for num_input, alpha in zip(num_inputs, alphas_inputs)
+            )
+            output_parents = get_top_k(softmax(alphas_output), num_inputs[-1])
+            parents = {
+                "0": [],
+                "1": [0],
+                "2": [0, 1],
+                "3": parents_node_3,
+                "4": parents_node_4,
+                "5": output_parents,
+            }
+            node_list = [INPUT, *node_list, CONV1X1, OUTPUT]
+
+        elif isinstance(self.search_space, NB1Shot1Space2):
+            num_inputs = list(self.search_space.num_parents_per_node.values())[2:]
+            parents_node_2, parents_node_3, parents_node_4 = (
+                get_top_k(softmax(alpha, axis=1), num_input)
+                for num_input, alpha in zip(num_inputs[:-1], alphas_inputs)
+            )
+            output_parents = get_top_k(softmax(alphas_output), num_inputs[-1])
+            parents = {
+                "0": [],
+                "1": [0],
+                "2": parents_node_2,
+                "3": parents_node_3,
+                "4": parents_node_4,
+                "5": output_parents,
+            }
+            node_list = [INPUT, *node_list, CONV1X1, OUTPUT]
+
+        elif isinstance(self.search_space, NB1Shot1Space3):
+            num_inputs = list(self.search_space.num_parents_per_node.values())[2:]
+            parents_node_2, parents_node_3, parents_node_4, parents_node_5 = (
+                get_top_k(softmax(alpha, axis=1), num_input)
+                for num_input, alpha in zip(num_inputs[:-1], alphas_inputs)
+            )
+            output_parents = get_top_k(softmax(alphas_output), num_inputs[-1])
+            parents = {
+                "0": [],
+                "1": [0],
+                "2": parents_node_2,
+                "3": parents_node_3,
+                "4": parents_node_4,
+                "5": parents_node_5,
+                "6": output_parents,
+            }
+            node_list = [INPUT, *node_list, OUTPUT]
+
+        else:
+            raise ValueError("Unknown search space")
+
+        adjacency_matrix = self.search_space.create_nasbench_adjacency_matrix(parents)
+        # Convert the adjacency matrix in format for nasbench
+
+        adjacency_list = adjacency_matrix.astype(np.int32).tolist()
+
+        genotype = NASBench1Shot1ConfoptGenotype(matrix=adjacency_list, ops=node_list)
+
+        return genotype
