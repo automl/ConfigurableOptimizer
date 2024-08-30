@@ -32,7 +32,7 @@ def parent_combinations(node: int, num_parents: int) -> list:
     return list(itertools.combinations(list(range(int(node))), num_parents))
 
 
-class SearchSpace:
+class NB1Shot1Space:
     def __init__(self, search_space_number: int, num_intermediate_nodes: int) -> None:
         self.search_space_number = search_space_number
         self.num_intermediate_nodes = num_intermediate_nodes

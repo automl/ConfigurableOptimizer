@@ -7,11 +7,11 @@ import ConfigSpace
 from nasbench import api
 import numpy as np
 
-from .search_space import SearchSpace
+from .search_space import NB1Shot1Space
 from .utils import INPUT, OUTPUT, OUTPUT_NODE
 
 
-class SearchSpace3(SearchSpace):
+class NB1Shot1Space3(NB1Shot1Space):
     def __init__(self) -> None:
         self.search_space_number = 3
         self.num_intermediate_nodes = 5

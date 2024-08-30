@@ -9,8 +9,8 @@ from confopt.searchspace.darts.core.operations import ReLUConvBN
 
 from .operations import OPS, ConvBnRelu
 from .search_spaces.genotypes import PRIMITIVES
-from .search_spaces.search_space import SearchSpace
-from .search_spaces.search_space_1 import SearchSpace1
+from .search_spaces.search_space import NB1Shot1Space
+from .search_spaces.search_space_1 import NB1Shot1Space1
 
 
 class MixedOp(nn.Module):
@@ -64,7 +64,7 @@ class ChoiceBlock(nn.Module):
 
 class Cell(nn.Module):
     def __init__(
-        self, steps: int, C_prev: int, C: int, layer: int, search_space: SearchSpace
+        self, steps: int, C_prev: int, C: int, layer: int, search_space: NB1Shot1Space
     ) -> None:
         super().__init__()
         # All cells are normal cells in NASBench case.
@@ -112,7 +112,7 @@ class Cell(nn.Module):
             if input_weights is not None:
                 # Node 1 has no choice with respect to its input
                 if (choice_block_idx == 0) or (
-                    choice_block_idx == 1 and type(self.search_space) == SearchSpace1
+                    choice_block_idx == 1 and type(self.search_space) == NB1Shot1Space1
                 ):
                     input_weight = None
                 else:
@@ -151,7 +151,7 @@ class Cell(nn.Module):
 class Network(nn.Module):
     def __init__(
         self,
-        search_space: SearchSpace,
+        search_space: NB1Shot1Space,
         C: int = 16,
         num_classes: int = 10,
         layers: int = 9,
@@ -258,7 +258,7 @@ class Network(nn.Module):
             1e-3 * torch.randn(1, self._steps + 1).cuda(), requires_grad=True
         )
 
-        begin = 3 if type(self.search_space) == SearchSpace1 else 2
+        begin = 3 if type(self.search_space) == NB1Shot1Space1 else 2
         # Initialize the weights for the inputs to each choice block.
         self.alphas_inputs = [
             nn.Parameter(1e-3 * torch.randn(1, n_inputs).cuda(), requires_grad=True)
