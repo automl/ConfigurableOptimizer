@@ -21,7 +21,7 @@ from confopt.searchspace.darts.core.operations import (
     SepConv,
     Zero,
 )
-from confopt.searchspace.nb1shot1.core.model_search import (
+from confopt.searchspace.nb1_shot_1.core.model_search import (
     Cell as NasBench1Shot1SearchCell,
 )
 from confopt.searchspace.nb201.core import NAS201SearchCell
@@ -563,11 +563,48 @@ class TestDARTSSearchSpace(unittest.TestCase):
 
 
 class TestNASBench1Shot1SearchSpace(unittest.TestCase):
-    def test_arch_parameters(self) -> None:
-        search_space = NASBench1Shot1SearchSpace()
+    def test_arch_parameters_s1(self) -> None:
+        search_space = NASBench1Shot1SearchSpace("S1")
         arch_params = search_space.arch_parameters
         assert len(arch_params) == 4
-        assert isinstance(arch_params[0], nn.Parameter)
+
+        for arch_param in arch_params:
+            assert isinstance(arch_param, nn.Parameter)
+        
+        assert arch_params[0].shape == (4, 3)
+        assert arch_params[1].shape == (1, 5)
+        assert arch_params[2].shape == (1, 3)
+        assert arch_params[3].shape == (1, 4)
+
+    def test_arch_parameters_s2(self) -> None:
+        search_space = NASBench1Shot1SearchSpace("S2")
+        arch_params = search_space.arch_parameters
+        assert len(arch_params) == 5
+
+        for arch_param in arch_params:
+            assert isinstance(arch_param, nn.Parameter)
+        
+        assert arch_params[0].shape == (4, 3)
+        assert arch_params[1].shape == (1, 5)
+        assert arch_params[2].shape == (1, 2)
+        assert arch_params[3].shape == (1, 3)
+        assert arch_params[4].shape == (1, 4)
+
+
+    def test_arch_parameters_s3(self) -> None:
+        search_space = NASBench1Shot1SearchSpace("S3")
+        arch_params = search_space.arch_parameters
+        assert len(arch_params) == 6
+
+        for arch_param in arch_params:
+            assert isinstance(arch_param, nn.Parameter)
+        
+        assert arch_params[0].shape == (5, 3)
+        assert arch_params[1].shape == (1, 6)
+        assert arch_params[2].shape == (1, 2)
+        assert arch_params[3].shape == (1, 3)
+        assert arch_params[4].shape == (1, 4)
+        assert arch_params[5].shape == (1, 5)
 
     def _test_forward_pass(self, model: nn.Module) -> None:
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
@@ -581,32 +618,22 @@ class TestNASBench1Shot1SearchSpace(unittest.TestCase):
         assert out[1].shape == torch.Size([2, 10])
 
     def test_forward_pass_s1(self) -> None:
-        search_space = NASBench1Shot1SearchSpace(
-            num_intermediate_nodes=4,
-            search_space_type="S1",
-        )
+        search_space = NASBench1Shot1SearchSpace("S1")
         self._test_forward_pass(search_space)
 
     def test_forward_pass_s2(self) -> None:
-        search_space = NASBench1Shot1SearchSpace(
-            num_intermediate_nodes=4,
-            search_space_type="S2",
-        )
+        search_space = NASBench1Shot1SearchSpace("S2")
         self._test_forward_pass(search_space)
 
     def test_forward_pass_s3(self) -> None:
-        search_space = NASBench1Shot1SearchSpace(
-            num_intermediate_nodes=4,
-            search_space_type="S3",
-        )
+        search_space = NASBench1Shot1SearchSpace("S3")
         self._test_forward_pass(search_space)
 
     def test_supernet_init(self) -> None:
         layers = 7
         num_classes = 13
         search_space = NASBench1Shot1SearchSpace(
-            num_intermediate_nodes=4,
-            search_space_type="S1",
+            search_space="S1",
             layers=7,
             num_classes=num_classes,
         )
@@ -620,19 +647,9 @@ class TestNASBench1Shot1SearchSpace(unittest.TestCase):
         assert logits.shape == torch.Size([2, num_classes])
         assert out.shape == torch.Size([2, 64])
 
-    def test_discretize(self) -> None:
-        search_space = NASBench1Shot1SearchSpace(
-            num_intermediate_nodes=4, search_space_type="S2"
-        )
-        search_space.discretize()
-
-        self._test_forward_pass(search_space)
-
     def test_prune(self) -> None:
         # TODO: Update NB1Shot1 later
-        search_space = NASBench1Shot1SearchSpace(
-            num_intermediate_nodes=4, search_space_type="S2"
-        )
+        search_space = NASBench1Shot1SearchSpace("S2")
         search_space.prune()
         alphas_mixed_op = search_space.arch_parameters[0]
 
@@ -644,8 +661,7 @@ class TestNASBench1Shot1SearchSpace(unittest.TestCase):
 
         self._test_forward_pass(search_space)
 
-    def test_optim_forward_pass(self) -> None:
-        search_space = NASBench1Shot1SearchSpace()
+    def _test_optim_forward_pass(self, search_space: NASBench1Shot1SearchSpace) -> None:
         loss_fn = torch.nn.CrossEntropyLoss().to(DEVICE)
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
         y = torch.randint(low=0, high=9, size=(2,)).to(DEVICE)
@@ -659,6 +675,18 @@ class TestNASBench1Shot1SearchSpace(unittest.TestCase):
         alphas_after = search_space.arch_parameters
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
             assert not torch.allclose(arch_param_before, arch_param_after)
+
+    def test_optim_forward_pass_s1(self) -> None:
+        search_space = NASBench1Shot1SearchSpace("S1", output_weights=True)
+        self._test_optim_forward_pass(search_space)
+
+    def test_optim_forward_pass_s2(self) -> None:
+        search_space = NASBench1Shot1SearchSpace("S2", output_weights=True)
+        self._test_optim_forward_pass(search_space)
+
+    def test_optim_forward_pass_s3(self) -> None:
+        search_space = NASBench1Shot1SearchSpace("S3", output_weights=True)
+        self._test_optim_forward_pass(search_space)
 
 
 class TestTransNASBench101SearchSpace(unittest.TestCase):
