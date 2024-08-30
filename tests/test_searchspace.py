@@ -108,6 +108,42 @@ def _test_toggle_lora(search_space: SearchSpace) -> None:  # noqa: C901
             assert not hasattr(module, "_original_r")
             assert module.conv.weight.requires_grad is False
 
+def _test_gradient_stats_support_without_gradients(search_space: SearchSpace) -> None:
+    x = torch.randn(2, 3, 32, 32).to(DEVICE)
+    out = search_space(x)
+
+    search_space.update_grad_stats()
+    stats = search_space.get_grad_stats()
+
+    values = tuple(v for v in stats.values())
+    assert all(v == 0 for v in values)
+    assert len(values) == len(search_space.model.cells)
+
+def _test_gradient_stats_support(search_space: SearchSpace) -> None:
+    x = torch.randn(2, 3, 32, 32).to(DEVICE)
+    _, out = search_space(x)
+    out.mean().backward()
+
+    search_space.update_grad_stats()
+    stats = search_space.get_grad_stats()
+
+    values = tuple(v for v in stats.values())
+    assert all(v != 0 for v in values)
+    assert len(values) == len(search_space.model.cells)
+
+    original_values = values
+
+    # one more backward pass
+    _, out = search_space(x)
+    out.mean().backward()
+
+    search_space.update_grad_stats()
+    stats = search_space.get_grad_stats()
+
+    values = tuple(v for v in stats.values())
+
+    assert all(original_v != new_v for original_v, new_v in zip(original_values, values))
+
 
 class TestBabyDARTS(unittest.TestCase):
     def test_arch_parameters(self) -> None:
@@ -397,7 +433,13 @@ class TestNASBench201SearchSpace(unittest.TestCase):
     def test_toggle_lora(self) -> None:
         _test_toggle_lora(NASBench201SearchSpace())
 
+    def test_gradient_stats_support_without_gradients(self) -> None:
+        search_space = NASBench201SearchSpace()
+        _test_gradient_stats_support_without_gradients(search_space)
 
+    def test_gradient_stats_support(self) -> None:
+        search_space = NASBench201SearchSpace()
+        _test_gradient_stats_support(search_space)
 class TestDARTSSearchSpace(unittest.TestCase):
     def test_arch_parameters(self) -> None:
         search_space = DARTSSearchSpace()
@@ -560,6 +602,14 @@ class TestDARTSSearchSpace(unittest.TestCase):
 
     def test_toggle_lora(self) -> None:
         _test_toggle_lora(DARTSSearchSpace())
+
+    def test_gradient_stats_support_without_gradients(self) -> None:
+        search_space = DARTSSearchSpace()
+        _test_gradient_stats_support_without_gradients(search_space)
+
+    def test_gradient_stats_support(self) -> None:
+        search_space = DARTSSearchSpace()
+        _test_gradient_stats_support(search_space)
 
 
 class TestNASBench1Shot1SearchSpace(unittest.TestCase):
@@ -803,6 +853,14 @@ class TestTransNASBench101SearchSpace(unittest.TestCase):
         model_params = search_space.model_weight_parameters()
 
         assert model_params == model_optimizer.param_groups[0]["params"]
+
+    def test_gradient_stats_support_without_gradients(self) -> None:
+        search_space = TransNASBench101SearchSpace()
+        _test_gradient_stats_support_without_gradients(search_space)
+
+    def test_gradient_stats_support(self) -> None:
+        search_space = TransNASBench101SearchSpace()
+        _test_gradient_stats_support(search_space)
 
 
 class TestRobustDARTSSearchSpace(unittest.TestCase):
