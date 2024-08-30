@@ -93,8 +93,10 @@ class SDARTSPerturbator(BasePerturbator):
         saved_params = [p.clone() for p in alphas]
         optimizer = LinfSGD(alphas, lr=2 * epsilon / steps)
         with torch.no_grad():
+            model.eval()
             _, logits = model(X)
             loss_before = loss_criterion(logits, y)
+            model.train()
 
         if random_start:
             for p in alphas:
@@ -119,8 +121,11 @@ class SDARTSPerturbator(BasePerturbator):
         optimizer.zero_grad()
         model.zero_grad()
         with torch.no_grad():
+            model.eval()
             _, logits = model(X)
             loss_after = loss_criterion(logits, y)
+            model.train()
+
         if loss_before > loss_after:
             for i, p in enumerate(alphas):
                 p.data.copy_(saved_params[i])

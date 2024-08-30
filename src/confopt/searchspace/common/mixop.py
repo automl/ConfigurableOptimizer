@@ -12,10 +12,16 @@ __all__ = ["OperationChoices"]
 
 
 class OperationChoices(nn.Module):
-    def __init__(self, ops: list[nn.Module], is_reduction_cell: bool = False) -> None:
+    def __init__(
+        self,
+        ops: list[nn.Module],
+        is_reduction_cell: bool = False,
+        device: torch.device = DEVICE,
+    ) -> None:
         super().__init__()
         self.ops = ops
         self.is_reduction_cell = is_reduction_cell
+        self.device = device
 
     def forward(self, x: torch.Tensor, alphas: list[torch.Tensor]) -> torch.Tensor:
         assert len(alphas) == len(
@@ -27,13 +33,21 @@ class OperationChoices(nn.Module):
 
         return sum(states)  # type: ignore
 
-    def change_op_channel_size(self, wider: int | None = None) -> None:
-        if wider is None or wider == 1:
+    def change_op_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,
+    ) -> None:
+        if not k and k == 1:
             return
 
         for op in self.ops:
-            if not (isinstance(op, (nn.AvgPool2d, nn.MaxPool2d))):
-                op.change_channel_size(k=1 / wider, device=DEVICE)  # type: ignore
+            # if not (isinstance(op, (nn.AvgPool2d, nn.MaxPool2d))):
+            op.change_channel_size(
+                k=k, num_channels_to_add=num_channels_to_add, device=self.device
+            )  # type: ignore
+            if hasattr(op, "__post__init__"):
+                op.__post__init__()
 
 
 class OperationBlock(nn.Module):
@@ -91,14 +105,20 @@ class OperationBlock(nn.Module):
 
         return self.forward_method(x, self.ops, alphas)
 
-    def change_op_channel_size(self, wider: int | None = None) -> None:
-        if wider is None:
-            wider = self.partial_connector.k if self.partial_connector else 1
-        if wider == 1:
+    def change_op_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,
+    ) -> None:
+        if not k and not num_channels_to_add:
+            k = self.partial_connector.k if self.partial_connector else 1
+        if k is not None and k == 1:
             return
 
         for op in self.ops:
-            if not (isinstance(op, (nn.AvgPool2d, nn.MaxPool2d))):
-                op.change_channel_size(k=1 / wider, device=self.device)  # type: ignore
-                if hasattr(op, "__post__init__"):
-                    op.__post__init__()
+            # if not (isinstance(op, (nn.AvgPool2d, nn.MaxPool2d))):
+            op.change_channel_size(
+                k=k, num_channels_to_add=num_channels_to_add, device=self.device
+            )  # type: ignore
+            if hasattr(op, "__post__init__"):
+                op.__post__init__()

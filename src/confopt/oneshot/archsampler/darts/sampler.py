@@ -20,15 +20,10 @@ class DARTSSampler(BaseSampler):
             arch_combine_fn=arch_combine_fn,
         )
 
-    def sample_alphas(
-        self, arch_parameters: list[torch.Tensor]
-    ) -> list[torch.Tensor] | None:
-        sampled_alphas = []
-        for alpha in arch_parameters:
-            if self.arch_combine_fn == "default":
-                sampled_alpha = torch.nn.functional.softmax(alpha, dim=-1)
-            elif self.arch_combine_fn == "sigmoid":
-                sampled_alpha = torch.nn.functional.sigmoid(alpha)
+    def sample(self, alpha: torch.Tensor) -> torch.Tensor:
+        if self.arch_combine_fn == "default":
+            sampled_alpha = torch.nn.functional.softmax(alpha, dim=-1)
+        elif self.arch_combine_fn == "sigmoid":
+            sampled_alpha = torch.nn.functional.sigmoid(alpha)
 
-            sampled_alphas.append(sampled_alpha)
-        return sampled_alphas
+        return sampled_alpha

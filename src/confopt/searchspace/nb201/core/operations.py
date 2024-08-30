@@ -11,7 +11,7 @@ from confopt.oneshot.weightentangler import (
     WeightEntanglementSequential,
 )
 from confopt.searchspace.common import Conv2DLoRA
-import confopt.utils.reduce_channels as rc
+import confopt.utils.change_channel_size as ch
 
 __all__ = ["OPS", "ResNetBasicblock", "SearchSpaceNames", "ReLUConvBN"]
 
@@ -215,8 +215,10 @@ class ReLUConvBN(ConvolutionalWEModule):
             This method dynamically changes the number of output channels in the
             ReLUConvBN block.
         """
-        self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
-        self.op[2] = rc.reduce_bn_features(self.op[2], k, device)
+        self.op[1], index = ch.change_channel_size_conv(self.op[1], k=k, device=device)
+        self.op[2], _ = ch.change_features_bn(
+            self.op[2], k=k, index=index, device=device
+        )
 
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
@@ -319,9 +321,11 @@ class SepConv(ConvolutionalWEModule):
             This method dynamically changes the number of output channels in the SepConv
             block.
         """
-        self.op[1] = rc.reduce_conv_channels(self.op[1], k, device)
-        self.op[2] = rc.reduce_conv_channels(self.op[2], k, device)
-        self.op[3] = rc.reduce_bn_features(self.op[3], k, device)
+        if k > 1:
+            self.op[1] = ch.reduce_conv_channels(self.op[1], k=k, device=device)
+            self.op[2] = ch.reduce_conv_channels(self.op[2], k=k, device=device)
+            self.op[3] = ch.reduce_bn_features(self.op[3], k=k, device=device)
+        # for k < 1, in SepConv according to DRNAS there is no wider() function
 
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
@@ -550,6 +554,7 @@ class ResNetBasicblock(nn.Module):
             This method does not perform any operations, as the number of channels in
             this block is fixed.
         """
+        # this function is not implemented in DRNAS for wider() or partial connection
 
 
 class Pooling(nn.Module):
@@ -632,7 +637,7 @@ class Pooling(nn.Module):
             preprocessing block (if used).
         """
         if self.preprocess:
-            self.preprocess.change_channel_size(k, device)
+            self.preprocess.change_channel_size(k=k, device=device)
 
 
 class Identity(nn.Module):
@@ -861,15 +866,56 @@ class FactorizedReduce(nn.Module):
             This method dynamically changes the number of output channels in the block's
             convolutional layers and BatchNorm.
         """
-        if self.stride == 2:
-            for i in range(2):
-                self.convs[i] = rc.reduce_conv_channels(self.convs[i], k, device)
-        elif self.stride == 1:
-            self.conv = rc.reduce_conv_channels(self.conv, k, device)
-        else:
-            raise ValueError(f"Invalid stride: {self.stride}")
+        if k > 1:
+            if self.stride == 2:
+                for i in range(2):
+                    self.convs[i] = ch.reduce_conv_channels(
+                        self.convs[i], k=k, device=device
+                    )
+            elif self.stride == 1:
+                self.conv = ch.reduce_conv_channels(self.conv, k=k, device=device)
+            else:
+                raise ValueError(f"Invalid stride: {self.stride}")
+            self.bn = ch.reduce_bn_features(self.bn, k)
+            return
 
-        self.bn = rc.reduce_bn_features(self.bn, k)
+        if self.stride == 2:
+            num_channels_to_add_C_in = int(
+                max(1, self.convs[0].in_channels // int(1 / k - 1))
+            )
+            num_channels_to_add_C_out = int(
+                max(1, self.convs[0].out_channels // int(1 / k - 1))
+            )
+            self.convs[0], _ = ch.increase_in_channel_size_conv(
+                self.convs[0], num_channels_to_add_C_in
+            )
+            self.convs[0], index1 = ch.increase_out_channel_size_conv(
+                self.convs[0], num_channels_to_add_C_out // 2
+            )
+            self.convs[1], _ = ch.increase_in_channel_size_conv(
+                self.convs[1], num_channels_to_add_C_in
+            )
+            self.convs[1], index2 = ch.increase_out_channel_size_conv(
+                self.convs[1],
+                num_channels_to_add_C_out - num_channels_to_add_C_out // 2,
+            )
+            self.bn, _ = ch.increase_num_features_bn(
+                self.bn,
+                num_channels_to_add_C_out,
+                index=torch.cat([index1, index2]),
+            )
+        elif self.stride == 1:
+            num_channels_to_add_C_in = int(max(1, self.conv.in_channels // k))
+            num_channels_to_add_C_out = int(max(1, self.conv.out_channels // k))
+            self.conv, _ = ch.increase_in_channel_size_conv(
+                self.conv, num_channels_to_add_C_in
+            )
+            self.conv, index = ch.increase_out_channel_size_conv(
+                self.conv, num_channels_to_add_C_out
+            )
+            self.bn, _ = ch.increase_num_features_bn(
+                self.bn, num_channels_to_add_C_out, index=index
+            )
 
     def activate_lora(self, r: int) -> None:
         if self.stride == 2:

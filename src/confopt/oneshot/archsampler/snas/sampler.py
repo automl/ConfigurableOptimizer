@@ -33,15 +33,8 @@ class SNASSampler(BaseSampler):
             self.temp_init - self.temp_min
         ) + self.temp_min
 
-    def sample_alphas(
-        self, arch_parameters: list[torch.Tensor]
-    ) -> list[torch.Tensor] | None:
-        sampled_alphas = []
-        for alpha in arch_parameters:
-            sampled_alphas.append(self.sample(alpha, self.curr_temp))
-        return sampled_alphas
-
-    def sample(self, alpha: torch.Tensor, temperature: float) -> torch.Tensor:
+    def sample(self, alpha: torch.Tensor) -> torch.Tensor:
+        temperature = self.curr_temp
         weights = F.gumbel_softmax(alpha, temperature)
         return weights
 

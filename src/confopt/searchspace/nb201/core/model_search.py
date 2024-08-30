@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 import math
+from typing import Callable
 
 import torch
 from torch import nn
@@ -134,7 +135,9 @@ class NB201SearchModel(nn.Module):
         self.beta_parameters = nn.Parameter(
             1e-3 * torch.randn(num_edge)  # type: ignore
         )
-        self.weights: dict[str, list[torch.Tensor]] = {}
+        self.weights_grad: list[torch.Tensor] = []
+        self.grad_hook_handlers: list[torch.utils.hooks.RemovableHandle] = []
+
         self.num_edges = num_edge
         self.num_nodes = max_nodes - 1
         self.num_ops = len(search_space)
@@ -270,7 +273,32 @@ class NB201SearchModel(nn.Module):
             weights_to_sample = self._compute_arch_attention(weights_to_sample)
 
         weights = self.sample(weights_to_sample)
+
+        if self.mask is not None:
+            weights = normalize_params(weights, self.mask)
+
         return weights
+
+    def reset_hooks(self) -> None:
+        for hook in self.grad_hook_handlers:
+            hook.remove()
+
+        self.grad_hook_handlers = []
+
+    def save_gradient(self) -> Callable:
+        def hook(grad: torch.Tensor) -> None:
+            self.weights_grad.append(grad)
+
+        return hook
+
+    def save_weight_grads(
+        self,
+        weights: torch.Tensor,
+    ) -> None:
+        if not self.training:
+            return
+        grad_hook = weights.register_hook(self.save_gradient())
+        self.grad_hook_handlers.append(grad_hook)
 
     def forward(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the model.
@@ -283,29 +311,19 @@ class NB201SearchModel(nn.Module):
             - The output tensor after the forward pass.
             - The logits tensor produced by the model.
         """
+        self.reset_hooks()
         if self.edge_normalization:
             return self.edge_normalization_forward(inputs)
 
-        self.weights["alphas"] = []
+        self.weights_grad = []
 
         weights = self.sample_weights()
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
             if isinstance(cell, SearchCell):
-                # TODO fix layer alignment
-                alphas = weights
-                # Retain Grads for weights
-                if self.training:
-                    if isinstance(alphas, list):
-                        for alpha in alphas:
-                            alpha.retain_grad()
-                    else:
-                        assert isinstance(alphas, torch.Tensor)
-                        alphas.retain_grad()
-                    self.weights["alphas"].append(alphas)
-                if self.mask is not None:
-                    alphas = normalize_params(alphas, self.mask)
+                alphas = weights.clone()
+                self.save_weight_grads(alphas)
                 feature = cell(feature, alphas)
             else:
                 feature = cell(feature)
@@ -321,14 +339,15 @@ class NB201SearchModel(nn.Module):
         self,
         inputs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        self.weights["alphas"] = []
+        self.weights_grad = []
+
         weights = self.sample_weights()
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
             if isinstance(cell, SearchCell):
-                # TODO fix layer alignment
-                alphas = weights
+                alphas = weights.clone()
+                self.save_weight_grads(alphas)
                 betas = torch.empty((0,)).to(alphas[0].device)  # type: ignore
                 for v in range(1, self.max_nodes):
                     idx_nodes = []
@@ -339,18 +358,7 @@ class NB201SearchModel(nn.Module):
                         self.beta_parameters[idx_nodes], dim=-1
                     )
                     betas = torch.cat([betas, beta_node_v], dim=0)
-                # Retain Grads for weights
-                if self.training:
-                    if isinstance(alphas, list):
-                        for alpha in alphas:
-                            alpha.retain_grad()
-                    else:
-                        assert isinstance(alphas, torch.Tensor)
-                        alphas.retain_grad()
-                    self.weights["alphas"].append(alphas)
 
-                if self.mask is not None:
-                    alphas = normalize_params(alphas, self.mask)
                 feature = cell(feature, alphas, betas)
             else:
                 feature = cell(feature)
@@ -362,19 +370,21 @@ class NB201SearchModel(nn.Module):
 
         return out, logits
 
-    def get_arch_grads(self) -> list[torch.Tensor]:
+    def get_arch_grads(self, only_first_and_last: bool = False) -> list[torch.Tensor]:
         grads = []
-        for alphas in self.weights["alphas"]:
-            if isinstance(alphas, list):
-                alphas_grads = [alpha.grad.data.clone().detach() for alpha in alphas]
-                grads.append(torch.stack(alphas_grads).detach().reshape(-1))
-            else:
-                grads.append(alphas.grad.data.clone().detach().reshape(-1))
+        if only_first_and_last:
+            grads.append(self.weights_grad[0].reshape(-1))
+            grads.append(self.weights_grad[1].reshape(-1))
+        else:
+            for alphas in self.weights_grad:
+                grads.append(alphas.reshape(-1))
 
         return grads
 
-    def _get_mean_layer_alignment_score(self) -> float:
-        grads = self.get_arch_grads()
+    def get_mean_layer_alignment_score(
+        self, only_first_and_last: bool = False
+    ) -> float:
+        grads = self.get_arch_grads(only_first_and_last)
         mean_score = calc_layer_alignment_score(grads)
 
         if math.isnan(mean_score):

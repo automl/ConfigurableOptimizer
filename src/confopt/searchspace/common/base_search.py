@@ -129,6 +129,16 @@ class LayerAlignmentScoreSupport(ModelWrapper):
 
         """
 
+    @abstractmethod
+    def get_first_and_last_layer_alignment_score(self) -> tuple[float, float]:
+        """Get the layer alignment score for the first and last layer of the model.
+
+        Returns:
+            tuple[float, float]: The layer alignment score of the first and last layer
+            of normal and reduction cells.
+
+        """
+
 
 class OperationStatisticsSupport(ModelWrapper):
     @abstractmethod

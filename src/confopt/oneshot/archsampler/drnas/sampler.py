@@ -21,17 +21,15 @@ class DRNASSampler(BaseSampler):
             arch_combine_fn=arch_combine_fn,
         )
 
-    def sample_alphas(self, arch_parameters: torch.Tensor) -> list[torch.Tensor]:
-        sampled_alphas = []
-        for alpha in arch_parameters:
-            sampled_alphas.append(self.sample(alpha))
-        return sampled_alphas
-
     def sample(self, alpha: torch.Tensor) -> torch.Tensor:
-        beta = F.elu(alpha) + 1
-        weights = torch.distributions.dirichlet.Dirichlet(beta).rsample()
+        weights_list = []
+        for alpha_edge in alpha:
+            beta = F.elu(alpha_edge) + 1
+            weights = torch.distributions.dirichlet.Dirichlet(beta).rsample()
 
-        if self.arch_combine_fn == "sigmoid":
-            weights = torch.nn.functional.sigmoid(weights)
+            if self.arch_combine_fn == "sigmoid":
+                weights = torch.nn.functional.sigmoid(weights)
+            weights_list.append(weights)
 
-        return weights  # type: ignore
+        weights = torch.stack(weights_list)
+        return weights

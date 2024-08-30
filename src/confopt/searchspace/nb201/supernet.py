@@ -110,7 +110,10 @@ class NASBench201SearchSpace(
         self.model.apply(partial_fn)
 
     def get_mean_layer_alignment_score(self) -> tuple[float, float]:
-        return self.model._get_mean_layer_alignment_score(), 0
+        return self.model.get_mean_layer_alignment_score(), 0
+
+    def get_first_and_last_layer_alignment_score(self) -> tuple[float, float]:
+        return self.model.get_mean_layer_alignment_score(only_first_and_last=True), 0
 
     def get_num_skip_ops(self) -> dict[str, int]:
         alphas_normal = self.model.arch_parameters

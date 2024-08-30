@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 import math
-from typing import Literal
+from typing import Callable, Literal
 import warnings
 
 import torch
@@ -262,7 +262,8 @@ class Network(nn.Module):
 
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.classifier = nn.Linear(C_prev, num_classes)
-        self.weights: dict[str, list[torch.Tensor]] = {}
+        self.weights_grad: dict[str, list[torch.Tensor]] = {}
+        self.grad_hook_handlers: list[torch.utils.hooks.RemovableHandle] = []
 
         # Multi-head attention for architectural parameters
         self.is_arch_attention_enabled = False  # disabled by default
@@ -292,19 +293,25 @@ class Network(nn.Module):
         # Replace this function on the fly to change the sampling method
         return F.softmax(alphas, dim=-1)
 
-    def retain_weight_grad(
-        self, weights: torch.Tensor, weight_type: Literal["reduce", "normal"]
+    def reset_hooks(self) -> None:
+        for hook in self.grad_hook_handlers:
+            hook.remove()
+        self.grad_hook_handlers = []
+
+    def save_gradient(self, cell_type: Literal["normal", "reduce"]) -> Callable:
+        def hook(grad: torch.Tensor) -> None:
+            self.weights_grad[cell_type].append(grad)
+
+        return hook
+
+    def save_weight_grads(
+        self, weights: torch.Tensor, cell_type: Literal["reduce", "normal"]
     ) -> None:
-        # Retain grads for calculating layer alignment score
-        assert weight_type in ["reduce", "normal"]
-        if self.training:
-            if isinstance(weights, list):
-                for weight in weights:
-                    weight.retain_grad()
-            else:
-                assert isinstance(weights, torch.Tensor)
-                weights.retain_grad()
-        self.weights[weight_type].append(weights)
+        assert cell_type in ["reduce", "normal"]
+        if not self.training:
+            return
+        grad_hook = weights.register_hook(self.save_gradient(cell_type=cell_type))
+        self.grad_hook_handlers.append(grad_hook)
 
     def sample_weights(self) -> tuple[torch.Tensor, torch.Tensor]:
         if self.projection_mode:
@@ -328,6 +335,10 @@ class Network(nn.Module):
         weights_normal = self.sample(weights_normal_to_sample)
         weights_reduce = self.sample(weights_reduce_to_sample)
 
+        if self.mask is not None:
+            weights_normal = normalize_params(weights_normal, self.mask[0])
+            weights_reduce = normalize_params(weights_reduce, self.mask[1])
+
         return weights_normal, weights_reduce
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -343,27 +354,26 @@ class Network(nn.Module):
             - The output tensor after the forward pass.
             - The logits tensor produced by the model.
         """
+        self.reset_hooks()
         if self.edge_normalization:
             return self.edge_normalization_forward(x)
 
         s0 = s1 = self.stem(x)
-        self.weights["normal"] = []
-        self.weights["reduce"] = []
+        self.weights_grad["normal"] = []
+        self.weights_grad["reduce"] = []
 
         weights_normal, weights_reduce = self.sample_weights()
 
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
-                weights = weights_reduce
-                self.retain_weight_grad(weights, "reduce")
-                if self.mask is not None:
-                    weights = normalize_params(weights, self.mask[1])
+                weights = weights_reduce.clone()
+                self.save_weight_grads(weights, cell_type="reduce")
             else:
-                weights = weights_normal
-                self.retain_weight_grad(weights, "normal")
-                if self.mask is not None:
-                    weights = normalize_params(weights, self.mask[0])
+                weights = weights_normal.clone()
+                self.save_weight_grads(weights, cell_type="normal")
+
             s0, s1 = s1, cell(s0, s1, weights)
+
         out = self.global_pooling(s1)
         logits = self.classifier(out.view(out.size(0), -1))
         return torch.squeeze(out, dim=(-1, -2)), logits
@@ -375,17 +385,15 @@ class Network(nn.Module):
         # TODO: normalization of alphas
 
         s0 = s1 = self.stem(inputs)
-        self.weights["normal"] = []
-        self.weights["reduce"] = []
+        self.weights_grad["normal"] = []
+        self.weights_grad["reduce"] = []
 
         weights_normal, weights_reduce = self.sample_weights()
 
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
-                weights = weights_reduce
-                self.retain_weight_grad(weights, "reduce")
-                if self.mask is not None:
-                    weights = normalize_params(weights, self.mask[1])
+                weights = weights_reduce.clone()
+                self.save_weight_grads(weights, cell_type="reduce")
                 n = 3
                 start = 2
                 weights2 = F.softmax(self.betas_reduce[0:2], dim=-1)
@@ -396,10 +404,8 @@ class Network(nn.Module):
                     n += 1
                     weights2 = torch.cat([weights2, tw2], dim=0)
             else:
-                weights = weights_normal
-                self.retain_weight_grad(weights, "normal")
-                if self.mask is not None:
-                    weights = normalize_params(weights, self.mask[0])
+                weights = weights_normal.clone()
+                self.save_weight_grads(weights, cell_type="normal")
                 n = 3
                 start = 2
                 weights2 = F.softmax(self.betas_normal[0:2], dim=-1)
@@ -537,26 +543,28 @@ class Network(nn.Module):
         )
         return genotype
 
-    def get_arch_grads(self) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
-        def get_grads(alphas_list: list[torch.Tensor]) -> list[torch.Tensor]:
+    def get_arch_grads(
+        self, only_first_and_last: bool = False
+    ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+        def get_grads(alphas_grads_list: list[torch.Tensor]) -> list[torch.Tensor]:
             grads = []
-            for alphas in alphas_list:
-                if isinstance(alphas, list):
-                    alphas_grads = [
-                        alpha.grad.data.clone().detach() for alpha in alphas
-                    ]
-                    grads.append(torch.stack(alphas_grads).detach().reshape(-1))
-                else:
-                    grads.append(alphas.grad.data.clone().detach().reshape(-1))
+            if only_first_and_last:
+                grads.append(alphas_grads_list[0].reshape(-1))
+                grads.append(alphas_grads_list[-1].reshape(-1))
+            else:
+                for alphas_grad in alphas_grads_list:
+                    grads.append(alphas_grad.reshape(-1))
 
             return grads
 
-        grads_normal = get_grads(self.weights["normal"])
-        grads_reduce = get_grads(self.weights["reduce"])
+        grads_normal = get_grads(self.weights_grad["normal"])
+        grads_reduce = get_grads(self.weights_grad["reduce"])
         return grads_normal, grads_reduce
 
-    def _get_mean_layer_alignment_score(self) -> tuple[float, float]:
-        grads_normal, grads_reduce = self.get_arch_grads()
+    def get_mean_layer_alignment_score(
+        self, only_first_and_last: bool = False
+    ) -> tuple[float, float]:
+        grads_normal, grads_reduce = self.get_arch_grads(only_first_and_last)
         mean_score_normal = calc_layer_alignment_score(grads_normal)
         mean_score_reduce = calc_layer_alignment_score(grads_reduce)
 
