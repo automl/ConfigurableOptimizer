@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn  # noqa: PLR0402
 
 from confopt.oneshot.base_component import OneShotComponent
-from confopt.utils import reset_gm_score_attributes
+from confopt.utils import AverageMeter, reset_gm_score_attributes
 
 
 class ModelWrapper(nn.Module, ABC):
@@ -293,3 +293,61 @@ class FLOPSRegTermSupport(ModelWrapper):
             torch.Tensor: The FLOPS regularization term of the model.
         """
         ...
+
+
+class GradientStatsSupport(ModelWrapper):
+    def __init__(self, model: nn.Module):
+        super().__init__(model)
+        self.model.is_gradient_stats_enabled = True
+        self.n_cells = len(self.model.cells)
+        self.cell_grads_meters = {idx: AverageMeter() for idx in range(self.n_cells)}
+
+    def reset_grad_stats(self) -> None:
+        for cell_grad_meter in self.cell_grads_meters.values():
+            cell_grad_meter.reset()
+
+    def _calculate_gradient_norm(self, model: nn.Module) -> float:
+        total_norm = 0.0
+
+        for param in model.parameters():
+            if param.grad is not None:
+                param_norm = param.grad.data.norm(2)
+                total_norm += param_norm.item() ** 2
+        total_norm = total_norm**0.5
+
+        return total_norm
+
+    def get_grad_stats(self) -> dict[str, Any]:
+        """Get the gradient statistics of the model.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the gradient statistics
+            of the model.
+        """
+        cell_grad_stats = self.get_cell_grad_stats()
+
+        all_stats = {}
+        all_stats.update(cell_grad_stats)
+        # all_stats.update(other_stats) # Add other stats here
+
+        return all_stats
+
+    def get_cell_grad_stats(self) -> dict[str, Any]:
+        """Get the gradient statistics of the cells in the model.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the gradient statistics of
+            the cells in the model.
+        """
+        cell_grad_stats = {}
+        for idx, cell_grad_meter in self.cell_grads_meters.items():
+            cell_grad_stats[
+                f"gradient_stats/cell_{idx}_grad_norm"
+            ] = cell_grad_meter.avg
+
+        return cell_grad_stats
+
+    def update_grad_stats(self) -> None:
+        """Compute the gradient statistics of the cells in the model."""
+        for idx, cell in enumerate(self.model.cells):
+            self.cell_grads_meters[idx].update(self._calculate_gradient_norm(cell))

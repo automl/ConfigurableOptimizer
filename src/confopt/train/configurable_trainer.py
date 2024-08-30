@@ -18,6 +18,8 @@ from confopt.dataset import AbstractData
 from confopt.searchspace import SearchSpace
 from confopt.searchspace.common.base_search import (
     GradientMatchingScoreSupport,
+    GradientStatsSupport,
+    LayerAlignmentScoreSupport,
     OperationStatisticsSupport,
 )
 from confopt.utils import (
@@ -274,6 +276,12 @@ class ConfigurableTrainer:
             }
             self.logger.update_wandb_logs(layer_alignment_metric)
 
+            # Log gradient stats
+            if isinstance(unwrapped_network, GradientStatsSupport):
+                grad_stats = unwrapped_network.get_grad_stats()
+                self.logger.update_wandb_logs(grad_stats)
+                unwrapped_network.reset_grad_stats()
+
             # Create checkpoints
             (
                 self.valid_losses[epoch],
@@ -432,9 +440,7 @@ class ConfigurableTrainer:
             base_loss = search_space_handler.add_reg_terms(unwrapped_network, base_loss)
             base_loss.backward()
 
-            if isinstance(unwrapped_network, OperationStatisticsSupport) and (
-                layer_alignment_scores is not None
-            ):
+            if isinstance(unwrapped_network, LayerAlignmentScoreSupport):
                 (
                     score_normal,
                     score_reduce,
@@ -468,6 +474,9 @@ class ConfigurableTrainer:
                 unwrapped_network, GradientMatchingScoreSupport
             ):
                 unwrapped_network.preserve_grads()  # type: ignore
+
+            if isinstance(unwrapped_network, GradientStatsSupport):
+                unwrapped_network.update_grad_stats()
 
             w_optimizer.zero_grad()
             if not is_warm_epoch:

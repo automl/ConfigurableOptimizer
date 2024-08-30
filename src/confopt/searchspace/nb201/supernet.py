@@ -9,6 +9,7 @@ from torch import nn
 from confopt.searchspace.common import (
     ArchAttentionSupport,
     GradientMatchingScoreSupport,
+    GradientStatsSupport,
     LayerAlignmentScoreSupport,
     OperationStatisticsSupport,
     PerturbationArchSelectionSupport,
@@ -33,6 +34,7 @@ class NASBench201SearchSpace(
     OperationStatisticsSupport,
     LayerAlignmentScoreSupport,
     PerturbationArchSelectionSupport,
+    GradientStatsSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
         """Initialize the custom search model of NASBench201SearchSpace.
