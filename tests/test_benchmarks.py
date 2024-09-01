@@ -89,13 +89,13 @@ tnb101_genotype_fail = TNB101Genotype(
 tnb101_genotype = TNB101Genotype(
     node_edge_dict={
         1: [("nor_conv_3x3", 0)],
-        2: [("nor_conv_3x3", 0), ("nor_conv_3x3", 1)],
-        3: [("skip_connect", 0), ("skip_connect", 1), ("nor_conv_1x1", 2)],
+        2: [("nor_conv_3x3", 0), ("nor_conv_1x1", 1)],
+        3: [("skip_connect", 0), ("none", 1), ("nor_conv_1x1", 2)],
     },
-    op_idx_list=[3, 3, 3, 1, 1, 2],
+    op_idx_list=[3, 3, 2, 1, 0, 2],
 )
 
-test_tnb101_acc_top1 = 52.55772399902344
+test_tnb101_acc_top1 = 50.8658447265625
 test_tnb101_fail_acc_top1 = 29.433717727661133
 
 
