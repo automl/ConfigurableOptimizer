@@ -18,6 +18,9 @@ def configure_optimizer(
     # Iterate over the parameters in the new optimizer
     for i, p in enumerate(optimizer_new.param_groups[0]["params"]):
         # If the parameter does not have a 'raw_id', copy the state directly
+        if not hasattr(p, "optimizer_id"):
+            p.optimizer_id = i
+            continue
         if not hasattr(p, "raw_id") and not hasattr(p, "optimizer_id"):
             optimizer_new.state[p] = optimizer_old.state[p]
             p.optimizer_id = i
