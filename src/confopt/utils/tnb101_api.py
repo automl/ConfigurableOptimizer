@@ -1,3 +1,7 @@
+"""TransNASBenchAPI class is taken from yawen-d/TransNASBench.
+Original code can be found at:
+https://github.com/yawen-d/TransNASBench/blob/main/api/api.py.
+"""
 from __future__ import annotations
 
 import copy
