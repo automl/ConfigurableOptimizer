@@ -195,7 +195,6 @@ class Cell(nn.Module):
             self.preprocess0 = ReLUConvBN(
                 self.C_prev_prev, self.C, 1, 1, 0, affine=False
             )  # type: ignore
-        # TODO: copy optimizer id to new preprocess0
 
     def change_op_channel_size(
         self,
@@ -872,7 +871,9 @@ class Network(nn.Module):
     def create_new_cell(self, pos: int) -> Cell:
         prev_cell = self.cells[pos - 1]
         new_cell = copy.deepcopy(prev_cell)
-        # TODO: copy optimizer_id refereces to new_cell
+        for new_param, param in zip(new_cell.parameters(), prev_cell.parameters()):
+            if hasattr(param, "optimizer_id"):
+                new_param.optimizer_id = param.optimizer_id
 
         new_cell.C = prev_cell.C
         new_cell.C_prev = prev_cell.C * self._multiplier
