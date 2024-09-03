@@ -9,6 +9,7 @@ import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common import OperationChoices
 from confopt.searchspace.darts.core.operations import ReLUConvBN
+from confopt.utils import normalize_params, prune, set_ops_to_prune
 
 from .operations import OPS, ConvBnRelu
 from .search_spaces.genotypes import PRIMITIVES, NASBench1Shot1ConfoptGenotype
@@ -153,6 +154,11 @@ class Cell(nn.Module):
             tensor_list, dim=1
         )
 
+    def prune_ops(self, mask: torch.Tensor) -> None:
+        for choice_block_idx in range(self._steps):
+            edge_mask = mask[choice_block_idx]
+            set_ops_to_prune(self._choice_blocks[choice_block_idx].mixed_op, edge_mask)
+
 
 class Network(nn.Module):
     def __init__(
@@ -203,6 +209,7 @@ class Network(nn.Module):
 
         self.classifier = nn.Linear(C_prev, num_classes)
         self._initialize_alphas()
+        self.mask = None
 
     def new(self) -> Network:
         model_new = Network(
@@ -221,8 +228,23 @@ class Network(nn.Module):
         # Replace this function on the fly to change the sampling method
         return F.softmax(alphas, dim=-1)
 
+    def sample_weights(
+        self,
+    ) -> tuple[torch.Tensor, torch.Tensor | None, list[torch.Tensor]]:
+        mixed_op_weights = self.sample(self._arch_parameters[0])
+        output_weights = (
+            self.sample(self._arch_parameters[1]) if self._output_weights else None
+        )
+        input_weights = [self.sample(alpha) for alpha in self._arch_parameters[2:]]
+
+        if self.mask is not None:
+            mixed_op_weights = normalize_params(mixed_op_weights, self.mask)
+
+        return mixed_op_weights, output_weights, input_weights
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # NASBench only has one input to each cell
+        mixed_op_weights, output_weights, input_weights = self.sample_weights()
         s0 = self.stem(x)
         for i, cell in enumerate(self.cells):
             if i in [self._layers // 3, 2 * self._layers // 3]:
@@ -231,16 +253,18 @@ class Network(nn.Module):
                 s0 = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)(s0)
 
             # Sample mixed_op weights for the choice blocks in the graph
-            mixed_op_weights = self.sample(self._arch_parameters[0])
+            mixed_op_weights_cell = mixed_op_weights.clone()
 
             # Sample the output weights (if applicable)
-            output_weights = (
-                self.sample(self._arch_parameters[1]) if self._output_weights else None
+            output_weights_cell = (
+                output_weights.clone() if self._output_weights else None  # type: ignore
             )
 
             # Sample the input weights for the nodes in the cell
-            input_weights = [self.sample(alpha) for alpha in self._arch_parameters[2:]]
-            s0 = cell(s0, mixed_op_weights, output_weights, input_weights)
+            input_weights_cell = [weight.clone() for weight in input_weights]
+            s0 = cell(
+                s0, mixed_op_weights_cell, output_weights_cell, input_weights_cell
+            )
 
         # Include one more preprocessing step here
         s0 = self.postprocess(s0)  # [N, C_max * (steps + 1), w, h] -> [N, C_max, w, h]
@@ -364,3 +388,18 @@ class Network(nn.Module):
         genotype = NASBench1Shot1ConfoptGenotype(matrix=adjacency_list, ops=node_list)
 
         return genotype
+
+    def prune(self, prune_fraction: float) -> None:
+        # mask is only applied to mixedop weights,
+        # not to input and output weights
+
+        assert prune_fraction < 1, "Prune fraction should be less than 1"
+        assert prune_fraction >= 0, "Prune fraction greater or equal to 0"
+
+        num_ops = len(PRIMITIVES)
+        top_k = num_ops - int(num_ops * prune_fraction)
+
+        self.mask = prune(self.alphas_mixed_op, top_k, self.mask)
+
+        for cell in self.cells:
+            cell.prune_ops(self.mask)
