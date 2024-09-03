@@ -665,20 +665,15 @@ class ConfigurableTrainer:
 
         genotype = unwrap_model(network).model.genotype()
 
-        result_train, rusult_valid, result_test = self.benchmark_api.query(
+        benchmark_metric = self.benchmark_api.query(
             genotype, dataset=self.query_dataset
         )
+        test_acc = benchmark_metric.get("benchmark/test_top1", 0)
         self.logger.log(
-            f"Benchmark Results for {self.query_dataset} -> train: {result_train}, "
-            + f"valid: {rusult_valid}, test: {result_test}"
+            f"Benchmark Results for {self.query_dataset} -> test: {test_acc}"
         )
 
-        log_dict = {
-            "benchmark/train": result_train,
-            "benchmark/valid": rusult_valid,
-            "benchmark/test": result_test,
-        }
-        self.logger.update_wandb_logs(log_dict)
+        self.logger.update_wandb_logs(benchmark_metric)
 
     def _initialize_lora_modules(
         self,

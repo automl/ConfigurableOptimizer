@@ -14,7 +14,7 @@ class BenchmarkBase:
         genotype: Any,
         dataset: str = "cifar10",
         **api_kwargs: str,  # type: ignore
-    ) -> tuple[float, float, float]:
+    ) -> dict:
         pass
 
     @abstractmethod

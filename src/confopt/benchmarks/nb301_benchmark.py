@@ -5,9 +5,8 @@ from typing import Literal
 
 import nasbench301 as nb301
 
-from confopt.searchspace.darts.core.genotypes import Genotype
-
-from .benchmark_base import BenchmarkBase
+from confopt.benchmarks.benchmark_base import BenchmarkBase
+from confopt.searchspace.darts.core.genotypes import DARTSGenotype as Genotype
 
 
 class NB301Benchmark(BenchmarkBase):
@@ -51,13 +50,14 @@ class NB301Benchmark(BenchmarkBase):
 
     def query(
         self, genotype: Genotype, dataset: str = "cifar10", **api_kwargs: str
-    ) -> tuple[float, float, float]:
+    ) -> dict:
         if dataset != "cifar10":
             raise ValueError(f"Dataset {dataset} is not supported with NB301 API")
         result_test = self.api.predict(
             config=genotype, representation="genotype", **api_kwargs
         )
-        return 0.0, 0.0, result_test
+        results_metric = {"benchmark/test_top1": result_test}
+        return results_metric
 
 
 if __name__ == "__main__":

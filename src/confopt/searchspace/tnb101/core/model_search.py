@@ -10,6 +10,7 @@ from confopt.utils import prune, set_ops_to_prune
 from confopt.utils.normalize_params import normalize_params
 
 from . import operations as ops
+from .genotypes import TNB101Genotype
 from .operations import OPS, TRANS_NAS_BENCH_101
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -40,7 +41,7 @@ class TNB101SearchModel(nn.Module):
             track_running_stats: used for torch.nn.BatchNorm2D.
         """
         super().__init__()
-        assert stride == 1 or stride == 2, f"invalid stride {stride}"
+        assert stride in (1, 2), f"invalid stride {stride}"
 
         self.C = C
         self.stride = stride
@@ -293,6 +294,28 @@ class TNB101SearchModel(nn.Module):
         attn_alphas, _ = self.multihead_attention(alphas, alphas, alphas)
         return attn_alphas
 
+    def genotype(self) -> TNB101Genotype:
+        node_edge_dict: dict[int, list[tuple[str, int]]] = {}
+        op_idx_list = []
+
+        if self.is_arch_attention_enabled:
+            arch_parameters = self._compute_arch_attention(self._arch_parameters)
+        else:
+            arch_parameters = self._arch_parameters
+        edge2index = self.cells[0].edge2index
+
+        for i in range(1, self.max_nodes):
+            for j in range(i):
+                node_str = f"{i}<-{j}"
+                max_idx = torch.argmax(arch_parameters[edge2index[node_str]])
+                if i in node_edge_dict:
+                    node_edge_dict[i].append((self.op_names[max_idx], j))
+                else:
+                    node_edge_dict[i] = [(self.op_names[max_idx], j)]
+                op_idx_list.append(max_idx.item())
+
+        return TNB101Genotype(node_edge_dict=node_edge_dict, op_idx_list=op_idx_list)
+
 
 class TNB101SearchCell(nn.Module):
     expansion = 1
@@ -319,7 +342,7 @@ class TNB101SearchCell(nn.Module):
             track_running_stats: used for torch.nn.BatchNorm2D.
         """
         super().__init__()
-        assert stride == 1 or stride == 2, f"invalid stride {stride}"
+        assert stride in (1, 2), f"invalid stride {stride}"
 
         self.op_names = deepcopy(op_names)
         self.edges = nn.ModuleDict()

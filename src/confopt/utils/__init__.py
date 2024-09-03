@@ -20,6 +20,7 @@ from .distributed import (
 from .logger import Logger, prepare_logger
 from .normalize_params import normalize_params
 from .time import get_runtime, get_time_as_string
+from .tnb101_api import TransNASBenchAPI
 
 
 class ExperimentCheckpointLoader:
@@ -333,4 +334,5 @@ __all__ = [
     "update_gradient_matching_scores",
     "get_pos_reductions_darts",
     "get_pos_new_cell_darts",
+    "TransNASBenchAPI",
 ]
