@@ -68,6 +68,34 @@ class SearchSpace(ModelWrapper):
         for component in self.components:
             component.new_step()
 
+    def get_num_ops(self) -> int:
+        """Get number of operations in an edge of a cell of the model.
+
+        Returns:
+            int: Number of operations
+        """
+        raise NotImplementedError("get_num_ops is not implemented for this searchpace")
+
+    def get_num_edges(self) -> int:
+        """Get number of edges in a cell of the model.
+
+        Returns:
+            int: Number of edges
+        """
+        raise NotImplementedError(
+            "get_num_edges is not implemented for this searchpace"
+        )
+
+    def get_num_nodes(self) -> int:
+        """Get number of nodes in a cell of the model.
+
+        Returns:
+            int: Number of nodes
+        """
+        raise NotImplementedError(
+            "get_num_nodes is not implemented for this searchpace"
+        )
+
 
 class ArchAttentionSupport(ModelWrapper):
     def set_arch_attention(self, enabled: bool) -> None:
@@ -162,30 +190,6 @@ class OperationStatisticsSupport(ModelWrapper):
         # all_stats.update(other_stats) # Add other stats here
 
         return all_stats
-
-    @abstractmethod
-    def get_num_ops(self) -> int:
-        """Get number of operations in an edge of a cell of the model.
-
-        Returns:
-            int: Number of operations
-        """
-
-    @abstractmethod
-    def get_num_edges(self) -> int:
-        """Get number of edges in a cell of the model.
-
-        Returns:
-            int: Number of rdges
-        """
-
-    @abstractmethod
-    def get_num_nodes(self) -> int:
-        """Get number of nodes in a cell of the model.
-
-        Returns:
-            int: Number of nodes
-        """
 
 
 class PerturbationArchSelectionSupport(ModelWrapper):
