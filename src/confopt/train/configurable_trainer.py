@@ -167,11 +167,6 @@ class ConfigurableTrainer:
             )
             is_warm_epoch = True
 
-        layer_alignment_scores = {
-            "mean": (AverageMeter(), AverageMeter()),
-            "first_and_last": (AverageMeter(), AverageMeter()),
-        }
-
         for epoch in range(self.start_epoch + 1, self.epochs + 1):
             epoch_str = f"{epoch:03d}-{self.epochs:03d}"
             if epoch == warm_epochs + 1:
@@ -201,7 +196,6 @@ class ConfigurableTrainer:
                 is_warm_epoch=is_warm_epoch,
                 oles=oles,
                 calc_gm_score=calc_gm_score,
-                layer_alignment_scores=layer_alignment_scores,
             )
 
             # Logging
@@ -252,29 +246,14 @@ class ConfigurableTrainer:
                 self.logger.update_wandb_logs(ops_stats)
 
             # Log Layer Alignment scores
-            mean_str = "mean"
-            first_and_last_str = "first_and_last"
-            self.logger.log(
-                f"[{epoch_str}] Layer Alignment score: "
-                + f" normal: {layer_alignment_scores[mean_str][0].avg:.4f},"
-                + f" reduce: {layer_alignment_scores[mean_str][1].avg:.4f}"
-            )
-            self.logger.log(
-                f"[{epoch_str}] First and Last Layer Alignment score: "
-                + f" normal: {layer_alignment_scores[first_and_last_str][0].avg:.4f},"
-                + f" reduce: {layer_alignment_scores[first_and_last_str][1].avg:.4f}"
-            )
-            layer_alignment_metric = {
-                "layer_alignment/mean/normal": layer_alignment_scores[mean_str][0].avg,
-                "layer_alignment/mean/reduce": layer_alignment_scores[mean_str][1].avg,
-                "layer_alignment/first_and_last/normal": layer_alignment_scores[
-                    first_and_last_str
-                ][0].avg,
-                "layer_alignment/first_and_last/reduce": layer_alignment_scores[
-                    first_and_last_str
-                ][1].avg,
-            }
-            self.logger.update_wandb_logs(layer_alignment_metric)
+            if isinstance(unwrapped_network, LayerAlignmentScoreSupport):
+                layer_alignment_scores = unwrapped_network.get_layer_alignment_scores()
+                self.logger.update_wandb_logs(layer_alignment_scores)
+                layer_alignment_scores_list = (
+                    unwrapped_network.get_layer_alignment_scores_as_strings()
+                )
+                for la_score in layer_alignment_scores_list:
+                    self.logger.log(f"[{epoch_str}] " + la_score)
 
             # Log gradient stats
             if isinstance(unwrapped_network, GradientStatsSupport):
@@ -344,6 +323,9 @@ class ConfigurableTrainer:
             ):
                 unwrapped_network.reset_gm_scores()
 
+            if isinstance(unwrapped_network, LayerAlignmentScoreSupport):
+                unwrapped_network.reset_layer_alignment_scores()
+
             # measure elapsed time
             epoch_time.update(time.time() - start_time)
             start_time = time.time()
@@ -361,7 +343,6 @@ class ConfigurableTrainer:
         is_warm_epoch: bool = False,
         oles: bool = False,
         calc_gm_score: bool = False,
-        layer_alignment_scores: dict | None = None,
     ) -> tuple[TrainingMetrics, TrainingMetrics]:
         data_time, batch_time = AverageMeter(), AverageMeter()
         base_losses, base_top1, base_top5 = (
@@ -377,11 +358,6 @@ class ConfigurableTrainer:
         network.train()
         unwrapped_network = unwrap_model(network)
         end = time.time()
-
-        if layer_alignment_scores is not None:
-            for key in layer_alignment_scores:
-                layer_alignment_scores[key][0].reset()  # type: ignore
-                layer_alignment_scores[key][1].reset()  # type: ignore
 
         for step, (base_inputs, base_targets) in enumerate(train_loader):
             # FIXME: What was the point of this? and is it safe to remove?
@@ -441,27 +417,7 @@ class ConfigurableTrainer:
             base_loss.backward()
 
             if isinstance(unwrapped_network, LayerAlignmentScoreSupport):
-                (
-                    score_normal,
-                    score_reduce,
-                ) = unwrapped_network.get_mean_layer_alignment_score()
-                (
-                    first_and_last_score_normal,
-                    first_and_last_score_reduce,
-                ) = unwrapped_network.get_first_and_last_layer_alignment_score()
-
-                layer_alignment_scores["mean"][0].update(  # type: ignore
-                    val=score_normal
-                )
-                layer_alignment_scores["mean"][1].update(  # type: ignore
-                    val=score_reduce
-                )
-                layer_alignment_scores["first_and_last"][0].update(  # type: ignore
-                    val=first_and_last_score_normal
-                )
-                layer_alignment_scores["first_and_last"][1].update(  # type: ignore
-                    val=first_and_last_score_reduce
-                )
+                unwrapped_network.update_layer_alignment_scores()
 
             torch.nn.utils.clip_grad_norm_(
                 unwrapped_network.model_weight_parameters(), 5
@@ -753,6 +709,10 @@ class ConfigurableTrainer:
 
         if is_gm_score_enabled and isinstance(network, GradientMatchingScoreSupport):
             unwrapped_network.reset_gm_score_attributes()
+
+        # TODO-ICLR: Check if this is needed
+        if isinstance(network, LayerAlignmentScoreSupport):
+            unwrapped_network.reset_layer_alignment_scores()
 
     def get_all_running_mean_scores(self, network: torch.nn.Module) -> dict:
         running_sim_dict = {}

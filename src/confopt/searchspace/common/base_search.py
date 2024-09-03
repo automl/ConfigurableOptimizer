@@ -119,6 +119,78 @@ class GradientMatchingScoreSupport(ModelWrapper):
 
 
 class LayerAlignmentScoreSupport(ModelWrapper):
+    def __init__(self, model: nn.Module):
+        super().__init__(model)
+        self.cell_grads_meters = {idx: AverageMeter() for idx in range(self.n_cells)}
+        self.score_types = ["mean", "first_last"]
+        self.cell_types = ["normal", "reduce"]
+        self.layer_alignment_meters: dict[str, dict] = {
+            score_type: {} for score_type in self.score_types
+        }
+
+        for score_type in self.score_types:
+            for cell_type in self.cell_types:
+                self.layer_alignment_meters[score_type][cell_type] = AverageMeter()
+
+    def get_layer_alignment_scores_as_strings(self) -> list[str]:
+        """Get the layer alignment scores of the model as strings.
+
+        Returns:
+            list[str]: A list containing the layer alignment scores of the model
+            as strings.
+        """
+        layer_alignment_scores = []
+
+        for score_type in self.score_types:
+            for cell_type in self.cell_types:
+                layer_alignment_scores.append(
+                    f"Layer Alignment Score ({score_type}) for cell type: {cell_type}: "
+                    + f"{self.layer_alignment_meters[score_type][cell_type].avg:.4f}"
+                )
+
+        return layer_alignment_scores
+
+    def reset_layer_alignment_scores(self) -> None:
+        """Reset the layer alignment scores of the model."""
+        for score_type in self.score_types:
+            for cell_type in self.cell_types:
+                self.layer_alignment_meters[score_type][cell_type].reset()
+
+    def update_layer_alignment_scores(self) -> None:
+        """Update the layer alignment scores of the model."""
+        # Update the "mean" scores
+        score_normal, score_reduce = self.get_mean_layer_alignment_score()
+        self.layer_alignment_meters["mean"]["normal"].update(val=score_normal)
+        self.layer_alignment_meters["mean"]["reduce"].update(val=score_reduce)
+
+        # Update the "first_last" scores
+        (
+            score_normal_first,
+            score_normal_last,
+        ) = self.get_first_and_last_layer_alignment_score()
+        self.layer_alignment_meters["first_last"]["normal"].update(
+            val=score_normal_first
+        )
+        self.layer_alignment_meters["first_last"]["reduce"].update(
+            val=score_normal_last
+        )
+
+    def get_layer_alignment_scores(self) -> dict[str, Any]:
+        """Get the layer alignment scores of the model.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the layer alignment scores of
+            the model.
+        """
+        layer_alignment_scores = {}
+        for score_type in self.score_types:
+            for cell_type in self.cell_types:
+                layer_alignment_scores[
+                    f"layer_alignment_scores/{score_type}/{cell_type}"
+                ] = self.layer_alignment_meters[score_type][cell_type].avg
+
+        return layer_alignment_scores
+
     @abstractmethod
     def get_mean_layer_alignment_score(self) -> tuple[float, float]:
         """Get the mean layer alignment score of the model.
