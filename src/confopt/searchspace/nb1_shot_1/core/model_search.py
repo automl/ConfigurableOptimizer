@@ -8,6 +8,7 @@ import warnings
 import numpy as np
 import torch
 from torch import nn
+from torch.distributions import Dirichlet
 import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common import OperationChoices
@@ -338,6 +339,19 @@ class Network(nn.Module):
         # TODO-ICLR: Beta parameters for edge normalization
         self._beta_parameters = [None]
         self._initialize_projection_params()
+
+        self.anchor_mixed_op = Dirichlet(torch.ones_like(self.alphas_mixed_op).cuda())
+        self.anchor_inputs = [
+            Dirichlet(torch.ones_like(alpha).cuda()) for alpha in self.alphas_inputs
+        ]
+        self.anchor_output = Dirichlet(torch.ones_like(self.alphas_output).cuda())
+
+    def get_drnas_anchors(self) -> list[torch.Tensor]:
+        return [
+            self.anchor_mixed_op,
+            self.anchor_output,
+            *self.anchor_inputs,
+        ]
 
     ### PerturbationArchSelection START ###
     def _initialize_projection_params(self) -> None:

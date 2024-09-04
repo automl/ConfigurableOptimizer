@@ -63,11 +63,10 @@ class DrNASRegularizationTerm(RegularizationTerm):
         anchors = model.get_drnas_anchors()
         arch_parameters = model.arch_parameters
 
-        if anchors[1] is None:
-            anchors = [anchors[0]]
-            assert (
-                len(arch_parameters) == 1
-            ), "Only one set of arch_parameters is expected"
+        assert len(arch_parameters) == len(anchors), (
+            "There should be same number of anchors"
+            + " as the number of arch parameters in the model"
+        )
 
         kl_reg_terms = []
         for anchor, alphas in zip(anchors, arch_parameters):

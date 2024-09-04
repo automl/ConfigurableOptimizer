@@ -361,7 +361,7 @@ class PerturbationArchSelectionSupport(ModelWrapper):
 
 class DrNASRegTermSupport(ModelWrapper):
     @abstractmethod
-    def get_drnas_anchors(self) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_drnas_anchors(self) -> list[torch.Tensor]:
         """Get the anchors used in DrNAS.
 
         Returns:

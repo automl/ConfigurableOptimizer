@@ -165,8 +165,8 @@ class DARTSSearchSpace(
 
         return stats
 
-    def get_drnas_anchors(self) -> tuple[torch.Tensor, torch.Tensor]:
-        return self.model.anchor_normal, self.model.anchor_reduce
+    def get_drnas_anchors(self) -> list[torch.Tensor]:
+        return [self.model.anchor_normal, self.model.anchor_reduce]
 
     def get_weighted_flops(self) -> torch.Tensor:
         ### TODO ###

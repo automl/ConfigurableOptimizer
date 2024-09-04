@@ -8,6 +8,7 @@ from torch import nn
 from confopt.searchspace.common import SearchSpace
 from confopt.searchspace.common.base_search import (
     ArchAttentionSupport,
+    DrNASRegTermSupport,
     GradientStatsSupport,
     LayerAlignmentScoreSupport,
     PerturbationArchSelectionSupport,
@@ -36,6 +37,7 @@ class NASBench1Shot1SearchSpace(
     LayerAlignmentScoreSupport,
     ArchAttentionSupport,
     GradientStatsSupport,
+    DrNASRegTermSupport,
 ):
     def __init__(
         self, search_space: Literal["S1", "S2", "S3"], *args: Any, **kwargs: dict
@@ -139,6 +141,9 @@ class NASBench1Shot1SearchSpace(
 
     def get_first_and_last_layer_alignment_score(self) -> tuple[float, float]:
         return self.model.get_mean_layer_alignment_score(only_first_and_last=True), 0
+
+    def get_drnas_anchors(self) -> list[torch.Tensor]:
+        return self.model.get_drnas_anchors()
 
 
 if __name__ == "__main__":
