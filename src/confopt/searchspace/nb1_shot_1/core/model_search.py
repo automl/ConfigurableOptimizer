@@ -287,7 +287,7 @@ class Network(nn.Module):
     def beta_parameters(self) -> list[torch.Tensor] | None:
         return self._beta_parameters
 
-    def get_genotype(self) -> Any:
+    def genotype(self) -> Any:
         def softmax(weights: torch.Tensor, axis: int = -1) -> np.ndarray:
             return F.softmax(torch.Tensor(weights), axis).data.cpu().numpy()
 
