@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import copy
 from typing import Any
+import warnings
 
 import numpy as np
 import torch
@@ -231,6 +233,9 @@ class Network(nn.Module):
     def sample_weights(
         self,
     ) -> tuple[torch.Tensor, torch.Tensor | None, list[torch.Tensor]]:
+        if self.projection_mode:
+            return self.get_projected_weights()
+
         mixed_op_weights = self.sample(self._arch_parameters[0])
         output_weights = (
             self.sample(self._arch_parameters[1]) if self._output_weights else None
@@ -277,9 +282,10 @@ class Network(nn.Module):
 
     def _initialize_alphas(self) -> None:
         # Initializes the weights for the mixed ops.
-        num_ops = len(PRIMITIVES)
+        self.num_ops = len(PRIMITIVES)
+        self.num_edges = self._steps
         self.alphas_mixed_op = nn.Parameter(
-            1e-3 * torch.randn(self._steps, num_ops).cuda(), requires_grad=True
+            1e-3 * torch.randn(self._steps, self.num_ops).cuda(), requires_grad=True
         )
 
         # For the alphas on the output node initialize a weighting vector for all
@@ -294,6 +300,10 @@ class Network(nn.Module):
             nn.Parameter(1e-3 * torch.randn(1, n_inputs).cuda(), requires_grad=True)
             for n_inputs in range(begin, self._steps + 1)
         ]
+        # total choice blocks + one output node
+        self.num_nodes = self._steps + 1 - begin
+        if self._output_weights:
+            self.num_nodes += 1
 
         # Total architecture parameters
         self._arch_parameters = [
@@ -304,6 +314,138 @@ class Network(nn.Module):
 
         # TODO-ICLR: Beta parameters for edge normalization
         self._beta_parameters = [None]
+        self._initialize_projection_params()
+
+    def _initialize_projection_params(self) -> None:
+        self.proj_weights = torch.zeros_like(self.alphas_mixed_op)
+        self.proj_weights_edge = [
+            torch.zeros_like(alpha) for alpha in self.alphas_inputs
+        ]
+        if self._output_weights:
+            self.proj_weights_edge.append(torch.zeros_like(self.alphas_output))
+
+        self.candidate_flags = torch.tensor(
+            self.num_edges * [True], requires_grad=False, dtype=torch.bool
+        )
+        self.candidate_flags_edge = torch.tensor(
+            self.num_nodes * [True], requires_grad=False, dtype=torch.bool
+        )
+
+        # nodes to outgoing edges
+        self.nid2eids: dict[int, list[int]] = {}
+        offset = 0
+        for nid in range(self.num_nodes):
+            self.nid2eids[nid] = [
+                *range(offset, offset + self.proj_weights_edge[nid].shape[-1])
+            ]
+            offset += self.proj_weights_edge[nid].shape[-1]
+
+        self.nid2selected_eids: dict[int, list[int]] = {}
+        for i in range(self.num_nodes):
+            self.nid2selected_eids[i] = []
+
+        self.projection_mode = False
+        self.projection_evaluation = False
+        self.removed_projected_weights = None
+        self.removed_projected_weights_inputs = None
+        self.removed_projected_weights_output = None
+
+    def remove_from_projected_weights(
+        self, selected_edge: int, selected_op: int | None, topology: bool = False
+    ) -> None:
+        weights_mixed_op, weights_output, weights_inputs = self.get_projected_weights()
+        if self._output_weights:
+            weights_nodes = [*weights_inputs, weights_output]
+        else:
+            weights_nodes = weights_inputs
+
+        if topology:
+            if selected_op is not None:
+                warnings.warn(
+                    "selected_op should be set to None in case of topology search",
+                    stacklevel=1,
+                )
+            # get node from the selected edge
+            selected_nid = None
+            selected_eid = None
+            for nid in self.nid2eids:
+                if selected_edge in self.nid2eids[nid]:
+                    selected_nid = nid
+                    selected_eid = self.nid2eids[nid].index(selected_edge)
+                    break
+
+            proj_mask_edge = torch.ones_like(
+                weights_nodes[selected_nid]  # type: ignore
+            )
+            proj_mask_edge[0][selected_eid] = 0
+            weights_nodes[selected_nid] *= proj_mask_edge  # type: ignore
+        else:
+            proj_mask = torch.ones_like(weights_mixed_op[selected_edge])
+            proj_mask[selected_op] = 0
+            weights_mixed_op *= proj_mask
+
+        self.removed_projected_weights = weights_mixed_op
+
+        if self._output_weights:
+            self.removed_projected_weights_inputs = weights_nodes[:-1]  # type: ignore
+            self.removed_projected_weights_output = weights_nodes[-1]
+        else:
+            self.removed_projected_weights_inputs = weights_nodes  # type: ignore
+            self.removed_projected_weights_output = None
+
+    def mark_projected_op(self, eid: int, opid: int) -> None:
+        self.proj_weights[eid][opid] = 1
+        self.candidate_flags[eid] = False
+
+    def mark_projected_edges(self, nid: int, eids: list[int]) -> None:
+        for eid in eids:
+            edge_idx = self.nid2eids[nid].index(eid)
+            self.proj_weights_edge[nid][0][edge_idx] = 1
+        self.nid2selected_eids[nid] = copy.deepcopy(eids)
+        self.candidate_flags_edge[nid] = False
+
+    def get_projected_weights(
+        self,
+    ) -> tuple[torch.Tensor, torch.Tensor | None, list[torch.Tensor]]:
+        if self.projection_evaluation:
+            removed_output_weights = (
+                self.removed_projected_weights_output if self._output_weights else None
+            )
+            return (  # type: ignore
+                self.removed_projected_weights,
+                removed_output_weights,
+                self.removed_projected_weights_inputs,
+            )
+
+        alphas_mixed_op = self.arch_parameters()[0]
+        alphas_nodes = self.arch_parameters()[2:]
+        if self._output_weights:
+            alphas_nodes.append(self.arch_parameters()[1])
+
+        weights_mixed_op = torch.softmax(alphas_mixed_op, dim=-1)
+        weights_nodes = [torch.softmax(alpha, dim=-1) for alpha in alphas_nodes]
+
+        # operations for mixed op
+        for eid in range(self.num_edges):
+            if not self.candidate_flags[eid]:
+                weights_mixed_op[eid].data.copy_(self.proj_weights[eid])
+
+        # edge for alpha input
+        for nid in sorted(self.nid2eids.keys()):
+            if not self.candidate_flags_edge[nid]:
+                weights_nodes[nid].data.copy_(self.proj_weights_edge[nid])
+
+        if self._output_weights:
+            return weights_mixed_op, weights_nodes[-1], weights_nodes[:-1]
+
+        return weights_mixed_op, None, weights_nodes
+
+    def get_max_input_edges_at_node(self, selected_node: int) -> int:
+        if isinstance(self.search_space, NB1Shot1Space1):
+            num_inputs = list(self.search_space.num_parents_per_node.values())[3:]
+        else:
+            num_inputs = list(self.search_space.num_parents_per_node.values())[2:]
+        return num_inputs[selected_node]
 
     def arch_parameters(self) -> list[torch.Tensor]:
         return self._arch_parameters
