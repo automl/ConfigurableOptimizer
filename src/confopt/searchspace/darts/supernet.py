@@ -11,6 +11,7 @@ from confopt.searchspace.common import (
     DrNASRegTermSupport,
     FLOPSRegTermSupport,
     GradientMatchingScoreSupport,
+    InsertCellSupport,
     LayerAlignmentScoreSupport,
     OperationStatisticsSupport,
     PerturbationArchSelectionSupport,
@@ -35,6 +36,7 @@ class DARTSSearchSpace(
     DrNASRegTermSupport,
     FLOPSRegTermSupport,
     PerturbationArchSelectionSupport,
+    InsertCellSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
         """DARTS Search Space for Neural Architecture Search.

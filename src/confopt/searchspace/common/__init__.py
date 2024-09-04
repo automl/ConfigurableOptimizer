@@ -3,6 +3,7 @@ from .base_search import (
     DrNASRegTermSupport,
     FLOPSRegTermSupport,
     GradientMatchingScoreSupport,
+    InsertCellSupport,
     LayerAlignmentScoreSupport,
     OperationStatisticsSupport,
     PerturbationArchSelectionSupport,
@@ -25,4 +26,5 @@ __all__ = [
     "LayerAlignmentScoreSupport",
     "OperationStatisticsSupport",
     "ArchAttentionSupport",
+    "InsertCellSupport",
 ]
