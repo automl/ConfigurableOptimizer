@@ -121,7 +121,6 @@ class GradientMatchingScoreSupport(ModelWrapper):
 class LayerAlignmentScoreSupport(ModelWrapper):
     def __init__(self, model: nn.Module):
         super().__init__(model)
-        self.cell_grads_meters = {idx: AverageMeter() for idx in range(self.n_cells)}
         self.score_types = ["mean", "first_last"]
         self.cell_types = ["normal", "reduce"]
         self.layer_alignment_meters: dict[str, dict] = {
