@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import copy
-from typing import Any
+import math
+from typing import Any, Callable
 import warnings
 
 import numpy as np
@@ -11,7 +12,12 @@ import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common import OperationChoices
 from confopt.searchspace.darts.core.operations import ReLUConvBN
-from confopt.utils import normalize_params, prune, set_ops_to_prune
+from confopt.utils import (
+    calc_layer_alignment_score,
+    normalize_params,
+    prune,
+    set_ops_to_prune,
+)
 
 from .operations import OPS, ConvBnRelu
 from .search_spaces.genotypes import PRIMITIVES, NASBench1Shot1ConfoptGenotype
@@ -213,6 +219,9 @@ class Network(nn.Module):
         self._initialize_alphas()
         self.mask = None
 
+        self.weights_grad: list[torch.Tensor] = []
+        self.grad_hook_handlers: list[torch.utils.hooks.RemovableHandle] = []
+
     def new(self) -> Network:
         model_new = Network(
             self.search_space,
@@ -248,6 +257,7 @@ class Network(nn.Module):
         return mixed_op_weights, output_weights, input_weights
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.reset_hooks()
         # NASBench only has one input to each cell
         mixed_op_weights, output_weights, input_weights = self.sample_weights()
         s0 = self.stem(x)
@@ -267,6 +277,7 @@ class Network(nn.Module):
 
             # Sample the input weights for the nodes in the cell
             input_weights_cell = [weight.clone() for weight in input_weights]
+            self.save_weight_grads(mixed_op_weights_cell)
             s0 = cell(
                 s0, mixed_op_weights_cell, output_weights_cell, input_weights_cell
             )
@@ -316,6 +327,7 @@ class Network(nn.Module):
         self._beta_parameters = [None]
         self._initialize_projection_params()
 
+    ### PerturbationArchSelection START ###
     def _initialize_projection_params(self) -> None:
         self.proj_weights = torch.zeros_like(self.alphas_mixed_op)
         self.proj_weights_edge = [
@@ -447,6 +459,8 @@ class Network(nn.Module):
             num_inputs = list(self.search_space.num_parents_per_node.values())[2:]
         return num_inputs[selected_node]
 
+    ### PerturbationArchSelection END ###
+
     def arch_parameters(self) -> list[torch.Tensor]:
         return self._arch_parameters
 
@@ -545,3 +559,49 @@ class Network(nn.Module):
 
         for cell in self.cells:
             cell.prune_ops(self.mask)
+
+    ### Layer Alignment START ###
+    def reset_hooks(self) -> None:
+        for hook in self.grad_hook_handlers:
+            hook.remove()
+
+        self.grad_hook_handlers = []
+
+    def save_gradient(self) -> Callable:
+        def hook(grad: torch.Tensor) -> None:
+            self.weights_grad.append(grad)
+
+        return hook
+
+    def save_weight_grads(
+        self,
+        weights: torch.Tensor,
+    ) -> None:
+        if not self.training:
+            return
+        grad_hook = weights.register_hook(self.save_gradient())
+        self.grad_hook_handlers.append(grad_hook)
+
+    def get_arch_grads(self, only_first_and_last: bool = False) -> list[torch.Tensor]:
+        grads = []
+        if only_first_and_last:
+            grads.append(self.weights_grad[0].reshape(-1))
+            grads.append(self.weights_grad[1].reshape(-1))
+        else:
+            for alphas in self.weights_grad:
+                grads.append(alphas.reshape(-1))
+
+        return grads
+
+    def get_mean_layer_alignment_score(
+        self, only_first_and_last: bool = False
+    ) -> float:
+        grads = self.get_arch_grads(only_first_and_last)
+        mean_score = calc_layer_alignment_score(grads)
+
+        if math.isnan(mean_score):
+            mean_score = 0
+
+        return mean_score
+
+    ### Layer Alignment END ###

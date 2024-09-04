@@ -6,7 +6,10 @@ import torch
 from torch import nn
 
 from confopt.searchspace.common import SearchSpace
-from confopt.searchspace.common.base_search import PerturbationArchSelectionSupport
+from confopt.searchspace.common.base_search import (
+    LayerAlignmentScoreSupport,
+    PerturbationArchSelectionSupport,
+)
 from confopt.searchspace.nb1_shot_1.core import (
     NB1Shot1Space1,
     NB1Shot1Space2,
@@ -25,7 +28,9 @@ search_space_map = {
 }
 
 
-class NASBench1Shot1SearchSpace(SearchSpace, PerturbationArchSelectionSupport):
+class NASBench1Shot1SearchSpace(
+    SearchSpace, PerturbationArchSelectionSupport, LayerAlignmentScoreSupport
+):
     def __init__(
         self, search_space: Literal["S1", "S2", "S3"], *args: Any, **kwargs: dict
     ) -> None:
@@ -122,6 +127,12 @@ class NASBench1Shot1SearchSpace(SearchSpace, PerturbationArchSelectionSupport):
 
     def get_max_input_edges_at_node(self, selected_node: int) -> int:
         return self.model.get_max_input_edges_at_node(selected_node)
+
+    def get_mean_layer_alignment_score(self) -> tuple[float, float]:
+        return self.model.get_mean_layer_alignment_score(), 0
+
+    def get_first_and_last_layer_alignment_score(self) -> tuple[float, float]:
+        return self.model.get_mean_layer_alignment_score(only_first_and_last=True), 0
 
 
 if __name__ == "__main__":
