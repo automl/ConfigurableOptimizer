@@ -184,14 +184,9 @@ class Cell(nn.Module):
     def change_preprocessing0_type(
         self,
         prev_reduction: bool = False,
-        reduction: bool = False,
     ) -> None:
         if prev_reduction:
             self.preprocess0 = FactorizedReduce(self.C_prev_prev, self.C, affine=False)
-        elif reduction is True:
-            self.preprocess0 = ReLUConvBN(
-                self.C_prev_prev, self.C, 1, 1, 0, affine=False
-            )  # type: ignore
         else:
             self.preprocess0 = ReLUConvBN(
                 self.C_prev_prev, self.C, 1, 1, 0, affine=False
