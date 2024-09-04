@@ -7,6 +7,7 @@ from torch import nn
 
 from confopt.searchspace.common import SearchSpace
 from confopt.searchspace.common.base_search import (
+    ArchAttentionSupport,
     LayerAlignmentScoreSupport,
     PerturbationArchSelectionSupport,
 )
@@ -29,7 +30,10 @@ search_space_map = {
 
 
 class NASBench1Shot1SearchSpace(
-    SearchSpace, PerturbationArchSelectionSupport, LayerAlignmentScoreSupport
+    SearchSpace,
+    PerturbationArchSelectionSupport,
+    LayerAlignmentScoreSupport,
+    ArchAttentionSupport,
 ):
     def __init__(
         self, search_space: Literal["S1", "S2", "S3"], *args: Any, **kwargs: dict

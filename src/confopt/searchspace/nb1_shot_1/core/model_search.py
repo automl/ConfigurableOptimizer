@@ -222,6 +222,12 @@ class Network(nn.Module):
         self.weights_grad: list[torch.Tensor] = []
         self.grad_hook_handlers: list[torch.utils.hooks.RemovableHandle] = []
 
+        # Multi-head attention for architectural parameters
+        self.is_arch_attention_enabled = False  # disabled by default
+        self.multihead_attention = nn.MultiheadAttention(
+            embed_dim=len(PRIMITIVES), num_heads=1
+        )
+
     def new(self) -> Network:
         model_new = Network(
             self.search_space,
@@ -245,7 +251,13 @@ class Network(nn.Module):
         if self.projection_mode:
             return self.get_projected_weights()
 
-        mixed_op_weights = self.sample(self._arch_parameters[0])
+        mixed_op_weights_to_sample = self._arch_parameters[0]
+        if self.is_arch_attention_enabled:
+            mixed_op_weights_to_sample = self._compute_arch_attention(
+                mixed_op_weights_to_sample
+            )
+
+        mixed_op_weights = self.sample(mixed_op_weights_to_sample)
         output_weights = (
             self.sample(self._arch_parameters[1]) if self._output_weights else None
         )
@@ -429,7 +441,11 @@ class Network(nn.Module):
                 self.removed_projected_weights_inputs,
             )
 
-        alphas_mixed_op = self.arch_parameters()[0]
+        if self.is_arch_attention_enabled:
+            alphas_mixed_op = self._compute_arch_attention(self.arch_parameters()[0])
+        else:
+            alphas_mixed_op = self.arch_parameters()[0]
+
         alphas_nodes = self.arch_parameters()[2:]
         if self._output_weights:
             alphas_nodes.append(self.arch_parameters()[1])
@@ -474,7 +490,11 @@ class Network(nn.Module):
         def get_top_k(array: np.ndarray, k: int) -> list:
             return list(np.argpartition(array[0], -k)[-k:])
 
-        alphas_mixed_op = self.arch_parameters()[0]
+        if self.is_arch_attention_enabled:
+            alphas_mixed_op = self._compute_arch_attention(self.arch_parameters()[0])
+        else:
+            alphas_mixed_op = self.arch_parameters()[0]
+
         chosen_node_ops = softmax(alphas_mixed_op, axis=-1).argmax(-1)
 
         node_list = [PRIMITIVES[i] for i in chosen_node_ops]
@@ -605,3 +625,7 @@ class Network(nn.Module):
         return mean_score
 
     ### Layer Alignment END ###
+
+    def _compute_arch_attention(self, alphas: nn.Parameter) -> torch.Tensor:
+        attn_alphas, _ = self.multihead_attention(alphas, alphas, alphas)
+        return attn_alphas
