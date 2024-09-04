@@ -119,13 +119,13 @@ def increase_in_channel_size_conv(
     if index is None:
         index = torch.randint(low=0, high=in_channels, size=(num_channels_to_add,))
 
-    optimizer_id, ref_id = get_optimizer_ids(conv_weights)
+    optimizer_id = get_optimizer_ids(conv_weights)
     conv_lora.conv.weight = nn.Parameter(
         torch.cat([conv_weights, conv_weights[:, index, :, :].clone()], dim=1),
         requires_grad=True,
     )
-    set_optimizer_ids(conv_lora.weight, optimizer_id, ref_id)
-    set_optimizer_ids(conv_lora.conv.weight, optimizer_id, ref_id)
+    set_optimizer_ids(conv_lora.weight, optimizer_id)
+    set_optimizer_ids(conv_lora.conv.weight, optimizer_id)
     conv_lora.weight = conv_lora.conv.weight
     conv_lora.in_channels += num_channels_to_add
     conv_lora.conv.in_channels += num_channels_to_add
@@ -161,13 +161,13 @@ def increase_out_channel_size_conv(
     else:
         num_channels_to_add = len(index)
 
-    optimizer_id, ref_id = get_optimizer_ids(conv_weights)
+    optimizer_id = get_optimizer_ids(conv_weights)
     conv_lora.conv.weight = nn.Parameter(
         torch.cat([conv_weights, conv_weights[index, :, :, :].clone()], dim=0),
         requires_grad=True,
     )
-    set_optimizer_ids(conv_lora.weight, optimizer_id, ref_id)
-    set_optimizer_ids(conv_lora.conv.weight, optimizer_id, ref_id)
+    set_optimizer_ids(conv_lora.weight, optimizer_id)
+    set_optimizer_ids(conv_lora.conv.weight, optimizer_id)
     conv_lora.weight = conv_lora.conv.weight
     conv_lora.out_channels += num_channels_to_add
     conv_lora.conv.out_channels += num_channels_to_add
@@ -283,16 +283,16 @@ def increase_num_features_bn(
     bn.running_mean = torch.cat([running_mean, running_mean[index].clone()])
     bn.running_var = torch.cat([running_var, running_var[index].clone()])
     if bn.affine:
-        optimizer_id_weight, ref_id_weight = get_optimizer_ids(bn.weight)
+        optimizer_id_weight = get_optimizer_ids(bn.weight)
         bn.weight = nn.Parameter(
             torch.cat([weight, weight[index].clone()], dim=0), requires_grad=True
         )
-        set_optimizer_ids(bn.weight, optimizer_id_weight, ref_id_weight)
-        optimizer_id_bias, ref_id_bias = get_optimizer_ids(bn.bias)
+        set_optimizer_ids(bn.weight, optimizer_id_weight)
+        optimizer_id_bias = get_optimizer_ids(bn.bias)
         bn.bias = nn.Parameter(
             torch.cat([bias, bias[index].clone()], dim=0), requires_grad=True
         )
-        set_optimizer_ids(bn.bias, optimizer_id_bias, ref_id_bias)
+        set_optimizer_ids(bn.bias, optimizer_id_bias)
         if hasattr(bn_weights, "out_index"):
             bn_weights.out_index.append(index)
             bn.weight.out_index = bn_weights.out_index
@@ -310,20 +310,13 @@ def increase_num_features_bn(
 
 def get_optimizer_ids(
     module: torch.Tensor | Conv2DLoRA,
-) -> tuple[int | None, int | None]:
+) -> int | None:
     optimizer_id = None
-    ref_id = None
     if hasattr(module, "optimizer_id"):
         optimizer_id = module.optimizer_id
-    if hasattr(module, "ref_id"):
-        ref_id = module.ref_id
-    return optimizer_id, ref_id
+    return optimizer_id
 
 
-def set_optimizer_ids(
-    module: nn.Parameter, optimizer_id: int | None = None, ref_id: int | None = None
-) -> None:
+def set_optimizer_ids(module: nn.Parameter, optimizer_id: int | None = None) -> None:
     if optimizer_id is not None:
         module.optimizer_id = optimizer_id
-    if ref_id is not None:
-        module.ref_id = ref_id
