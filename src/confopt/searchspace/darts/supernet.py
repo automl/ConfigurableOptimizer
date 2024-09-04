@@ -235,3 +235,6 @@ class DARTSSearchSpace(
 
     def insert_new_cells(self, num_of_cells: int) -> None:
         self.model.insert_new_cells(num_of_cells)
+
+    def create_new_cell(self, position: int) -> nn.Module:
+        return self.model.create_new_cell(position)
