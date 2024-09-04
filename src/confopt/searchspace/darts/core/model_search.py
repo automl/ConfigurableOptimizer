@@ -21,7 +21,12 @@ from confopt.utils import (
 )
 from confopt.utils.normalize_params import normalize_params
 
-from .genotypes import BABY_PRIMITIVES, PRIMITIVES, DARTSGenotype
+from .genotypes import (
+    BABY_PRIMITIVES,
+    PRIMITIVES,
+    DARTSGenotype,
+    get_skip_connection_index,
+)
 from .model import NetworkCIFAR, NetworkImageNet
 from .operations import OLES_OPS, OPS, FactorizedReduce, Identity, ReLUConvBN
 
@@ -29,7 +34,6 @@ NUM_CIFAR_CLASSES = 10
 NUM_CIFAR100_CLASSES = 100
 NUM_IMAGENET_CLASSES = 120
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-SKIP_CONNECTION = 3
 
 
 class MixedOp(nn.Module):
@@ -224,15 +228,16 @@ class Cell(nn.Module):
 
     def change_skip_connection_type(self, reduction: bool) -> None:
         idx = 0
+        skip_connection_index = get_skip_connection_index()
         for i in range(self._steps):
             for j in range(2 + i):
                 if j < 2:
                     if reduction:
-                        self._ops[idx].ops[SKIP_CONNECTION] = FactorizedReduce(
+                        self._ops[idx].ops[skip_connection_index] = FactorizedReduce(
                             self.C, self.C, affine=False
                         )
                     else:
-                        self._ops[idx].ops[SKIP_CONNECTION] = Identity()
+                        self._ops[idx].ops[skip_connection_index] = Identity()
                 idx += 1
 
     def increase_channel_size(
