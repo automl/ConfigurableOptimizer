@@ -72,6 +72,8 @@ class TestDARTSSearchSpace(unittest.TestCase):
             and op1.op[1].conv.stride == op2.op[1].conv.stride
             and op1.op[1].conv.padding == op2.op[1].conv.padding
             and op1.op[2].num_features == op2.op[2].num_features
+            and op1.op[2].bias == op2.op[2].bias
+            and op1.op[2].affine == op2.op[2].affine
         )
 
     def _compare_pooling(self, op1: Pooling, op2: Pooling) -> bool:
@@ -79,6 +81,8 @@ class TestDARTSSearchSpace(unittest.TestCase):
             isinstance(op1.op[0], type(op2.op[0]))
             and op1.op[0].stride == op2.op[0].stride
             and op1.op[1].num_features == op2.op[1].num_features
+            and op1.op[1].bias == op2.op[1].bias
+            and op1.op[1].affine == op2.op[1].affine
         )
 
     def _compare_dilconv(self, op1: DilConv, op2: DilConv) -> bool:
@@ -94,6 +98,9 @@ class TestDARTSSearchSpace(unittest.TestCase):
             and op1.op[1].conv.dilation == op2.op[1].conv.dilation
             and op1.op[2].conv.in_channels == op2.op[2].conv.in_channels
             and op1.op[2].conv.out_channels == op2.op[2].conv.out_channels
+            and op1.op[3].num_features == op2.op[3].num_features
+            and op1.op[3].bias == op2.op[3].bias
+            and op1.op[3].affine == op2.op[3].affine
         )
 
     def _compare_sepconv(self, op1: SepConv, op2: SepConv) -> bool:
@@ -108,11 +115,15 @@ class TestDARTSSearchSpace(unittest.TestCase):
             and op1.op[2].conv.in_channels == op2.op[2].conv.in_channels
             and op1.op[2].conv.out_channels == op2.op[2].conv.out_channels
             and op1.op[3].num_features == op2.op[3].num_features
+            and op1.op[3].bias == op2.op[3].bias
+            and op1.op[3].affine == op2.op[3].affine
             and op1.op[5].in_channels == op2.op[5].in_channels
             and op1.op[5].conv.groups == op2.op[5].conv.groups
             and op1.op[6].conv.in_channels == op2.op[6].conv.in_channels
             and op1.op[6].conv.out_channels == op2.op[6].conv.out_channels
             and op1.op[7].num_features == op2.op[7].num_features
+            and op1.op[7].bias == op2.op[7].bias
+            and op1.op[7].affine == op2.op[7].affine
         )
 
     def _compare_identity(self, op1: Identity, op2: Identity) -> bool:  # noqa: ARG002
