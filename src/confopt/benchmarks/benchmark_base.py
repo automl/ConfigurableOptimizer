@@ -13,7 +13,7 @@ class BenchmarkBase:
         self,
         genotype: Any,
         dataset: str = "cifar10",
-        **api_kwargs: str,  # type: ignore
+        **api_kwargs: Any,
     ) -> dict:
         pass
 
