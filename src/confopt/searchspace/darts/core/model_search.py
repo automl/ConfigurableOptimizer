@@ -898,7 +898,7 @@ class Network(nn.Module):
             # update stride
             new_cell.change_op_stride_size(new_stride=2, is_reduction_cell=True)
             # have ReLUConvBN as pre0
-            new_cell.change_preprocessing0_type(reduction=True)
+            new_cell.change_preprocessing0_type()
 
         # reduction-normal->noraml
         elif self._layers in (6, 7):
