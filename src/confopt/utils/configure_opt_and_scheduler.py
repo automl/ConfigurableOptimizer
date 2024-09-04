@@ -45,7 +45,6 @@ def configure_optimizer(
                     get_momentum_buffer_conv(p, state_new)
 
             if optimizer_id != i:
-                p.ref_id = p.optimizer_id
                 p.optimizer_id = i
 
     return optimizer_new
