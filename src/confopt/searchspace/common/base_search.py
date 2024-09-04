@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn  # noqa: PLR0402
 
 from confopt.oneshot.base_component import OneShotComponent
-from confopt.utils import reset_gm_score_attributes
+from confopt.utils import AverageMeter, reset_gm_score_attributes
 
 
 class ModelWrapper(nn.Module, ABC):
@@ -68,6 +68,34 @@ class SearchSpace(ModelWrapper):
         for component in self.components:
             component.new_step()
 
+    def get_num_ops(self) -> int:
+        """Get number of operations in an edge of a cell of the model.
+
+        Returns:
+            int: Number of operations
+        """
+        raise NotImplementedError("get_num_ops is not implemented for this searchpace")
+
+    def get_num_edges(self) -> int:
+        """Get number of edges in a cell of the model.
+
+        Returns:
+            int: Number of edges
+        """
+        raise NotImplementedError(
+            "get_num_edges is not implemented for this searchpace"
+        )
+
+    def get_num_nodes(self) -> int:
+        """Get number of nodes in a cell of the model.
+
+        Returns:
+            int: Number of nodes
+        """
+        raise NotImplementedError(
+            "get_num_nodes is not implemented for this searchpace"
+        )
+
 
 class ArchAttentionSupport(ModelWrapper):
     def set_arch_attention(self, enabled: bool) -> None:
@@ -119,6 +147,77 @@ class GradientMatchingScoreSupport(ModelWrapper):
 
 
 class LayerAlignmentScoreSupport(ModelWrapper):
+    def __init__(self, model: nn.Module):
+        super().__init__(model)
+        self.score_types = ["mean", "first_last"]
+        self.cell_types = ["normal", "reduce"]
+        self.layer_alignment_meters: dict[str, dict] = {
+            score_type: {} for score_type in self.score_types
+        }
+
+        for score_type in self.score_types:
+            for cell_type in self.cell_types:
+                self.layer_alignment_meters[score_type][cell_type] = AverageMeter()
+
+    def get_layer_alignment_scores_as_strings(self) -> list[str]:
+        """Get the layer alignment scores of the model as strings.
+
+        Returns:
+            list[str]: A list containing the layer alignment scores of the model
+            as strings.
+        """
+        layer_alignment_scores = []
+
+        for score_type in self.score_types:
+            for cell_type in self.cell_types:
+                layer_alignment_scores.append(
+                    f"Layer Alignment Score ({score_type}) for cell type: {cell_type}: "
+                    + f"{self.layer_alignment_meters[score_type][cell_type].avg:.4f}"
+                )
+
+        return layer_alignment_scores
+
+    def reset_layer_alignment_scores(self) -> None:
+        """Reset the layer alignment scores of the model."""
+        for score_type in self.score_types:
+            for cell_type in self.cell_types:
+                self.layer_alignment_meters[score_type][cell_type].reset()
+
+    def update_layer_alignment_scores(self) -> None:
+        """Update the layer alignment scores of the model."""
+        # Update the "mean" scores
+        score_normal, score_reduce = self.get_mean_layer_alignment_score()
+        self.layer_alignment_meters["mean"]["normal"].update(val=score_normal)
+        self.layer_alignment_meters["mean"]["reduce"].update(val=score_reduce)
+
+        # Update the "first_last" scores
+        (
+            score_normal_first,
+            score_normal_last,
+        ) = self.get_first_and_last_layer_alignment_score()
+        self.layer_alignment_meters["first_last"]["normal"].update(
+            val=score_normal_first
+        )
+        self.layer_alignment_meters["first_last"]["reduce"].update(
+            val=score_normal_last
+        )
+
+    def get_layer_alignment_scores(self) -> dict[str, Any]:
+        """Get the layer alignment scores of the model.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the layer alignment scores of
+            the model.
+        """
+        layer_alignment_scores = {}
+        for score_type in self.score_types:
+            for cell_type in self.cell_types:
+                layer_alignment_scores[
+                    f"layer_alignment_scores/{score_type}/{cell_type}"
+                ] = self.layer_alignment_meters[score_type][cell_type].avg
+
+        return layer_alignment_scores
+
     @abstractmethod
     def get_mean_layer_alignment_score(self) -> tuple[float, float]:
         """Get the mean layer alignment score of the model.
@@ -162,30 +261,6 @@ class OperationStatisticsSupport(ModelWrapper):
         # all_stats.update(other_stats) # Add other stats here
 
         return all_stats
-
-    @abstractmethod
-    def get_num_ops(self) -> int:
-        """Get number of operations in an edge of a cell of the model.
-
-        Returns:
-            int: Number of operations
-        """
-
-    @abstractmethod
-    def get_num_edges(self) -> int:
-        """Get number of edges in a cell of the model.
-
-        Returns:
-            int: Number of rdges
-        """
-
-    @abstractmethod
-    def get_num_nodes(self) -> int:
-        """Get number of nodes in a cell of the model.
-
-        Returns:
-            int: Number of nodes
-        """
 
 
 class PerturbationArchSelectionSupport(ModelWrapper):
@@ -316,3 +391,61 @@ class InsertCellSupport(ModelWrapper):
             nn.Module: The new cell.
         """
         ...
+
+
+class GradientStatsSupport(ModelWrapper):
+    def __init__(self, model: nn.Module):
+        super().__init__(model)
+        self.model.is_gradient_stats_enabled = True
+        self.n_cells = len(self.model.cells)
+        self.cell_grads_meters = {idx: AverageMeter() for idx in range(self.n_cells)}
+
+    def reset_grad_stats(self) -> None:
+        for cell_grad_meter in self.cell_grads_meters.values():
+            cell_grad_meter.reset()
+
+    def _calculate_gradient_norm(self, model: nn.Module) -> float:
+        total_norm = 0.0
+
+        for param in model.parameters():
+            if param.grad is not None:
+                param_norm = param.grad.data.norm(2)
+                total_norm += param_norm.item() ** 2
+        total_norm = total_norm**0.5
+
+        return total_norm
+
+    def get_grad_stats(self) -> dict[str, Any]:
+        """Get the gradient statistics of the model.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the gradient statistics
+            of the model.
+        """
+        cell_grad_stats = self.get_cell_grad_stats()
+
+        all_stats = {}
+        all_stats.update(cell_grad_stats)
+        # all_stats.update(other_stats) # Add other stats here
+
+        return all_stats
+
+    def get_cell_grad_stats(self) -> dict[str, Any]:
+        """Get the gradient statistics of the cells in the model.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the gradient statistics of
+            the cells in the model.
+        """
+        cell_grad_stats = {}
+        for idx, cell_grad_meter in self.cell_grads_meters.items():
+            cell_grad_stats[
+                f"gradient_stats/cell_{idx}_grad_norm"
+            ] = cell_grad_meter.avg
+
+        return cell_grad_stats
+
+    def update_grad_stats(self) -> None:
+        """Compute the gradient statistics of the cells in the model."""
+        for idx, cell in enumerate(self.model.cells):
+            self.cell_grads_meters[idx].update(self._calculate_gradient_norm(cell))
