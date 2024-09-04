@@ -351,7 +351,11 @@ class Experiment:
         search_space: SearchSpaceType,
         config: dict,
     ) -> None:
-        if search_space == SearchSpaceType.NB201:
+        if search_space == SearchSpaceType.NB1SHOT1:
+            from confopt.benchmarks import NB101Benchmark
+
+            self.benchmark_api = NB101Benchmark("full")
+        elif search_space == SearchSpaceType.NB201:
             from confopt.benchmarks import NB201Benchmark
 
             self.benchmark_api = NB201Benchmark()
