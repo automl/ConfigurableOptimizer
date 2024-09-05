@@ -9,6 +9,7 @@ from confopt.searchspace.common.base_search import (
     ArchAttentionSupport,
     GradientMatchingScoreSupport,
     GradientStatsSupport,
+    OperationStatisticsSupport,
     SearchSpace,
 )
 from confopt.utils import update_gradient_matching_scores
@@ -16,6 +17,7 @@ from confopt.utils import update_gradient_matching_scores
 from .core import TNB101MicroModel
 from .core.model_search import preserve_grads
 from .core.operations import OLES_OPS
+from .core.operations import TRANS_NAS_BENCH_101 as PRIMITIVES
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -25,6 +27,7 @@ class TransNASBench101SearchSpace(
     GradientMatchingScoreSupport,
     ArchAttentionSupport,
     GradientStatsSupport,
+    OperationStatisticsSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
         model = TNB101MicroModel(*args, **kwargs).to(DEVICE)
@@ -64,6 +67,18 @@ class TransNASBench101SearchSpace(
             early_stop_threshold=early_stop_threshold,
         )
         self.model.apply(partial_fn)
+
+    def get_num_skip_ops(self) -> dict[str, int]:
+        alphas_normal = self.arch_parameters[0]
+        count_skip = lambda alphas: sum(
+            alphas.argmax(dim=-1) == PRIMITIVES.index("skip_connect")
+        )
+
+        stats = {
+            "skip_connections/normal": count_skip(alphas_normal),
+        }
+
+        return stats
 
 
 if __name__ == "__main__":
