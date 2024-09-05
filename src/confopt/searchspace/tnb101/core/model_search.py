@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import math
+from typing import Callable
 
 import torch
 from torch import nn
 
 from confopt.searchspace.common import OperationBlock, OperationChoices
-from confopt.utils import preserve_gradients_in_module, prune, set_ops_to_prune
+from confopt.utils import (
+    calc_layer_alignment_score,
+    preserve_gradients_in_module,
+    prune,
+    set_ops_to_prune,
+)
 from confopt.utils.normalize_params import normalize_params
 
 from . import operations as ops
@@ -110,6 +117,9 @@ class TNB101SearchModel(nn.Module):
         )
         self._beta_parameters = nn.Parameter(1e-3 * torch.randn(self.num_edge))
 
+        self.weights_grad: list[torch.Tensor] = []
+        self.grad_hook_handlers: list[torch.utils.hooks.RemovableHandle] = []
+
         # Multi-head attention for architectural parameters
         self.is_arch_attention_enabled = False  # disabled by default
         self.multihead_attention = nn.MultiheadAttention(
@@ -137,11 +147,15 @@ class TNB101SearchModel(nn.Module):
         return weights
 
     def forward(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        self.reset_hooks()
+
         if self._arch_parameters is None:
             return self.discrete_model_forward(inputs)
 
         if self.edge_normalization:
             return self.edge_normalization_forward(inputs)
+
+        self.weights_grad = []
 
         # alphas = self.sample(self._arch_parameters)
         alphas = self.sample_weights()
@@ -150,6 +164,8 @@ class TNB101SearchModel(nn.Module):
             alphas = normalize_params(alphas, self.mask)
 
         feature = self.stem(inputs)
+        self.save_weight_grads(alphas.clone())
+
         for cell in self.cells:
             feature = cell(feature, alphas)
 
@@ -180,6 +196,8 @@ class TNB101SearchModel(nn.Module):
         inputs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         # alphas = self.sample(self._arch_parameters)
+        self.weights_grad = []
+
         alphas = self.sample_weights()
 
         if self.mask is not None:
@@ -197,6 +215,7 @@ class TNB101SearchModel(nn.Module):
                     self._beta_parameters[idx_nodes], dim=-1
                 )
                 betas = torch.cat([betas, beta_node_v], dim=0)
+            self.save_weight_grads(alphas.clone())
             feature = cell(feature, alphas, betas)
 
         out = self.decoder(feature)
@@ -315,6 +334,52 @@ class TNB101SearchModel(nn.Module):
                 op_idx_list.append(max_idx.item())
 
         return TNB101Genotype(node_edge_dict=node_edge_dict, op_idx_list=op_idx_list)
+
+    ### Layer alignment score support  methods ###
+    def reset_hooks(self) -> None:
+        for hook in self.grad_hook_handlers:
+            hook.remove()
+
+        self.grad_hook_handlers = []
+
+    def save_gradient(self) -> Callable:
+        def hook(grad: torch.Tensor) -> None:
+            self.weights_grad.append(grad)
+
+        return hook
+
+    def save_weight_grads(
+        self,
+        weights: torch.Tensor,
+    ) -> None:
+        if not self.training:
+            return
+        grad_hook = weights.register_hook(self.save_gradient())
+        self.grad_hook_handlers.append(grad_hook)
+
+    def get_arch_grads(self, only_first_and_last: bool = False) -> list[torch.Tensor]:
+        grads = []
+        if only_first_and_last:
+            grads.append(self.weights_grad[0].reshape(-1))
+            grads.append(self.weights_grad[1].reshape(-1))
+        else:
+            for alphas in self.weights_grad:
+                grads.append(alphas.reshape(-1))
+
+        return grads
+
+    def get_mean_layer_alignment_score(
+        self, only_first_and_last: bool = False
+    ) -> float:
+        grads = self.get_arch_grads(only_first_and_last)
+        mean_score = calc_layer_alignment_score(grads)
+
+        if math.isnan(mean_score):
+            mean_score = 0
+
+        return mean_score
+
+    ### End of Layer alignment score support methods ###
 
 
 class TNB101SearchCell(nn.Module):

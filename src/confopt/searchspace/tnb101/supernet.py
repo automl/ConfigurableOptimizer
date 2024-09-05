@@ -9,6 +9,7 @@ from confopt.searchspace.common.base_search import (
     ArchAttentionSupport,
     GradientMatchingScoreSupport,
     GradientStatsSupport,
+    LayerAlignmentScoreSupport,
     OperationStatisticsSupport,
     SearchSpace,
 )
@@ -28,6 +29,7 @@ class TransNASBench101SearchSpace(
     ArchAttentionSupport,
     GradientStatsSupport,
     OperationStatisticsSupport,
+    LayerAlignmentScoreSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
         model = TNB101MicroModel(*args, **kwargs).to(DEVICE)
@@ -79,6 +81,15 @@ class TransNASBench101SearchSpace(
         }
 
         return stats
+
+    ### LayerAlignmentScoreSupport methods ###
+    def get_mean_layer_alignment_score(self) -> tuple[float, float]:
+        return self.model.get_mean_layer_alignment_score(), 0
+
+    def get_first_and_last_layer_alignment_score(self) -> tuple[float, float]:
+        return self.model.get_mean_layer_alignment_score(only_first_and_last=True), 0
+
+    ### End of LayerAlignmentScoreSupport methods ###
 
 
 if __name__ == "__main__":
