@@ -281,6 +281,7 @@ class BaseProfile:
             "active_reg_terms": [],
             "drnas_config": {"reg_scale": 1e-3},
             "flops_config": {},
+            "fairdarts_config": {},
         }
         self.regularization_config = regularization_config
 
