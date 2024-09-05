@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from thop import profile as flop_profile
 import torch
 from torch import nn
 
@@ -22,11 +23,14 @@ class OperationChoices(nn.Module):
         self.ops = ops
         self.is_reduction_cell = is_reduction_cell
         self.device = device
+        self.flops: list[float] | None = None
 
     def forward(self, x: torch.Tensor, alphas: list[torch.Tensor]) -> torch.Tensor:
         assert len(alphas) == len(
             self.ops
         ), "Number of operations and architectural weights do not match"
+        if self.flops is None:
+            self._calculate_flops(x)
         states = []
         for op, alpha in zip(self.ops, alphas):
             states.append(op(x) * alpha)
@@ -52,10 +56,31 @@ class OperationChoices(nn.Module):
             )  # type: ignore
             if hasattr(op, "__post__init__"):
                 op.__post__init__()
+        self.flops = None
 
     def change_op_stride_size(self, new_stride: int) -> None:
         for op in self.ops:
             op.change_stride_size(new_stride)
+        self.flops = None
+
+    def _calculate_flops(self, x: torch.Tensor) -> None:
+        input_tensor = torch.randn_like(x)
+        self.flops = []
+        with torch.no_grad():
+            for op in self.ops:
+                op_flop, _ = flop_profile(op, inputs=(input_tensor,))
+                self.flops.append(op_flop)
+
+        # move buffers created by thop to gpu
+        for op in self.ops:
+            op.to(DEVICE)
+
+    def flops_forward(self, alphas: torch.Tensor) -> torch.Tensor:
+        assert self.flops is not None, (
+            "Atleast one forward pass is required to polulate"
+            + " flops for this OperationBlock"
+        )
+        return sum([alpha * op_flop for alpha, op_flop in zip(alphas, self.flops)])
 
 
 class OperationBlock(nn.Module):
@@ -78,6 +103,7 @@ class OperationBlock(nn.Module):
         self.dropout = dropout
         self.weight_entangler = weight_entangler
         self.is_argmax_sampler = is_argmax_sampler
+        self.flops: list[float] | None = None
 
     def forward_method(
         self, x: torch.Tensor, ops: list[nn.Module], alphas: list[torch.Tensor]
@@ -105,6 +131,9 @@ class OperationBlock(nn.Module):
         x: torch.Tensor,
         alphas: list[torch.Tensor],
     ) -> torch.Tensor:
+        if self.flops is None:
+            self._calculate_flops(x)
+
         if self.dropout:
             alphas = self.dropout.apply_mask(alphas)
 
@@ -134,7 +163,27 @@ class OperationBlock(nn.Module):
             )  # type: ignore
             if hasattr(op, "__post__init__"):
                 op.__post__init__()
+        self.flops = None
 
     def change_op_stride_size(self, new_stride: int) -> None:
         for op in self.ops:
             op.change_stride_size(new_stride)
+        self.flops = None
+
+    def _calculate_flops(self, x: torch.Tensor) -> None:
+        input_tensor = torch.randn_like(x)
+        self.flops = []
+        for op in self.ops:
+            op_flop, _ = flop_profile(op, inputs=(input_tensor,), verbose=False)
+            self.flops.append(op_flop)
+
+        # move buffers created by thop to gpu
+        for op in self.ops:
+            op.to(DEVICE)
+
+    def get_weighted_flops(self, alphas: torch.Tensor) -> torch.Tensor:
+        assert self.flops is not None, (
+            "Atleast one forward pass is required to polulate"
+            + " flops for this OperationBlock"
+        )
+        return sum([alpha * op_flop for alpha, op_flop in zip(alphas, self.flops)])
