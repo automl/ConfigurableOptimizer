@@ -35,6 +35,9 @@ class SearchSpace(ModelWrapper):
     def set_arch_parameters(self, arch_parameters: list[nn.Parameter]) -> None:
         pass
 
+    def get_sampled_weights(self) -> list[nn.Parameter]:
+        return self.model.sampled_weights
+
     def get_cell_types(self) -> list[str]:
         return ["normal"]
 
