@@ -378,6 +378,29 @@ class FLOPSRegTermSupport(ModelWrapper):
         ...
 
 
+class InsertCellSupport(ModelWrapper):
+    @abstractmethod
+    def insert_new_cells(self, num_cells: int) -> None:
+        """Insert new cells in the model.
+
+        Args:
+            num_cells (int): Number of cells to insert.
+        """
+        ...
+
+    @abstractmethod
+    def create_new_cell(self, pos: int) -> nn.Module:
+        """Create a new cell in the model.
+
+        Args:
+            pos (int): Position to insert the new cell.
+
+        Returns:
+            nn.Module: The new cell.
+        """
+        ...
+
+
 class GradientStatsSupport(ModelWrapper):
     def __init__(self, model: nn.Module):
         super().__init__(model)

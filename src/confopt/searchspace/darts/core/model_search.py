@@ -13,15 +13,22 @@ import torch.nn.functional as F  # noqa: N812
 from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
 from confopt.utils import (
     calc_layer_alignment_score,
+    get_pos_new_cell_darts,
+    get_pos_reductions_darts,
     preserve_gradients_in_module,
     prune,
     set_ops_to_prune,
 )
 from confopt.utils.normalize_params import normalize_params
 
-from .genotypes import BABY_PRIMITIVES, PRIMITIVES, DARTSGenotype
+from .genotypes import (
+    BABY_PRIMITIVES,
+    PRIMITIVES,
+    DARTSGenotype,
+    get_skip_connection_index,
+)
 from .model import NetworkCIFAR, NetworkImageNet
-from .operations import OLES_OPS, OPS, FactorizedReduce, ReLUConvBN
+from .operations import OLES_OPS, OPS, FactorizedReduce, Identity, ReLUConvBN
 
 NUM_CIFAR_CLASSES = 10
 NUM_CIFAR100_CLASSES = 100
@@ -34,6 +41,7 @@ class MixedOp(nn.Module):
         self, C: int, stride: int, primitives: list[str] = PRIMITIVES, k: int = 1
     ):
         super().__init__()
+        self.C = C
         self._ops = nn.ModuleList()
         for primitive in primitives:
             op = OPS[primitive](C // k, stride, False)
@@ -80,6 +88,9 @@ class Cell(nn.Module):
         """
         super().__init__()
         self.reduction = reduction
+        self.C = C
+        self.C_prev = C_prev
+        self.C_prev_prev = C_prev_prev
 
         if reduction_prev:
             self.preprocess0 = FactorizedReduce(C_prev_prev, C, affine=False)
@@ -164,6 +175,81 @@ class Cell(nn.Module):
         for edge, edge_mask in zip(self._ops, mask):
             set_ops_to_prune(edge, edge_mask)
 
+    def change_op_stride_size(self, new_stride: int, is_reduction_cell: bool) -> None:
+        idx = 0
+        for i in range(self._steps):
+            for j in range(2 + i):
+                op = self._ops[idx]
+                op.is_reduction_cell = is_reduction_cell
+                if j < 2:
+                    op.change_op_stride_size(new_stride)
+                idx += 1
+
+    def change_preprocessing0_type(
+        self,
+        prev_reduction: bool = False,
+    ) -> None:
+        if prev_reduction:
+            self.preprocess0 = FactorizedReduce(self.C_prev_prev, self.C, affine=False)
+        else:
+            self.preprocess0 = ReLUConvBN(
+                self.C_prev_prev, self.C, 1, 1, 0, affine=False
+            )  # type: ignore
+
+    def change_op_channel_size(
+        self,
+        new_cell: bool = True,
+    ) -> None:
+        # if pre0 was not changed
+        if self.preprocess0.C_in != self.C_prev_prev:
+            num_channels_to_add = self.C_prev_prev - self.preprocess0.C_in
+            self.preprocess0.increase_in_channel_size(
+                num_channels_to_add=num_channels_to_add
+            )
+        if self.preprocess0.C_out != self.C:
+            num_channels_to_add = self.C - self.preprocess0.C_out
+            self.preprocess0.increase_out_channel_size(
+                num_channels_to_add=num_channels_to_add
+            )
+        if self.preprocess1.C_in != self.C_prev:
+            num_channels_to_add = self.C_prev - self.preprocess1.C_in
+            self.preprocess1.increase_in_channel_size(
+                num_channels_to_add=num_channels_to_add
+            )
+        if self.preprocess1.C_out != self.C:
+            num_channels_to_add = self.C - self.preprocess1.C_out
+            self.preprocess1.increase_out_channel_size(
+                num_channels_to_add=num_channels_to_add
+            )
+
+        if self.reduction and new_cell:
+            for op in self._ops:
+                op.change_op_channel_size(k=1 / 2, new_cell=True)
+
+    def change_skip_connection_type(self, reduction: bool) -> None:
+        idx = 0
+        skip_connection_index = get_skip_connection_index()
+        for i in range(self._steps):
+            for j in range(2 + i):
+                if j < 2:
+                    if reduction:
+                        self._ops[idx].ops[skip_connection_index] = FactorizedReduce(
+                            self.C, self.C, affine=False
+                        )
+                    else:
+                        self._ops[idx].ops[skip_connection_index] = Identity()
+                idx += 1
+
+    def increase_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,
+    ) -> None:
+        for op in self._ops:
+            op.change_op_channel_size(
+                k=k, num_channels_to_add=num_channels_to_add, new_cell=True
+            )
+
 
 class Network(nn.Module):
     def __init__(
@@ -240,7 +326,7 @@ class Network(nn.Module):
         self.cells = nn.ModuleList()
         reduction_prev = False
         for i in range(layers):
-            if i in [layers // 3, 2 * layers // 3]:
+            if i in get_pos_reductions_darts(layers=layers):
                 C_curr *= 2
                 reduction = True
             else:
@@ -781,6 +867,74 @@ class Network(nn.Module):
         attn_reduce = all_arch_attn[num_edges_normal:]
 
         return attn_normal, attn_reduce
+
+    def create_new_cell(self, pos: int) -> Cell:
+        prev_cell = self.cells[pos - 1]
+        new_cell = copy.deepcopy(prev_cell)
+
+        new_cell.C = prev_cell.C
+        new_cell.C_prev = prev_cell.C * self._multiplier
+        new_cell.C_prev_prev = prev_cell.C_prev
+
+        # reduction->normal
+        if prev_cell.reduction is True:
+            # update cell type
+            new_cell.reduction = False
+            # update stride
+            new_cell.change_op_stride_size(new_stride=1, is_reduction_cell=False)
+            # update skip connection
+            new_cell.change_skip_connection_type(reduction=False)
+            # have FactorizedReduce as pre0
+            new_cell.change_preprocessing0_type(prev_reduction=True)
+
+        # normal->reduction
+        elif self._layers == 3:
+            # update cell type
+            new_cell.reduction = True
+            # update skip connection
+            new_cell.change_skip_connection_type(reduction=True)
+            # update channel size
+            new_cell.C = prev_cell.C * 2  # holds when reduction or normal
+            # update stride
+            new_cell.change_op_stride_size(new_stride=2, is_reduction_cell=True)
+            # have ReLUConvBN as pre0
+            new_cell.change_preprocessing0_type()
+
+        # reduction-normal->noraml
+        elif self._layers in (6, 7):
+            # have ReLUConvBN as pre0
+            new_cell.change_preprocessing0_type()
+
+        # normal->normal-reduction-normal-reduction-normal
+        elif self._layers == 5:
+            # update channel size of reduction at pos=2
+            post_cell = self.cells[1]
+            post_cell.C_prev = new_cell.C * self._multiplier
+            post_cell.C_prev_prev = new_cell.C_prev
+            post_cell.change_op_channel_size(new_cell=False)
+
+        # else:
+        # normal->normal->normal
+
+        # change
+        if self._layers < 9:
+            new_cell.change_op_channel_size()
+
+        return new_cell
+
+    def insert_new_cells(self, num_of_cells: int) -> None:
+        for i in range(self._layers, self._layers + num_of_cells):
+            pos = get_pos_new_cell_darts(i)
+            self.cells.insert(pos, self.create_new_cell(pos))
+            self._layers += 1
+
+    def increase_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,
+    ) -> None:
+        for cell in self.cells:
+            cell.increase_channel_size(k=k, num_channels_to_add=num_channels_to_add)
 
 
 def preserve_grads(m: nn.Module) -> None:

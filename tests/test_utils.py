@@ -5,7 +5,12 @@ import unittest
 
 import torch
 
-from confopt.utils import Logger, prepare_logger
+from confopt.utils import (
+    Logger,
+    prepare_logger,
+    get_pos_reductions_darts,
+    get_pos_new_cell_darts,
+)
 from confopt.utils.channel_shuffle import channel_shuffle
 
 
@@ -42,6 +47,30 @@ class TestUtils(unittest.TestCase):
         shuffled_x = channel_shuffle(x, groups=k)
         assert x.shape == shuffled_x.shape
         assert not torch.allclose(original_x, shuffled_x)
+
+    def test_get_pos_reductions_darts(self) -> None:
+        # Test when layers = 2 nr
+        self.assertEqual(get_pos_reductions_darts(2), (1, 2))
+        # Test when layers = 3 nrn
+        self.assertEqual(get_pos_reductions_darts(3), (1, 3))
+        # Test when layers = 4 nrnr
+        self.assertEqual(get_pos_reductions_darts(4), (1, 3))
+        # Test when layers = 5 nrnrn
+        self.assertEqual(get_pos_reductions_darts(5), (1, 3))
+        # Test when layers = 6 nnrnrn
+        self.assertEqual(get_pos_reductions_darts(6), (2, 4))
+        # Test when layers = 7 nnrnnrn
+        self.assertEqual(get_pos_reductions_darts(7), (2, 5))
+        # Test when layers = 8 nnrnnrnn
+        self.assertEqual(get_pos_reductions_darts(8), (2, 5))
+        # Test when layers = 9 nnnrnnrnn
+        self.assertEqual(get_pos_reductions_darts(9), (3, 6))
+
+    def test_get_pos_new_cell_darts(self) -> None:
+        for i in range(2, 4):
+            self.assertEqual(get_pos_new_cell_darts(i), i)
+        self.assertEqual(get_pos_new_cell_darts(12), 8)
+        self.assertEqual(get_pos_new_cell_darts(19), 19)
 
 
 class TestLogger(unittest.TestCase):

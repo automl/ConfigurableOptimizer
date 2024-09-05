@@ -183,9 +183,8 @@ class ConvLoRA(nn.Module, LoRALayer):
         if mode:
             if self.merge_weights and self.merged:
                 self.unmerge_lora_weights()
-        else:
-            if self.merge_weights and not self.merged:  # noqa: PLR5501
-                self.merge_lora_weights()
+        elif self.merge_weights and not self.merged:
+            self.merge_lora_weights()
 
     def forward(
         self, x: torch.Tensor, weight: torch.Tensor = None, bias: torch.Tensor = None
@@ -241,3 +240,6 @@ class Conv2DLoRA(ConvLoRA):
               https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html
         """
         super().__init__(nn.Conv2d, *args, **kwargs)  # type: ignore
+
+    def change_stride_size(self, new_stride: int) -> None:
+        self.conv.stride = (new_stride, new_stride)

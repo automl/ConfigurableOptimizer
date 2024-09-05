@@ -25,7 +25,13 @@ class NoiseOp(nn.Module):
         noise = noise.to(DEVICE)
         return noise
 
-    def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
+    def change_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,
+        new_cell: bool = False,
+        device: torch.device = DEVICE,
+    ) -> None:
         pass
 
 

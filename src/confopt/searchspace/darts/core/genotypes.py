@@ -143,3 +143,7 @@ DARTS_V2 = Genotype(
 )
 
 DARTS = DARTS_V2
+
+
+def get_skip_connection_index() -> int:
+    return PRIMITIVES.index("skip_connect")

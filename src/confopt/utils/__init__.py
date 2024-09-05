@@ -284,6 +284,32 @@ def prune(
     return mask
 
 
+def get_pos_reductions_darts(layers: int) -> tuple[int, int]:
+    pos_reduction_1 = (layers - 2) // 3 + (1 if (layers - 2) % 3 else 0)
+    if layers == 2:
+        pos_reduction_1 = 1
+    pos_reduction_2 = (
+        pos_reduction_1 + (layers - 2) // 3 + (1 if (layers - 2) % 3 == 2 else 0) + 1
+    )
+    if layers == 3:
+        pos_reduction_2 = 3
+    return pos_reduction_1, pos_reduction_2
+
+
+def get_pos_new_cell_darts(layers: int) -> int:
+    if layers < 5:
+        return layers
+    part_no = (layers - 5) % 3
+    pos_reduction_1, pos_reduction_2 = get_pos_reductions_darts(layers=layers)
+    # if part_no == 2 add it as the last element
+    pos = layers
+    if part_no == 0:
+        pos = pos_reduction_1
+    elif part_no == 1:
+        pos = pos_reduction_2
+    return pos
+
+
 __all__ = [
     "calc_accuracy",
     "save_checkpoint",
@@ -306,5 +332,7 @@ __all__ = [
     "reset_gm_score_attributes",
     "set_ops_to_prune",
     "update_gradient_matching_scores",
+    "get_pos_reductions_darts",
+    "get_pos_new_cell_darts",
     "TransNASBenchAPI",
 ]

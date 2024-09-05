@@ -103,6 +103,7 @@ class ReLUConvBN(nn.Module):
         self,
         k: float | None = None,
         num_channels_to_add: int | None = None,
+        new_cell: bool = False,  # noqa: ARG002
         device: torch.device = DEVICE,
     ) -> None:
         """Change the number of input and output channels in the ReLUConvBN block.
@@ -111,6 +112,7 @@ class ReLUConvBN(nn.Module):
             k (int): The new number of input and output channels would be 1/k of the
             original size.
             num_channels_to_add (int): The number of channels to add to the operation.
+            new_cell (bool): Whether change is for creating a new cell.
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
 
@@ -150,6 +152,11 @@ class ReLUConvBN(nn.Module):
             self.op[2], num_channels_to_add, device=device
         )
         self.C_out += num_channels_to_add
+
+    def change_stride_size(self, new_stride: int) -> None:
+        for op in self.op:
+            if hasattr(op, "stride"):
+                op.stride = (new_stride, new_stride)
 
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
@@ -213,6 +220,7 @@ class Pooling(nn.Module):
         self,
         k: float | None = None,
         num_channels_to_add: int | None = None,
+        new_cell: bool = False,  # noqa: ARG002
         device: torch.device = DEVICE,
     ) -> None:
         """Change the number of input and output channels in the Pooling block's batch
@@ -222,12 +230,18 @@ class Pooling(nn.Module):
             k (int): The new number of input and output channels would be 1/k of the
             original size.
             num_channels_to_add (int): The number of channels to add to the operation.
+            new_cell (bool): Whether change is for creating a new cell.
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
         """
         self.op[1], _ = ch.change_features_bn(
             self.op[1], k=k, num_channels_to_add=num_channels_to_add, device=device
         )
+
+    def change_stride_size(self, new_stride: int) -> None:
+        for op in self.op:
+            if hasattr(op, "stride"):
+                op.stride = new_stride
 
 
 class DilConv(ConvolutionalWEModule):
@@ -301,6 +315,7 @@ class DilConv(ConvolutionalWEModule):
         self,
         k: float | None = None,
         num_channels_to_add: int | None = None,
+        new_cell: bool = False,
         device: torch.device = DEVICE,
     ) -> None:
         """Change the number of input and output channels in the DilConv's ops.
@@ -309,6 +324,7 @@ class DilConv(ConvolutionalWEModule):
             k (int): The new number of input and output channels would be 1/k of the
             original size.
             num_channels_to_add (int): The number of channels to add to the operation.
+            new_cell (bool): Whether change is for creating a new cell.
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
         """
@@ -323,9 +339,7 @@ class DilConv(ConvolutionalWEModule):
         if num_channels_to_add:
             num_channels_to_add_in = num_channels_to_add
             num_channels_to_add_out = num_channels_to_add
-        # TODO: The DrNAS is missing the increase in channel of conv1?
-        # but since we need it for creating a new cell this if was added
-        if k is None:
+        if new_cell:
             self.op[1], _ = ch.increase_in_channel_size_conv(
                 self.op[1], num_channels_to_add_in
             )
@@ -342,6 +356,13 @@ class DilConv(ConvolutionalWEModule):
         self.op[3], _ = ch.increase_num_features_bn(
             self.op[3], num_channels_to_add_out, index=index
         )
+
+    def change_stride_size(self, new_stride: int) -> None:
+        self.stride = new_stride
+        if hasattr(self.op[1], "conv") and hasattr(self.op[1].conv, "stride"):
+            self.op[1].conv.stride = (new_stride, new_stride)
+        else:
+            self.op[1].stride = (new_stride, new_stride)
 
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
@@ -439,6 +460,7 @@ class SepConv(ConvolutionalWEModule):
         self,
         k: float | None = None,
         num_channels_to_add: int | None = None,
+        new_cell: bool = False,
         device: torch.device = DEVICE,
     ) -> None:
         """Change the number of input and output channels in the SepConv's ops.
@@ -447,6 +469,7 @@ class SepConv(ConvolutionalWEModule):
             k (int): The new number of input and output channels would be 1/k of the
             original size.
             num_channels_to_add (int): The number of channels to add to the operation.
+            new_cell (bool): Whether change is for creating a new cell.
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
         """
@@ -465,8 +488,7 @@ class SepConv(ConvolutionalWEModule):
             num_channels_to_add_in = num_channels_to_add
             num_channels_to_add_out = num_channels_to_add
 
-        # TODO: this line does not exist in Drnas?
-        if k is None:
+        if new_cell:
             self.op[1], _ = ch.increase_in_channel_size_conv(
                 self.op[1], num_channels_to_add_in
             )
@@ -484,8 +506,7 @@ class SepConv(ConvolutionalWEModule):
             self.op[3], num_channels_to_add_out, index=index
         )
 
-        # TODO: this line does not exist in Drnas?
-        if k is None:
+        if new_cell:
             self.op[5], _ = ch.increase_in_channel_size_conv(
                 self.op[5], num_channels_to_add_in
             )
@@ -502,6 +523,13 @@ class SepConv(ConvolutionalWEModule):
         self.op[7], _ = ch.increase_num_features_bn(
             self.op[7], num_channels_to_add_out, index=index
         )
+
+    def change_stride_size(self, new_stride: int) -> None:
+        self.stride = new_stride
+        if hasattr(self.op[1], "conv") and hasattr(self.op[1].conv, "stride"):
+            self.op[1].conv.stride = (new_stride, new_stride)
+        elif hasattr(self.op[1], "stride"):
+            self.op[1].stride = (new_stride, new_stride)
 
     def activate_lora(self, r: int) -> None:
         self.op[1].activate_lora(r)
@@ -554,6 +582,7 @@ class Identity(nn.Module):
         self,
         k: float | None = None,
         num_channels_to_add: int | None = None,
+        new_cell: bool = False,
         device: torch.device = DEVICE,
     ) -> None:
         """Change the number of input and output channels in the Identity block
@@ -563,6 +592,7 @@ class Identity(nn.Module):
             k (int): The new number of input and output channels would be 1/k of the
             original size.
             num_channels_to_add (int): The number of channels to add to the operation.
+            new_cell (bool): Whether change is for creating a new cell.
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
 
@@ -570,6 +600,9 @@ class Identity(nn.Module):
             This method does not perform any operations, as the Identity block does
             not change the number of channels.
         """
+
+    def change_stride_size(self, new_stride: int) -> None:
+        pass
 
 
 class Zero(nn.Module):
@@ -612,6 +645,7 @@ class Zero(nn.Module):
         self,
         k: float | None = None,
         num_channels_to_add: int | None = None,
+        new_cell: bool = False,
         device: torch.device = DEVICE,
     ) -> None:
         """Change the number of input and output channels in the Zero block
@@ -621,6 +655,7 @@ class Zero(nn.Module):
             k (int): The new number of input and output channels would be 1/k of the
             original size.
             num_channels_to_add (int): The number of channels to add to the operation.
+            new_cell (bool): Whether change is for creating a new cell.
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
 
@@ -628,6 +663,9 @@ class Zero(nn.Module):
             This method does not perform any operations, as the Zero block does not
             change the number of channels.
         """
+
+    def change_stride_size(self, new_stride: int) -> None:
+        self.stride = new_stride
 
 
 class FactorizedReduce(nn.Module):
@@ -647,6 +685,8 @@ class FactorizedReduce(nn.Module):
         """
         super().__init__()
         # assert C_out % 2 == 0
+        self.C_in = C_in
+        self.C_out = C_out
         self.relu = nn.ReLU(inplace=False)
         self.conv_1 = Conv2DLoRA(
             C_in, C_out // 2, kernel_size=1, stride=2, padding=0, bias=False
@@ -674,6 +714,7 @@ class FactorizedReduce(nn.Module):
         self,
         k: float | None = None,
         num_channels_to_add: int | None = None,
+        new_cell: bool = False,  # noqa: ARG002
         device: torch.device = DEVICE,
     ) -> None:
         """Change the number of input and output channels in the Factorized Reduce
@@ -683,6 +724,7 @@ class FactorizedReduce(nn.Module):
             k (int): The new number of input and output channels would be 1/k of the
             original size.
             num_channels_to_add (int): The number of channels to add to the operation.
+            new_cell (bool): Whether change is for creating a new cell.
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
 
@@ -745,6 +787,9 @@ class FactorizedReduce(nn.Module):
         self.bn = ch.increase_num_features_bn(self.bn, num_channels_to_add, device)
         self.C_out += num_channels_to_add
 
+    def change_stride_size(self, new_stride: int) -> None:
+        pass
+
     def activate_lora(self, r: int) -> None:
         self.conv_1.activate_lora(r)
         self.conv_2.activate_lora(r)
@@ -796,6 +841,7 @@ class Conv7x1Conv1x7BN(nn.Module):
         self,
         k: float | None = None,
         num_channels_to_add: int | None = None,
+        new_cell: bool = False,
         device: torch.device = DEVICE,
     ) -> None:
         """Modify the channel sizes of the operation by reducing them to 'k' channels.
@@ -803,11 +849,16 @@ class Conv7x1Conv1x7BN(nn.Module):
         Args:
             k (int): The new number of channels.
             num_channels_to_add (int): The number of channels to add to the operation.
+            new_cell (bool): Whether change is for creating a new cell.
             device (torch.device): The target device (default is 'DEVICE').
 
         Note: This method is used for architectural search and adjusts the number of
         channels in the Convolution operation.
         """
+
+    def change_stride_size(self, new_stride: int) -> None:
+        self.op[1].stride = (1, new_stride)
+        self.op[2].stride = (new_stride, 1)
 
 
 OLES_OPS = [Zero, Pooling, Identity, SepConv, DilConv]

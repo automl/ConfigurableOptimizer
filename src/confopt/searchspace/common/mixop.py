@@ -37,6 +37,7 @@ class OperationChoices(nn.Module):
         self,
         k: float | None = None,
         num_channels_to_add: int | None = None,
+        new_cell: bool = False,
     ) -> None:
         if not k and k == 1:
             return
@@ -44,10 +45,17 @@ class OperationChoices(nn.Module):
         for op in self.ops:
             # if not (isinstance(op, (nn.AvgPool2d, nn.MaxPool2d))):
             op.change_channel_size(
-                k=k, num_channels_to_add=num_channels_to_add, device=self.device
+                k=k,
+                num_channels_to_add=num_channels_to_add,
+                new_cell=new_cell,
+                device=self.device,
             )  # type: ignore
             if hasattr(op, "__post__init__"):
                 op.__post__init__()
+
+    def change_op_stride_size(self, new_stride: int) -> None:
+        for op in self.ops:
+            op.change_stride_size(new_stride)
 
 
 class OperationBlock(nn.Module):
@@ -109,16 +117,24 @@ class OperationBlock(nn.Module):
         self,
         k: float | None = None,
         num_channels_to_add: int | None = None,
+        new_cell: bool = False,
     ) -> None:
         if not k and not num_channels_to_add:
             k = self.partial_connector.k if self.partial_connector else 1
-        if k is not None and k == 1:
+        if k and k == 1:
             return
 
         for op in self.ops:
             # if not (isinstance(op, (nn.AvgPool2d, nn.MaxPool2d))):
             op.change_channel_size(
-                k=k, num_channels_to_add=num_channels_to_add, device=self.device
+                k=k,
+                num_channels_to_add=num_channels_to_add,
+                new_cell=new_cell,
+                device=self.device,
             )  # type: ignore
             if hasattr(op, "__post__init__"):
                 op.__post__init__()
+
+    def change_op_stride_size(self, new_stride: int) -> None:
+        for op in self.ops:
+            op.change_stride_size(new_stride)

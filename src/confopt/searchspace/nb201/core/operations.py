@@ -202,12 +202,20 @@ class ReLUConvBN(ConvolutionalWEModule):
         """
         return self.op(x)  # type: ignore
 
-    def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
+    def change_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,
+        new_cell: bool = False,  # noqa: ARG002
+        device: torch.device = DEVICE,
+    ) -> None:
         """Change the number of input and output channels in the ReLUConvBN block.
 
         Args:
             k (int): The new number of input and output channels would be 1/k of the
             original size.
+            num_channels_to_add (int): The number of channels to add to the operation.
+            new_cell (bool): Whether change is for creating a new cell.
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
 
@@ -215,9 +223,15 @@ class ReLUConvBN(ConvolutionalWEModule):
             This method dynamically changes the number of output channels in the
             ReLUConvBN block.
         """
-        self.op[1], index = ch.change_channel_size_conv(self.op[1], k=k, device=device)
+        self.op[1], index = ch.change_channel_size_conv(
+            self.op[1], k=k, num_channels_to_add=num_channels_to_add, device=device
+        )
         self.op[2], _ = ch.change_features_bn(
-            self.op[2], k=k, index=index, device=device
+            self.op[2],
+            k=k,
+            num_channels_to_add=num_channels_to_add,
+            index=index,
+            device=device,
         )
 
     def activate_lora(self, r: int) -> None:
@@ -308,12 +322,20 @@ class SepConv(ConvolutionalWEModule):
         """
         return self.op(x)  # type: ignore
 
-    def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
+    def change_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,  # noqa: ARG002
+        new_cell: bool = False,  # noqa: ARG002
+        device: torch.device = DEVICE,
+    ) -> None:
         """Change the number of input and output channels in the SepConv block.
 
         Args:
             k (int): The new number of input and output channels would be 1/k of the
             original size.
+            num_channels_to_add (int): The number of channels to add to the operation.
+            new_cell (bool): Whether change is for creating a new cell.
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
 
@@ -321,7 +343,7 @@ class SepConv(ConvolutionalWEModule):
             This method dynamically changes the number of output channels in the SepConv
             block.
         """
-        if k > 1:
+        if k is not None and k > 1:
             self.op[1] = ch.reduce_conv_channels(self.op[1], k=k, device=device)
             self.op[2] = ch.reduce_conv_channels(self.op[2], k=k, device=device)
             self.op[3] = ch.reduce_bn_features(self.op[3], k=k, device=device)
@@ -413,12 +435,20 @@ class DualSepConv(nn.Module):
         x = self.op_b(x)
         return x
 
-    def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
+    def change_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,
+        new_cell: bool = False,
+        device: torch.device = DEVICE,
+    ) -> None:
         """Change the number of input and output channels in the DualSepConv block.
 
         Args:
             k (int): The new number of input and output channels would be 1/k of the
             original size.
+            num_channels_to_add (int): The number of channels to add to the operation.
+            new_cell (bool): Whether change is for creating a new cell.
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
 
@@ -426,8 +456,8 @@ class DualSepConv(nn.Module):
             This method dynamically changes the number of output channels in both
             SepConv blocks of the DualSepConv block.
         """
-        self.op_b.change_channel_size(k, device)
-        self.op_b.change_channel_size(k, device)
+        self.op_b.change_channel_size(k, num_channels_to_add, new_cell, device)
+        self.op_b.change_channel_size(k, num_channels_to_add, new_cell, device)
 
     def activate_lora(self, r: int) -> None:
         self.op_a.activate_lora(r)
@@ -540,13 +570,21 @@ class ResNetBasicblock(nn.Module):
         residual = self.downsample(inputs) if self.downsample is not None else inputs
         return residual + basicblock  # type: ignore
 
-    def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
+    def change_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,
+        new_cell: bool = False,
+        device: torch.device = DEVICE,
+    ) -> None:
         """Change the number of input and output channels in the ResNetBasicblock
         (no operation performed).
 
         Args:
             k (int): The new number of input and output channels would be 1/k of the
             original size.
+            num_channels_to_add (int): The number of channels to add to the operation.
+            new_cell (bool): Whether change is for creating a new cell.
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
 
@@ -622,13 +660,21 @@ class Pooling(nn.Module):
         x = self.preprocess(inputs) if self.preprocess else inputs
         return self.op(x)  # type: ignore
 
-    def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
+    def change_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,
+        new_cell: bool = False,
+        device: torch.device = DEVICE,
+    ) -> None:
         """Change the number of input and output channels in the Pooling block's
         preprocessing (if used).
 
         Args:
             k (int): The new number of input and output channels would be 1/k of the
             original size.
+            num_channels_to_add (int): The number of channels to add to the operation.
+            new_cell (bool): Whether change is for creating a new cell.
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
 
@@ -637,7 +683,12 @@ class Pooling(nn.Module):
             preprocessing block (if used).
         """
         if self.preprocess:
-            self.preprocess.change_channel_size(k=k, device=device)
+            self.preprocess.change_channel_size(
+                k=k,
+                num_channels_to_add=num_channels_to_add,
+                new_cell=new_cell,
+                device=device,
+            )
 
 
 class Identity(nn.Module):
@@ -669,13 +720,21 @@ class Identity(nn.Module):
         """
         return x
 
-    def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
+    def change_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,
+        new_cell: bool = False,
+        device: torch.device = DEVICE,
+    ) -> None:
         """Change the number of input and output channels in the Identity block
         (no operation performed).
 
         Args:
             k (int): The new number of input and output channels would be 1/k of the
             original size.
+            num_channels_to_add (int): The number of channels to add to the operation.
+            new_cell (bool): Whether change is for creating a new cell.
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
 
@@ -736,13 +795,21 @@ class Zero(nn.Module):
         zeros = x.new_zeros(shape, dtype=x.dtype, device=x.device)
         return zeros
 
-    def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
+    def change_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,
+        new_cell: bool = False,  # noqa: ARG002
+        device: torch.device = DEVICE,  # noqa: ARG002
+    ) -> None:
         """Change the number of input and output channels in the Zero block
         (no operation performed).
 
         Args:
             k (int): The new number of input and output channels would be 1/k of the
             original size.
+            num_channels_to_add (int): The number of channels to add to the operation.
+            new_cell (bool): Whether change is for creating a new cell.
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
 
@@ -750,6 +817,13 @@ class Zero(nn.Module):
             This method does not perform any operations, as the Zero block does not
             change the number of channels.
         """
+        assert (k is not None) or (num_channels_to_add is not None)
+        if k is not None:
+            self.C_in = int(self.C_in // k)
+            self.C_out = int(self.C_out // k)
+        if num_channels_to_add is not None:
+            self.C_in += num_channels_to_add
+            self.C_out += num_channels_to_add
 
     def extra_repr(self) -> str:
         """Return an informative string representation of the Zero block.
@@ -852,13 +926,21 @@ class FactorizedReduce(nn.Module):
         out = self.bn(out)
         return out
 
-    def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
+    def change_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,
+        new_cell: bool = False,  # noqa: ARG002
+        device: torch.device = DEVICE,
+    ) -> None:
         """Change the number of input and output channels in the Factorized Reduce
         block.
 
         Args:
             k (int): The new number of input and output channels would be 1/k of the
             original size.
+            num_channels_to_add (int): The number of channels to add to the operation.
+            new_cell (bool): Whether change is for creating a new cell.
             device (torch.device, optional): The device to which the operations are
             moved. Defaults to DEVICE.
 
@@ -866,7 +948,7 @@ class FactorizedReduce(nn.Module):
             This method dynamically changes the number of output channels in the block's
             convolutional layers and BatchNorm.
         """
-        if k > 1:
+        if k is not None and k > 1:
             if self.stride == 2:
                 for i in range(2):
                     self.convs[i] = ch.reduce_conv_channels(
@@ -879,13 +961,18 @@ class FactorizedReduce(nn.Module):
             self.bn = ch.reduce_bn_features(self.bn, k)
             return
 
+        if num_channels_to_add is not None:
+            num_channels_to_add_C_in = num_channels_to_add
+            num_channels_to_add_C_out = num_channels_to_add
+
         if self.stride == 2:
-            num_channels_to_add_C_in = int(
-                max(1, self.convs[0].in_channels // int(1 / k - 1))
-            )
-            num_channels_to_add_C_out = int(
-                max(1, self.convs[0].out_channels // int(1 / k - 1))
-            )
+            if k is not None:
+                num_channels_to_add_C_in = int(
+                    max(1, self.convs[0].in_channels // int(1 / k - 1))
+                )
+                num_channels_to_add_C_out = int(
+                    max(1, self.convs[0].out_channels // int(1 / k - 1))
+                )
             self.convs[0], _ = ch.increase_in_channel_size_conv(
                 self.convs[0], num_channels_to_add_C_in
             )
@@ -905,8 +992,9 @@ class FactorizedReduce(nn.Module):
                 index=torch.cat([index1, index2]),
             )
         elif self.stride == 1:
-            num_channels_to_add_C_in = int(max(1, self.conv.in_channels // k))
-            num_channels_to_add_C_out = int(max(1, self.conv.out_channels // k))
+            if k is not None:
+                num_channels_to_add_C_in = int(max(1, self.conv.in_channels // k))
+                num_channels_to_add_C_out = int(max(1, self.conv.out_channels // k))
             self.conv, _ = ch.increase_in_channel_size_conv(
                 self.conv, num_channels_to_add_C_in
             )

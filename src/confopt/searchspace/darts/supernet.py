@@ -12,6 +12,7 @@ from confopt.searchspace.common import (
     FLOPSRegTermSupport,
     GradientMatchingScoreSupport,
     GradientStatsSupport,
+    InsertCellSupport,
     LayerAlignmentScoreSupport,
     OperationStatisticsSupport,
     PerturbationArchSelectionSupport,
@@ -36,6 +37,7 @@ class DARTSSearchSpace(
     DrNASRegTermSupport,
     FLOPSRegTermSupport,
     PerturbationArchSelectionSupport,
+    InsertCellSupport,
     GradientStatsSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
@@ -235,3 +237,9 @@ class DARTSSearchSpace(
 
     def get_max_input_edges_at_node(self, selected_node: int) -> int:  # noqa: ARG002
         return 2
+
+    def insert_new_cells(self, num_of_cells: int) -> None:
+        self.model.insert_new_cells(num_of_cells)
+
+    def create_new_cell(self, position: int) -> nn.Module:
+        return self.model.create_new_cell(position)

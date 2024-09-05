@@ -4,6 +4,7 @@ from .base_search import (
     FLOPSRegTermSupport,
     GradientMatchingScoreSupport,
     GradientStatsSupport,
+    InsertCellSupport,
     LayerAlignmentScoreSupport,
     OperationStatisticsSupport,
     PerturbationArchSelectionSupport,
@@ -27,4 +28,5 @@ __all__ = [
     "LayerAlignmentScoreSupport",
     "OperationStatisticsSupport",
     "ArchAttentionSupport",
+    "InsertCellSupport",
 ]

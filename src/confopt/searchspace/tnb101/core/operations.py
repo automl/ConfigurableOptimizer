@@ -86,10 +86,24 @@ class ReLUConvBN(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.ops(x)  # type: ignore
 
-    def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
-        self.op[1], index = ch.change_channel_size_conv(self.op[1], k=k, device=device)
+    def change_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,
+        new_cell: bool = False,  # noqa: ARG002
+        device: torch.device = DEVICE,
+    ) -> None:
+        assert (k is not None) or (num_channels_to_add is not None)
+
+        self.op[1], index = ch.change_channel_size_conv(
+            self.op[1], k=k, num_channels_to_add=num_channels_to_add, device=device
+        )
         self.op[2], _ = ch.change_features_bn(
-            self.op[2], k=k, index=index, device=device
+            self.op[2],
+            k=k,
+            num_channels_to_add=num_channels_to_add,
+            index=index,
+            device=device,
         )
 
     def activate_lora(self, r: int) -> None:
@@ -112,7 +126,13 @@ class Identity(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x
 
-    def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
+    def change_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,
+        new_cell: bool = False,
+        device: torch.device = DEVICE,
+    ) -> None:
         pass
 
 
@@ -136,9 +156,20 @@ class Zero(nn.Module):
             :, :, :: self.stride, :: self.stride
         ]
 
-    def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
-        self.C_in = int(self.C_in // k)
-        self.C_out = int(self.C_out // k)
+    def change_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,
+        new_cell: bool = False,  # noqa: ARG002
+        device: torch.device = DEVICE,
+    ) -> None:
+        assert (k is not None) or (num_channels_to_add is not None)
+        if k is not None:
+            self.C_in = int(self.C_in // k)
+            self.C_out = int(self.C_out // k)
+        if num_channels_to_add is not None:
+            self.C_in += num_channels_to_add
+            self.C_out += num_channels_to_add
         self.device = device
 
     def extra_repr(self) -> str:
@@ -196,9 +227,16 @@ class FactorizedReduce(nn.Module):
         out = self.bn(out)
         return out
 
-    def change_channel_size(self, k: float, device: torch.device = DEVICE) -> None:
-        if k > 1:
-            if self.stride == 2 and k > 1:
+    def change_channel_size(
+        self,
+        k: float | None = None,
+        num_channels_to_add: int | None = None,
+        new_cell: bool = False,  # noqa: ARG002
+        device: torch.device = DEVICE,
+    ) -> None:
+        assert (k is not None) or (num_channels_to_add is not None)
+        if k is not None and k > 1:
+            if self.stride == 2:
                 for i in range(2):
                     self.convs[i] = ch.reduce_conv_channels(
                         self.convs[i], k=k, device=device
@@ -209,14 +247,19 @@ class FactorizedReduce(nn.Module):
                 raise ValueError(f"Invalid stride: {self.stride}")
             self.bn = ch.reduce_bn_features(self.bn, k)
             return
+        if num_channels_to_add is not None:
+            num_channels_to_add_C_in = num_channels_to_add
+            num_channels_to_add_C_out = num_channels_to_add
 
         if self.stride == 2:
-            num_channels_to_add_C_in = int(
-                max(1, self.convs[0].in_channels // int(1 / k - 1))
-            )
-            num_channels_to_add_C_out = int(
-                max(1, self.convs[0].out_channels // int(1 / k - 1))
-            )
+            if k is not None:
+                num_channels_to_add_C_in = int(
+                    max(1, self.convs[0].in_channels // int(1 / k - 1))
+                )
+                num_channels_to_add_C_out = int(
+                    max(1, self.convs[0].out_channels // int(1 / k - 1))
+                )
+
             self.convs[0], _ = ch.increase_in_channel_size_conv(
                 self.convs[0], num_channels_to_add_C_in
             )
@@ -236,8 +279,10 @@ class FactorizedReduce(nn.Module):
                 index=torch.cat([index1, index2]),
             )
         elif self.stride == 1:
-            num_channels_to_add_C_in = int(max(1, self.conv.in_channels // k))
-            num_channels_to_add_C_out = int(max(1, self.conv.out_channels // k))
+            if k is not None:
+                num_channels_to_add_C_in = int(max(1, self.conv.in_channels // k))
+                num_channels_to_add_C_out = int(max(1, self.conv.out_channels // k))
+
             self.conv, _ = ch.increase_in_channel_size_conv(
                 self.conv, num_channels_to_add_C_in
             )
