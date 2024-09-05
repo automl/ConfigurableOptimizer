@@ -10,6 +10,7 @@ import torch.nn.functional as F  # noqa: N812
 from confopt.oneshot.base_component import OneShotComponent
 from confopt.searchspace.common import (
     DrNASRegTermSupport,
+    FairDARTSRegTermSupport,
     FLOPSRegTermSupport,
     SearchSpace,
 )
@@ -84,3 +85,26 @@ class FLOPSRegularizationTerm(RegularizationTerm):
         assert isinstance(model, FLOPSRegTermSupport)
 
         return model.get_weighted_flops()
+
+
+class FairDARTSRegularizationTerm(RegularizationTerm):
+    """Computes the regularization term for FairDARTS. Taken from
+    https://github.com/xiaomi-automl/FairDARTS/blob/master/fairdarts/separate_loss.py.
+    """
+
+    def loss(self, model: SearchSpace) -> torch.Tensor:
+        assert isinstance(
+            model, FairDARTSRegTermSupport
+        ), "Model must be of type FairDARTSRegTermSupport"
+
+        arch_parameters = model.get_fair_darts_arch_parameters()
+
+        if arch_parameters is None:
+            return torch.tensor(0.0, requires_grad=False).cuda()
+
+        arch_parameters = torch.cat(arch_parameters, dim=0)
+        loss = -F.l1_loss(
+            arch_parameters, torch.tensor(0.5, requires_grad=False).cuda()
+        )
+
+        return loss

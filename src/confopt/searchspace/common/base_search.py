@@ -449,3 +449,14 @@ class GradientStatsSupport(ModelWrapper):
         """Compute the gradient statistics of the cells in the model."""
         for idx, cell in enumerate(self.model.cells):
             self.cell_grads_meters[idx].update(self._calculate_gradient_norm(cell))
+
+
+class FairDARTSRegTermSupport(ModelWrapper):
+    @abstractmethod
+    def get_fair_darts_arch_parameters(self) -> list[torch.Tensor]:
+        """Get the arch parameters used in FairDARTS.
+
+        Returns:
+            torch.Tensor: The FairDARTS regularization term of the model.
+        """
+        ...
