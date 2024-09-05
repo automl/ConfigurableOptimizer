@@ -5,6 +5,10 @@ from math import log2
 import torch
 from torch import nn
 
+from confopt.oneshot.weightentangler import (
+    ConvolutionalWEModule,
+    WeightEntanglementSequential,
+)
 from confopt.searchspace.common import Conv2DLoRA
 import confopt.utils.change_channel_size as ch
 
@@ -44,7 +48,7 @@ OPS = {
 }
 
 
-class ReLUConvBN(nn.Module):
+class ReLUConvBN(ConvolutionalWEModule):
     def __init__(
         self,
         C_in: int,
@@ -78,13 +82,21 @@ class ReLUConvBN(nn.Module):
                 C_out, affine=affine, track_running_stats=track_running_stats
             ),
         ]
-        self.ops = nn.Sequential(*ops)
+        self.op = WeightEntanglementSequential(*ops)
         self.C_in = C_in
         self.C_out = C_out
         self.stride = stride
+        self.kernel_size = (
+            kernel_size if isinstance(kernel_size, int) else kernel_size[0]
+        )
+
+        self.__post__init__()
+
+    def mark_entanglement_weights(self) -> None:
+        self.op[1].can_entangle_weight = True
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.ops(x)  # type: ignore
+        return self.op(x)  # type: ignore
 
     def change_channel_size(
         self,
@@ -107,13 +119,13 @@ class ReLUConvBN(nn.Module):
         )
 
     def activate_lora(self, r: int) -> None:
-        self.ops[1].activate_lora(r)
+        self.op[1].activate_lora(r)
 
     def deactivate_lora(self) -> None:
-        self.ops[1].deactivate_lora()
+        self.op[1].deactivate_lora()
 
     def toggle_lora(self) -> None:
-        self.ops[1].toggle_lora()
+        self.op[1].toggle_lora()
 
     def extra_repr(self) -> str:
         return "C_in={C_in}, C_out={C_out}, stride={stride}".format(**self.__dict__)
