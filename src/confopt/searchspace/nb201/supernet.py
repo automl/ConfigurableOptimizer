@@ -8,6 +8,7 @@ from torch import nn
 
 from confopt.searchspace.common import (
     ArchAttentionSupport,
+    FairDARTSRegTermSupport,
     GradientMatchingScoreSupport,
     GradientStatsSupport,
     LayerAlignmentScoreSupport,
@@ -35,6 +36,7 @@ class NASBench201SearchSpace(
     LayerAlignmentScoreSupport,
     PerturbationArchSelectionSupport,
     GradientStatsSupport,
+    FairDARTSRegTermSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
         """Initialize the custom search model of NASBench201SearchSpace.
@@ -167,3 +169,6 @@ class NASBench201SearchSpace(
 
     def is_topology_supported(self) -> bool:
         return False
+
+    def get_fair_darts_arch_parameters(self) -> list[torch.Tensor]:
+        return self.get_sampled_weights()
