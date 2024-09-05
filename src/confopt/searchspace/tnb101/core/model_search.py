@@ -5,13 +5,13 @@ from copy import deepcopy
 import torch
 from torch import nn
 
-from confopt.searchspace.common import OperationChoices
-from confopt.utils import prune, set_ops_to_prune
+from confopt.searchspace.common import OperationBlock, OperationChoices
+from confopt.utils import preserve_gradients_in_module, prune, set_ops_to_prune
 from confopt.utils.normalize_params import normalize_params
 
 from . import operations as ops
 from .genotypes import TNB101Genotype
-from .operations import OPS, TRANS_NAS_BENCH_101
+from .operations import OLES_OPS, OPS, TRANS_NAS_BENCH_101
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -445,3 +445,14 @@ class TNB101SearchCell(nn.Module):
                 node_str = f"{i}<-{j}"
                 edge_mask = mask[self.edge2index[node_str]]
                 set_ops_to_prune(self.edges[node_str], edge_mask)
+
+
+def preserve_grads(m: nn.Module) -> None:
+    ignored_modules = (
+        OperationBlock,
+        OperationChoices,
+        TNB101SearchCell,
+        TNB101SearchModel,
+    )
+
+    preserve_gradients_in_module(m, ignored_modules, OLES_OPS)

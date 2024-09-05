@@ -547,3 +547,6 @@ class GenerativeDecoder(nn.Module):
         x = self.conv13(x)
         x = self.conv14(x)
         return x
+
+
+OLES_OPS = [Zero, Identity, ReLUConvBN]
