@@ -347,16 +347,13 @@ class PerturbationArchSelectionSupport(ModelWrapper):
         projected weights.
         """
 
-    def get_max_input_edges_at_node(self, selected_node: int) -> int:  # noqa: ARG002
+    @abstractmethod
+    def get_max_input_edges_at_node(self, selected_node: int) -> int:
         """Gets the number of edges allowed on a node after discretization.
 
         Returns:
             int: max number of edges from the nodes after discretization
         """
-        assert (
-            self.is_topology_supported()
-        ), "Topology should be supported for this function"
-        return 2
 
 
 class DrNASRegTermSupport(ModelWrapper):

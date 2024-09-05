@@ -232,3 +232,6 @@ class DARTSSearchSpace(
 
     def is_topology_supported(self) -> bool:
         return True
+
+    def get_max_input_edges_at_node(self, selected_node: int) -> int:  # noqa: ARG002
+        return 2

@@ -167,3 +167,6 @@ class NASBench201SearchSpace(
 
     def is_topology_supported(self) -> bool:
         return False
+
+    def get_max_input_edges_at_node(self, selected_node: int) -> int:  # noqa: ARG002
+        return 1
