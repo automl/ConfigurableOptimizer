@@ -171,10 +171,7 @@ class DARTSSearchSpace(
         return self.model.anchor_normal, self.model.anchor_reduce
 
     def get_weighted_flops(self) -> torch.Tensor:
-        ### TODO ###
-        ### Computed the FLOPS of the model, weighted by the architectural parameters
-
-        return torch.tensor(0.0)
+        return self.model.get_weighted_flops()
 
     def get_num_ops(self) -> int:
         return self.model.num_ops
