@@ -6,6 +6,7 @@ import torch
 from torch import nn
 
 from confopt.searchspace.common import SearchSpace
+from confopt.searchspace.common.base_search import FLOPSRegTermSupport
 from confopt.searchspace.nb1_shot_1.core import (
     NB1Shot1Space1,
     NB1Shot1Space2,
@@ -24,7 +25,7 @@ search_space_map = {
 }
 
 
-class NASBench1Shot1SearchSpace(SearchSpace):
+class NASBench1Shot1SearchSpace(SearchSpace, FLOPSRegTermSupport):
     def __init__(
         self, search_space: Literal["S1", "S2", "S3"], *args: Any, **kwargs: dict
     ) -> None:
@@ -60,6 +61,9 @@ class NASBench1Shot1SearchSpace(SearchSpace):
 
     def get_genotype(self) -> Any:
         return self.model.get_genotype()
+
+    def get_weighted_flops(self) -> torch.Tensor:
+        return self.model.get_weighted_flops()
 
 
 if __name__ == "__main__":
