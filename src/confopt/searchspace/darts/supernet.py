@@ -9,6 +9,7 @@ from torch import nn
 from confopt.searchspace.common import (
     ArchAttentionSupport,
     DrNASRegTermSupport,
+    FairDARTSRegTermSupport,
     FLOPSRegTermSupport,
     GradientMatchingScoreSupport,
     GradientStatsSupport,
@@ -39,6 +40,7 @@ class DARTSSearchSpace(
     PerturbationArchSelectionSupport,
     InsertCellSupport,
     GradientStatsSupport,
+    FairDARTSRegTermSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
         """DARTS Search Space for Neural Architecture Search.
@@ -243,3 +245,6 @@ class DARTSSearchSpace(
 
     def create_new_cell(self, position: int) -> nn.Module:
         return self.model.create_new_cell(position)
+
+    def get_fair_darts_arch_parameters(self) -> list[torch.Tensor]:
+        return self.get_sampled_weights()

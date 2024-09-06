@@ -35,6 +35,9 @@ class SearchSpace(ModelWrapper):
     def set_arch_parameters(self, arch_parameters: list[nn.Parameter]) -> None:
         pass
 
+    def get_sampled_weights(self) -> list[nn.Parameter]:
+        return self.model.sampled_weights
+
     def get_cell_types(self) -> list[str]:
         return ["normal"]
 
@@ -407,10 +410,26 @@ class GradientStatsSupport(ModelWrapper):
         self.model.is_gradient_stats_enabled = True
         self.n_cells = len(self.model.cells)
         self.cell_grads_meters = {idx: AverageMeter() for idx in range(self.n_cells)}
+        self.arch_grads_meters = {
+            idx: AverageMeter() for idx in range(len(self.arch_parameters))
+        }
+        self.arch_row_grads_meters: dict[str, AverageMeter] = {}
+
+        for idx, param in enumerate(self.arch_parameters):
+            for row_idx in range(param.size(0)):
+                self.arch_row_grads_meters[
+                    f"arch_param_{idx}_row_{row_idx}"
+                ] = AverageMeter()
 
     def reset_grad_stats(self) -> None:
         for cell_grad_meter in self.cell_grads_meters.values():
             cell_grad_meter.reset()
+
+        for arch_grad_meter in self.arch_grads_meters.values():
+            arch_grad_meter.reset()
+
+        for row_grad_meter in self.arch_row_grads_meters.values():
+            row_grad_meter.reset()
 
     def _calculate_gradient_norm(self, model: nn.Module) -> float:
         total_norm = 0.0
@@ -431,9 +450,11 @@ class GradientStatsSupport(ModelWrapper):
             of the model.
         """
         cell_grad_stats = self.get_cell_grad_stats()
+        arch_params_grad_stats = self.get_arch_params_grad_norm()
 
         all_stats = {}
         all_stats.update(cell_grad_stats)
+        all_stats.update(arch_params_grad_stats)
         # all_stats.update(other_stats) # Add other stats here
 
         return all_stats
@@ -453,7 +474,52 @@ class GradientStatsSupport(ModelWrapper):
 
         return cell_grad_stats
 
-    def update_grad_stats(self) -> None:
+    def get_arch_params_grad_norm(self) -> dict[str, Any]:
+        """Get the gradient norm of the architecture parameters of the model.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the gradient norm of the
+            architecture parameters of the model.
+        """
+        grad_stats: dict[str, Any] = {}
+
+        for idx, param in enumerate(self.arch_parameters):
+            grad_stats[
+                f"gradient_stats/total_arch_param_{idx}_grad_norm"
+            ] = self.arch_grads_meters[idx].avg
+
+            for row_idx, _row in enumerate(param):
+                grad_stats[
+                    f"gradient_stats/arch_param_{idx}_row_{row_idx}_grad_norm"
+                ] = self.arch_row_grads_meters[f"arch_param_{idx}_row_{row_idx}"].avg
+
+        return grad_stats
+
+    def update_cell_grad_stats(self) -> None:
         """Compute the gradient statistics of the cells in the model."""
         for idx, cell in enumerate(self.model.cells):
             self.cell_grads_meters[idx].update(self._calculate_gradient_norm(cell))
+
+    def update_arch_params_grad_stats(self) -> None:
+        """Compute the gradient norm of the architecture parameters of the model."""
+        for idx, param in enumerate(self.arch_parameters):
+            if param.grad is None:
+                continue
+
+            self.arch_grads_meters[idx].update(param.grad.data.norm(2).item())
+
+            for row_idx, row in enumerate(param.grad.data):
+                self.arch_row_grads_meters[f"arch_param_{idx}_row_{row_idx}"].update(
+                    row.norm(2).item()
+                )
+
+
+class FairDARTSRegTermSupport(ModelWrapper):
+    @abstractmethod
+    def get_fair_darts_arch_parameters(self) -> list[torch.Tensor]:
+        """Get the arch parameters used in FairDARTS.
+
+        Returns:
+            torch.Tensor: The FairDARTS regularization term of the model.
+        """
+        ...

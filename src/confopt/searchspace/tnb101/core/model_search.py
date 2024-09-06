@@ -149,6 +149,8 @@ class TNB101SearchModel(nn.Module):
         if self.mask is not None:
             alphas = normalize_params(alphas, self.mask)
 
+        self.sampled_weights = [alphas]
+
         feature = self.stem(inputs)
         for cell in self.cells:
             feature = cell(feature, alphas)
@@ -184,6 +186,8 @@ class TNB101SearchModel(nn.Module):
 
         if self.mask is not None:
             alphas = normalize_params(alphas, self.mask)
+
+        self.sampled_weights = [alphas]
 
         feature = self.stem(inputs)
         for cell in self.cells:

@@ -1,6 +1,7 @@
 from .base_search import (
     ArchAttentionSupport,
     DrNASRegTermSupport,
+    FairDARTSRegTermSupport,
     FLOPSRegTermSupport,
     GradientMatchingScoreSupport,
     GradientStatsSupport,
@@ -29,4 +30,5 @@ __all__ = [
     "OperationStatisticsSupport",
     "ArchAttentionSupport",
     "InsertCellSupport",
+    "FairDARTSRegTermSupport",
 ]
