@@ -126,6 +126,11 @@ class TNB101SearchModel(nn.Module):
             embed_dim=len(self.op_names), num_heads=1
         )
 
+        self.num_ops = len(self.op_names)
+        self.num_nodes = self.max_nodes - 1
+
+        self._initialize_projection_params()
+
     def arch_parameters(self) -> nn.Parameter:
         return self._arch_parameters
 
@@ -137,6 +142,9 @@ class TNB101SearchModel(nn.Module):
         return torch.nn.functional.softmax(alphas, dim=-1)
 
     def sample_weights(self) -> torch.Tensor:
+        if self.projection_mode:
+            return self.get_projected_weights()
+
         weights_to_sample = self._arch_parameters
 
         if self.is_arch_attention_enabled:
@@ -386,6 +394,51 @@ class TNB101SearchModel(nn.Module):
         return mean_score
 
     ### End of Layer alignment score support methods ###
+
+    ### Start of PerturbationArchSelection methods ###
+    def _initialize_projection_params(self) -> None:
+        self.candidate_flags = torch.tensor(
+            self.num_edge * [True],  # type: ignore
+            requires_grad=False,
+            dtype=torch.bool,
+        ).to(DEVICE)
+        self.proj_weights = torch.zeros_like(self._arch_parameters)
+
+        self.projection_mode = False
+        self.projection_evaluation = False
+        self.removed_projected_weights = None
+
+    def mark_projected_op(self, eid: int, opid: int) -> None:
+        self.proj_weights[eid][opid] = 1
+        self.candidate_flags[eid] = False
+
+    def get_projected_weights(self) -> torch.Tensor:
+        if self.projection_evaluation:
+            return self.removed_projected_weights
+
+        if self.is_arch_attention_enabled:
+            arch_parameters = self._compute_arch_attention(self._arch_parameters)
+        else:
+            arch_parameters = self._arch_parameters
+
+        weights = torch.softmax(arch_parameters, dim=-1)
+        for eid in range(len(arch_parameters)):  # type: ignore
+            if not self.candidate_flags[eid]:
+                weights[eid].data.copy_(self.proj_weights[eid])
+
+        return weights
+
+    def remove_from_projected_weights(
+        self, selected_edge: int, selected_op: int
+    ) -> None:
+        weights = self.get_projected_weights()
+        proj_mask = torch.ones_like(weights[selected_edge])
+        proj_mask[selected_op] = 0
+
+        weights[selected_edge] = weights[selected_edge] * proj_mask
+        self.removed_projected_weights = weights
+
+    ### End of PerturbationArchSelection methods ###
 
 
 class TNB101SearchCell(nn.Module):

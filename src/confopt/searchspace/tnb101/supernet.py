@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import partial
+from typing import Literal
 
 import torch
 from torch import nn
@@ -12,6 +13,7 @@ from confopt.searchspace.common.base_search import (
     GradientStatsSupport,
     LayerAlignmentScoreSupport,
     OperationStatisticsSupport,
+    PerturbationArchSelectionSupport,
     SearchSpace,
 )
 from confopt.utils import update_gradient_matching_scores
@@ -32,6 +34,7 @@ class TransNASBench101SearchSpace(
     OperationStatisticsSupport,
     LayerAlignmentScoreSupport,
     FairDARTSRegTermSupport,
+    PerturbationArchSelectionSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
         model = TNB101MicroModel(*args, **kwargs).to(DEVICE)
@@ -95,6 +98,53 @@ class TransNASBench101SearchSpace(
 
     def get_fair_darts_arch_parameters(self) -> list[torch.Tensor]:
         return self.get_sampled_weights()
+
+    def get_num_ops(self) -> int:
+        return self.model.num_ops
+
+    def get_num_edges(self) -> int:
+        return self.model.num_edge
+
+    def get_num_nodes(self) -> int:
+        return self.model.num_nodes
+
+    def is_topology_supported(self) -> bool:
+        return False
+
+    def set_topology(self, value: bool) -> None:
+        self.topology = value
+
+    def get_candidate_flags(self, cell_type: Literal["normal", "reduce"]) -> list:
+        assert cell_type == "normal"
+        return self.model.candidate_flags
+
+    def remove_from_projected_weights(
+        self,
+        selected_edge: int,
+        selected_op: int | None,
+        cell_type: Literal["normal", "reduce"] = "normal",
+    ) -> None:
+        assert cell_type == "normal"
+        assert selected_op is not None
+        self.model.remove_from_projected_weights(selected_edge, selected_op)
+
+    def mark_projected_operation(
+        self,
+        selected_edge: int,
+        selected_op: int,
+        cell_type: Literal["normal", "reduce"],
+    ) -> None:
+        assert cell_type == "normal"
+        self.model.mark_projected_op(selected_edge, selected_op)
+
+    def set_projection_mode(self, value: bool) -> None:
+        self.model.projection_mode = value
+
+    def set_projection_evaluation(self, value: bool) -> None:
+        self.model.projection_evaluation = value
+
+    def get_max_input_edges_at_node(self, selected_node: int) -> int:  # noqa: ARG002
+        return 1
 
 
 if __name__ == "__main__":
