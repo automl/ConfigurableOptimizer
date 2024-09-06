@@ -39,10 +39,10 @@ def configure_optimizer(
             # Copy momentum buffer if it exists
             if "momentum_buffer" in state_old:
                 if hasattr(p, "t") and p.t == "bn":
-                    get_momentum_buffer_bn(p, state_new)
+                    update_momentum_buffer_bn(p, state_new)
 
                 elif hasattr(p, "t") and p.t == "conv":
-                    get_momentum_buffer_conv(p, state_new)
+                    update_momentum_buffer_conv(p, state_new)
 
             if optimizer_id != i:
                 p.optimizer_id = i
@@ -50,7 +50,7 @@ def configure_optimizer(
     return optimizer_new
 
 
-def get_momentum_buffer_bn(p: nn.Parameter, state_new: dict) -> torch.Tensor:
+def update_momentum_buffer_bn(p: nn.Parameter, state_new: dict) -> torch.Tensor:
     for index in p.out_index:
         state_new["momentum_buffer"] = torch.cat(
             [
@@ -63,7 +63,7 @@ def get_momentum_buffer_bn(p: nn.Parameter, state_new: dict) -> torch.Tensor:
     return state_new["momentum_buffer"]
 
 
-def get_momentum_buffer_conv(p: nn.Parameter, state_new: dict) -> torch.Tensor:
+def update_momentum_buffer_conv(p: nn.Parameter, state_new: dict) -> torch.Tensor:
     if hasattr(p, "in_index"):
         for index in p.in_index:
             state_new["momentum_buffer"] = torch.cat(
