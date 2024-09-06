@@ -118,6 +118,8 @@ class NB101Benchmark(BenchmarkBase):
         )
         result = self.api.query(model_spec, epochs=epochs)
         result = {f"benchmark/{k}": v for k, v in result.items()}
+        result["benchmark/test_top1"] = result["benchmark/test_accuracy"]
+        del result["benchmark/test_accuracy"]
 
         return result
 
