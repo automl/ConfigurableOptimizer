@@ -401,6 +401,9 @@ class ConfigurableTrainer:
                     top5_meter=arch_top5,
                 )
 
+            if isinstance(unwrapped_network, GradientStatsSupport):
+                unwrapped_network.update_arch_params_grad_stats()
+
             # calculate gm_score
             if calc_gm_score and isinstance(
                 unwrapped_network, GradientMatchingScoreSupport
@@ -432,7 +435,7 @@ class ConfigurableTrainer:
                 unwrapped_network.preserve_grads()  # type: ignore
 
             if isinstance(unwrapped_network, GradientStatsSupport):
-                unwrapped_network.update_grad_stats()
+                unwrapped_network.update_cell_grad_stats()
 
             w_optimizer.zero_grad()
             if not is_warm_epoch:

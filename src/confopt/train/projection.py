@@ -47,7 +47,6 @@ class PerturbationArchSelection:
         assert (
             model.is_topology_supported()
         ), "project_edge can only be called on a searchspace that supports topology"
-
         candidate_flags = model.get_candidate_flags(cell_type)
 
         #### select an edge randomly
@@ -56,11 +55,12 @@ class PerturbationArchSelection:
         self.trainer.logger.log(f"selected node: {selected_nid} {cell_type}")
 
         eids = deepcopy(model.get_edges_at_node(selected_node=selected_nid))
-        while len(eids) > 2:
+        max_input_edges = model.get_max_input_edges_at_node(selected_node=selected_nid)
+        while len(eids) > max_input_edges:
             eid_to_del = None
             crit_extrema = None
             for eid in eids:
-                model.remove_from_projected_weights(eid, None, cell_type, topology=True)
+                model.remove_from_projected_weights(eid, None, cell_type)
 
                 model.set_projection_evaluation(True)
                 ## proj evaluation

@@ -8,6 +8,7 @@ from torch import nn
 
 from confopt.searchspace.common import (
     ArchAttentionSupport,
+    FairDARTSRegTermSupport,
     FLOPSRegTermSupport,
     GradientMatchingScoreSupport,
     GradientStatsSupport,
@@ -37,6 +38,7 @@ class NASBench201SearchSpace(
     PerturbationArchSelectionSupport,
     GradientStatsSupport,
     FLOPSRegTermSupport,
+    FairDARTSRegTermSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
         """Initialize the custom search model of NASBench201SearchSpace.
@@ -172,3 +174,9 @@ class NASBench201SearchSpace(
 
     def get_weighted_flops(self) -> torch.Tensor:
         return self.model.get_weighted_flops()
+
+    def get_max_input_edges_at_node(self, selected_node: int) -> int:  # noqa: ARG002
+        return 1
+
+    def get_fair_darts_arch_parameters(self) -> list[torch.Tensor]:
+        return self.get_sampled_weights()

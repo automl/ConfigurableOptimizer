@@ -1,14 +1,24 @@
 from __future__ import annotations
 
-from typing import Any
+import copy
+import math
+from typing import Any, Callable
+import warnings
 
 import numpy as np
 import torch
 from torch import nn
+from torch.distributions import Dirichlet
 import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common import OperationChoices
 from confopt.searchspace.darts.core.operations import ReLUConvBN
+from confopt.utils import (
+    calc_layer_alignment_score,
+    normalize_params,
+    prune,
+    set_ops_to_prune,
+)
 
 from .operations import OPS, ConvBnRelu
 from .search_spaces.genotypes import PRIMITIVES, NASBench1Shot1ConfoptGenotype
@@ -159,6 +169,11 @@ class Cell(nn.Module):
             flops += choice_block.mixed_op.get_weighted_flops(alphas[idx])
         return flops
 
+    def prune_ops(self, mask: torch.Tensor) -> None:
+        for choice_block_idx in range(self._steps):
+            edge_mask = mask[choice_block_idx]
+            set_ops_to_prune(self._choice_blocks[choice_block_idx].mixed_op, edge_mask)
+
 
 class Network(nn.Module):
     def __init__(
@@ -209,6 +224,16 @@ class Network(nn.Module):
 
         self.classifier = nn.Linear(C_prev, num_classes)
         self._initialize_alphas()
+        self.mask = None
+
+        self.weights_grad: list[torch.Tensor] = []
+        self.grad_hook_handlers: list[torch.utils.hooks.RemovableHandle] = []
+
+        # Multi-head attention for architectural parameters
+        self.is_arch_attention_enabled = False  # disabled by default
+        self.multihead_attention = nn.MultiheadAttention(
+            embed_dim=len(PRIMITIVES), num_heads=1
+        )
 
     def new(self) -> Network:
         model_new = Network(
@@ -227,8 +252,33 @@ class Network(nn.Module):
         # Replace this function on the fly to change the sampling method
         return F.softmax(alphas, dim=-1)
 
+    def sample_weights(
+        self,
+    ) -> tuple[torch.Tensor, torch.Tensor | None, list[torch.Tensor]]:
+        if self.projection_mode:
+            return self.get_projected_weights()
+
+        mixed_op_weights_to_sample = self._arch_parameters[0]
+        if self.is_arch_attention_enabled:
+            mixed_op_weights_to_sample = self._compute_arch_attention(
+                mixed_op_weights_to_sample
+            )
+
+        mixed_op_weights = self.sample(mixed_op_weights_to_sample)
+        output_weights = (
+            self.sample(self._arch_parameters[1]) if self._output_weights else None
+        )
+        input_weights = [self.sample(alpha) for alpha in self._arch_parameters[2:]]
+
+        if self.mask is not None:
+            mixed_op_weights = normalize_params(mixed_op_weights, self.mask)
+
+        return mixed_op_weights, output_weights, input_weights
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.reset_hooks()
         # NASBench only has one input to each cell
+        mixed_op_weights, output_weights, input_weights = self.sample_weights()
         s0 = self.stem(x)
         for i, cell in enumerate(self.cells):
             if i in [self._layers // 3, 2 * self._layers // 3]:
@@ -237,16 +287,19 @@ class Network(nn.Module):
                 s0 = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)(s0)
 
             # Sample mixed_op weights for the choice blocks in the graph
-            mixed_op_weights = self.sample(self._arch_parameters[0])
+            mixed_op_weights_cell = mixed_op_weights.clone()
 
             # Sample the output weights (if applicable)
-            output_weights = (
-                self.sample(self._arch_parameters[1]) if self._output_weights else None
+            output_weights_cell = (
+                output_weights.clone() if self._output_weights else None  # type: ignore
             )
 
             # Sample the input weights for the nodes in the cell
-            input_weights = [self.sample(alpha) for alpha in self._arch_parameters[2:]]
-            s0 = cell(s0, mixed_op_weights, output_weights, input_weights)
+            input_weights_cell = [weight.clone() for weight in input_weights]
+            self.save_weight_grads(mixed_op_weights_cell)
+            s0 = cell(
+                s0, mixed_op_weights_cell, output_weights_cell, input_weights_cell
+            )
 
         # Include one more preprocessing step here
         s0 = self.postprocess(s0)  # [N, C_max * (steps + 1), w, h] -> [N, C_max, w, h]
@@ -259,9 +312,10 @@ class Network(nn.Module):
 
     def _initialize_alphas(self) -> None:
         # Initializes the weights for the mixed ops.
-        num_ops = len(PRIMITIVES)
+        self.num_ops = len(PRIMITIVES)
+        self.num_edges = self._steps
         self.alphas_mixed_op = nn.Parameter(
-            1e-3 * torch.randn(self._steps, num_ops).cuda(), requires_grad=True
+            1e-3 * torch.randn(self._steps, self.num_ops).cuda(), requires_grad=True
         )
 
         # For the alphas on the output node initialize a weighting vector for all
@@ -276,6 +330,10 @@ class Network(nn.Module):
             nn.Parameter(1e-3 * torch.randn(1, n_inputs).cuda(), requires_grad=True)
             for n_inputs in range(begin, self._steps + 1)
         ]
+        # total choice blocks + one output node
+        self.num_nodes = self._steps + 1 - begin
+        if self._output_weights:
+            self.num_nodes += 1
 
         # Total architecture parameters
         self._arch_parameters = [
@@ -286,6 +344,158 @@ class Network(nn.Module):
 
         # TODO-ICLR: Beta parameters for edge normalization
         self._beta_parameters = [None]
+        self._initialize_projection_params()
+
+        self.anchor_mixed_op = Dirichlet(torch.ones_like(self.alphas_mixed_op).cuda())
+        self.anchor_inputs = [
+            Dirichlet(torch.ones_like(alpha).cuda()) for alpha in self.alphas_inputs
+        ]
+        self.anchor_output = Dirichlet(torch.ones_like(self.alphas_output).cuda())
+
+    def get_drnas_anchors(self) -> list[torch.Tensor]:
+        return [
+            self.anchor_mixed_op,
+            self.anchor_output,
+            *self.anchor_inputs,
+        ]
+
+    ### PerturbationArchSelection START ###
+    def _initialize_projection_params(self) -> None:
+        self.proj_weights = torch.zeros_like(self.alphas_mixed_op)
+        self.proj_weights_edge = [
+            torch.zeros_like(alpha) for alpha in self.alphas_inputs
+        ]
+        if self._output_weights:
+            self.proj_weights_edge.append(torch.zeros_like(self.alphas_output))
+
+        self.candidate_flags = torch.tensor(
+            self.num_edges * [True], requires_grad=False, dtype=torch.bool
+        )
+        self.candidate_flags_edge = torch.tensor(
+            self.num_nodes * [True], requires_grad=False, dtype=torch.bool
+        )
+
+        # nodes to outgoing edges
+        self.nid2eids: dict[int, list[int]] = {}
+        offset = 0
+        for nid in range(self.num_nodes):
+            self.nid2eids[nid] = [
+                *range(offset, offset + self.proj_weights_edge[nid].shape[-1])
+            ]
+            offset += self.proj_weights_edge[nid].shape[-1]
+
+        self.nid2selected_eids: dict[int, list[int]] = {}
+        for i in range(self.num_nodes):
+            self.nid2selected_eids[i] = []
+
+        self.projection_mode = False
+        self.projection_evaluation = False
+        self.removed_projected_weights = None
+        self.removed_projected_weights_inputs = None
+        self.removed_projected_weights_output = None
+
+    def remove_from_projected_weights(
+        self, selected_edge: int, selected_op: int | None, topology: bool = False
+    ) -> None:
+        weights_mixed_op, weights_output, weights_inputs = self.get_projected_weights()
+        if self._output_weights:
+            weights_nodes = [*weights_inputs, weights_output]
+        else:
+            weights_nodes = weights_inputs
+
+        if topology:
+            if selected_op is not None:
+                warnings.warn(
+                    "selected_op should be set to None in case of topology search",
+                    stacklevel=1,
+                )
+            # get node from the selected edge
+            selected_nid = None
+            selected_eid = None
+            for nid in self.nid2eids:
+                if selected_edge in self.nid2eids[nid]:
+                    selected_nid = nid
+                    selected_eid = self.nid2eids[nid].index(selected_edge)
+                    break
+
+            proj_mask_edge = torch.ones_like(
+                weights_nodes[selected_nid]  # type: ignore
+            )
+            proj_mask_edge[0][selected_eid] = 0
+            weights_nodes[selected_nid] *= proj_mask_edge  # type: ignore
+        else:
+            proj_mask = torch.ones_like(weights_mixed_op[selected_edge])
+            proj_mask[selected_op] = 0
+            weights_mixed_op *= proj_mask
+
+        self.removed_projected_weights = weights_mixed_op
+
+        if self._output_weights:
+            self.removed_projected_weights_inputs = weights_nodes[:-1]  # type: ignore
+            self.removed_projected_weights_output = weights_nodes[-1]
+        else:
+            self.removed_projected_weights_inputs = weights_nodes  # type: ignore
+            self.removed_projected_weights_output = None
+
+    def mark_projected_op(self, eid: int, opid: int) -> None:
+        self.proj_weights[eid][opid] = 1
+        self.candidate_flags[eid] = False
+
+    def mark_projected_edges(self, nid: int, eids: list[int]) -> None:
+        for eid in eids:
+            edge_idx = self.nid2eids[nid].index(eid)
+            self.proj_weights_edge[nid][0][edge_idx] = 1
+        self.nid2selected_eids[nid] = copy.deepcopy(eids)
+        self.candidate_flags_edge[nid] = False
+
+    def get_projected_weights(
+        self,
+    ) -> tuple[torch.Tensor, torch.Tensor | None, list[torch.Tensor]]:
+        if self.projection_evaluation:
+            removed_output_weights = (
+                self.removed_projected_weights_output if self._output_weights else None
+            )
+            return (  # type: ignore
+                self.removed_projected_weights,
+                removed_output_weights,
+                self.removed_projected_weights_inputs,
+            )
+
+        if self.is_arch_attention_enabled:
+            alphas_mixed_op = self._compute_arch_attention(self.arch_parameters()[0])
+        else:
+            alphas_mixed_op = self.arch_parameters()[0]
+
+        alphas_nodes = self.arch_parameters()[2:]
+        if self._output_weights:
+            alphas_nodes.append(self.arch_parameters()[1])
+
+        weights_mixed_op = torch.softmax(alphas_mixed_op, dim=-1)
+        weights_nodes = [torch.softmax(alpha, dim=-1) for alpha in alphas_nodes]
+
+        # operations for mixed op
+        for eid in range(self.num_edges):
+            if not self.candidate_flags[eid]:
+                weights_mixed_op[eid].data.copy_(self.proj_weights[eid])
+
+        # edge for alpha input
+        for nid in sorted(self.nid2eids.keys()):
+            if not self.candidate_flags_edge[nid]:
+                weights_nodes[nid].data.copy_(self.proj_weights_edge[nid])
+
+        if self._output_weights:
+            return weights_mixed_op, weights_nodes[-1], weights_nodes[:-1]
+
+        return weights_mixed_op, None, weights_nodes
+
+    def get_max_input_edges_at_node(self, selected_node: int) -> int:
+        if isinstance(self.search_space, NB1Shot1Space1):
+            num_inputs = list(self.search_space.num_parents_per_node.values())[3:]
+        else:
+            num_inputs = list(self.search_space.num_parents_per_node.values())[2:]
+        return num_inputs[selected_node]
+
+    ### PerturbationArchSelection END ###
 
     def arch_parameters(self) -> list[torch.Tensor]:
         return self._arch_parameters
@@ -300,7 +510,11 @@ class Network(nn.Module):
         def get_top_k(array: np.ndarray, k: int) -> list:
             return list(np.argpartition(array[0], -k)[-k:])
 
-        alphas_mixed_op = self.arch_parameters()[0]
+        if self.is_arch_attention_enabled:
+            alphas_mixed_op = self._compute_arch_attention(self.arch_parameters()[0])
+        else:
+            alphas_mixed_op = self.arch_parameters()[0]
+
         chosen_node_ops = softmax(alphas_mixed_op, axis=-1).argmax(-1)
 
         node_list = [PRIMITIVES[i] for i in chosen_node_ops]
@@ -381,3 +595,68 @@ class Network(nn.Module):
                 total_cell_flops = 1
             flops += torch.log(total_cell_flops)
         return flops / len(self.cells)
+
+    def prune(self, prune_fraction: float) -> None:
+        # mask is only applied to mixedop weights,
+        # not to input and output weights
+
+        assert prune_fraction < 1, "Prune fraction should be less than 1"
+        assert prune_fraction >= 0, "Prune fraction greater or equal to 0"
+
+        num_ops = len(PRIMITIVES)
+        top_k = num_ops - int(num_ops * prune_fraction)
+
+        self.mask = prune(self.alphas_mixed_op, top_k, self.mask)
+
+        for cell in self.cells:
+            cell.prune_ops(self.mask)
+
+    ### Layer Alignment START ###
+    def reset_hooks(self) -> None:
+        for hook in self.grad_hook_handlers:
+            hook.remove()
+
+        self.grad_hook_handlers = []
+
+    def save_gradient(self) -> Callable:
+        def hook(grad: torch.Tensor) -> None:
+            self.weights_grad.append(grad)
+
+        return hook
+
+    def save_weight_grads(
+        self,
+        weights: torch.Tensor,
+    ) -> None:
+        if not self.training:
+            return
+        grad_hook = weights.register_hook(self.save_gradient())
+        self.grad_hook_handlers.append(grad_hook)
+
+    def get_arch_grads(self, only_first_and_last: bool = False) -> list[torch.Tensor]:
+        grads = []
+        if only_first_and_last:
+            grads.append(self.weights_grad[0].reshape(-1))
+            grads.append(self.weights_grad[1].reshape(-1))
+        else:
+            for alphas in self.weights_grad:
+                grads.append(alphas.reshape(-1))
+
+        return grads
+
+    def get_mean_layer_alignment_score(
+        self, only_first_and_last: bool = False
+    ) -> float:
+        grads = self.get_arch_grads(only_first_and_last)
+        mean_score = calc_layer_alignment_score(grads)
+
+        if math.isnan(mean_score):
+            mean_score = 0
+
+        return mean_score
+
+    ### Layer Alignment END ###
+
+    def _compute_arch_attention(self, alphas: nn.Parameter) -> torch.Tensor:
+        attn_alphas, _ = self.multihead_attention(alphas, alphas, alphas)
+        return attn_alphas

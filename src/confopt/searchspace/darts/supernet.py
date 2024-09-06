@@ -9,6 +9,7 @@ from torch import nn
 from confopt.searchspace.common import (
     ArchAttentionSupport,
     DrNASRegTermSupport,
+    FairDARTSRegTermSupport,
     FLOPSRegTermSupport,
     GradientMatchingScoreSupport,
     GradientStatsSupport,
@@ -39,6 +40,7 @@ class DARTSSearchSpace(
     PerturbationArchSelectionSupport,
     InsertCellSupport,
     GradientStatsSupport,
+    FairDARTSRegTermSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
         """DARTS Search Space for Neural Architecture Search.
@@ -167,8 +169,8 @@ class DARTSSearchSpace(
 
         return stats
 
-    def get_drnas_anchors(self) -> tuple[torch.Tensor, torch.Tensor]:
-        return self.model.anchor_normal, self.model.anchor_reduce
+    def get_drnas_anchors(self) -> list[torch.Tensor]:
+        return [self.model.anchor_normal, self.model.anchor_reduce]
 
     def get_weighted_flops(self) -> torch.Tensor:
         return self.model.get_weighted_flops()
@@ -232,8 +234,14 @@ class DARTSSearchSpace(
     def is_topology_supported(self) -> bool:
         return True
 
+    def get_max_input_edges_at_node(self, selected_node: int) -> int:  # noqa: ARG002
+        return 2
+
     def insert_new_cells(self, num_of_cells: int) -> None:
         self.model.insert_new_cells(num_of_cells)
 
     def create_new_cell(self, position: int) -> nn.Module:
         return self.model.create_new_cell(position)
+
+    def get_fair_darts_arch_parameters(self) -> list[torch.Tensor]:
+        return self.get_sampled_weights()
