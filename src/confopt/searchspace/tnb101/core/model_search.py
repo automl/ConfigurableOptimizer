@@ -166,10 +166,11 @@ class TNB101SearchModel(nn.Module):
         self.sampled_weights = [alphas]
 
         feature = self.stem(inputs)
-        self.save_weight_grads(alphas.clone())
 
         for cell in self.cells:
-            feature = cell(feature, alphas)
+            weights = alphas.clone()
+            self.save_weight_grads(weights)
+            feature = cell(feature, weights)
 
         out = self.decoder(feature)
 
@@ -219,7 +220,8 @@ class TNB101SearchModel(nn.Module):
                     self._beta_parameters[idx_nodes], dim=-1
                 )
                 betas = torch.cat([betas, beta_node_v], dim=0)
-            self.save_weight_grads(alphas.clone())
+            weights = alphas.clone()
+            self.save_weight_grads(weights)
             feature = cell(feature, alphas, betas)
 
         out = self.decoder(feature)
