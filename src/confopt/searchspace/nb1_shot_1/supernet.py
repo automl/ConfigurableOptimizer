@@ -6,6 +6,13 @@ import torch
 from torch import nn
 
 from confopt.searchspace.common import SearchSpace
+from confopt.searchspace.common.base_search import (
+    ArchAttentionSupport,
+    DrNASRegTermSupport,
+    GradientStatsSupport,
+    LayerAlignmentScoreSupport,
+    PerturbationArchSelectionSupport,
+)
 from confopt.searchspace.nb1_shot_1.core import (
     NB1Shot1Space1,
     NB1Shot1Space2,
@@ -24,7 +31,14 @@ search_space_map = {
 }
 
 
-class NASBench1Shot1SearchSpace(SearchSpace):
+class NASBench1Shot1SearchSpace(
+    SearchSpace,
+    PerturbationArchSelectionSupport,
+    LayerAlignmentScoreSupport,
+    ArchAttentionSupport,
+    GradientStatsSupport,
+    DrNASRegTermSupport,
+):
     def __init__(
         self, search_space: Literal["S1", "S2", "S3"], *args: Any, **kwargs: dict
     ) -> None:
@@ -60,6 +74,76 @@ class NASBench1Shot1SearchSpace(SearchSpace):
 
     def get_genotype(self) -> Any:
         return self.model.get_genotype()
+
+    def get_num_ops(self) -> int:
+        return self.model.num_ops
+
+    def get_num_edges(self) -> int:
+        return self.model.num_edges
+
+    def get_num_nodes(self) -> int:
+        return self.search_space_type.num_intermediate_nodes
+
+    def get_candidate_flags(self, cell_type: Literal["normal", "reduce"]) -> list:
+        assert cell_type == "normal"
+        if self.topology:
+            return self.model.candidate_flags_edge
+        return self.model.candidate_flags
+
+    def get_edges_at_node(self, selected_node: int) -> list:
+        return self.model.nid2eids[selected_node]
+
+    def remove_from_projected_weights(
+        self,
+        selected_edge: int,
+        selected_op: int | None,
+        cell_type: Literal["normal", "reduce"] = "normal",
+    ) -> None:
+        assert cell_type == "normal"
+        if self.topology is None:
+            self.set_topology(False)
+        self.model.remove_from_projected_weights(
+            selected_edge, selected_op, self.topology
+        )
+
+    def mark_projected_operation(
+        self,
+        selected_edge: int,
+        selected_op: int,
+        cell_type: Literal["normal"] | Literal["reduce"],
+    ) -> None:
+        assert cell_type == "normal"
+        self.model.mark_projected_op(selected_edge, selected_op)
+
+    def mark_projected_edge(
+        self,
+        selected_node: int,
+        selected_edges: list[int],
+        cell_type: str | None = None,
+    ) -> None:
+        assert cell_type == "normal"
+        self.model.mark_projected_edges(selected_node, selected_edges)
+
+    def set_projection_mode(self, value: bool) -> None:
+        self.model.projection_mode = value
+
+    def set_projection_evaluation(self, value: bool) -> None:
+        self.model.projection_evaluation = value
+
+    def is_topology_supported(self) -> bool:
+        return True
+
+    def get_max_input_edges_at_node(self, selected_node: int) -> int:
+        return self.model.get_max_input_edges_at_node(selected_node)
+
+    def get_mean_layer_alignment_score(self) -> tuple[float, float]:
+        return self.model.get_mean_layer_alignment_score(), 0
+
+    def get_first_and_last_layer_alignment_score(self) -> tuple[float, float]:
+        return self.model.get_mean_layer_alignment_score(only_first_and_last=True), 0
+
+    def get_drnas_anchors(self) -> list[torch.Tensor]:
+        return self.model.get_drnas_anchors()
 
 
 if __name__ == "__main__":

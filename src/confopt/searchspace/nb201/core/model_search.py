@@ -318,6 +318,7 @@ class NB201SearchModel(nn.Module):
         self.weights_grad = []
 
         weights = self.sample_weights()
+        self.sampled_weights = [weights]
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
@@ -342,6 +343,7 @@ class NB201SearchModel(nn.Module):
         self.weights_grad = []
 
         weights = self.sample_weights()
+        self.sampled_weights = [weights]
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):

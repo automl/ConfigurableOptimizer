@@ -449,6 +449,7 @@ class Network(nn.Module):
         self.weights_grad["reduce"] = []
 
         weights_normal, weights_reduce = self.sample_weights()
+        self.sampled_weights = [weights_normal, weights_reduce]
 
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
@@ -475,6 +476,7 @@ class Network(nn.Module):
         self.weights_grad["reduce"] = []
 
         weights_normal, weights_reduce = self.sample_weights()
+        self.sampled_weights = [weights_normal, weights_reduce]
 
         for _i, cell in enumerate(self.cells):
             if cell.reduction:

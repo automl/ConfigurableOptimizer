@@ -33,6 +33,7 @@ from confopt.oneshot.perturbator import SDARTSPerturbator
 from confopt.oneshot.pruner.pruner import Pruner
 from confopt.oneshot.regularizer import (
     DrNASRegularizationTerm,
+    FairDARTSRegularizationTerm,
     FLOPSRegularizationTerm,
     Regularizer,
 )
@@ -454,6 +455,10 @@ class Experiment:
                 reg_terms.append(DrNASRegularizationTerm(**config["drnas_config"]))
             elif term == "flops":
                 reg_terms.append(FLOPSRegularizationTerm(**config["flops_config"]))
+            elif term == "fairdarts":
+                reg_terms.append(
+                    FairDARTSRegularizationTerm(**config["fairdarts_config"])
+                )
 
         self.regularizer = Regularizer(
             reg_terms=reg_terms,

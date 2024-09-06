@@ -7,6 +7,7 @@ from torch import nn
 
 from confopt.searchspace.common.base_search import (
     ArchAttentionSupport,
+    FairDARTSRegTermSupport,
     GradientMatchingScoreSupport,
     GradientStatsSupport,
     LayerAlignmentScoreSupport,
@@ -30,6 +31,7 @@ class TransNASBench101SearchSpace(
     GradientStatsSupport,
     OperationStatisticsSupport,
     LayerAlignmentScoreSupport,
+    FairDARTSRegTermSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
         model = TNB101MicroModel(*args, **kwargs).to(DEVICE)
@@ -90,6 +92,9 @@ class TransNASBench101SearchSpace(
         return self.model.get_mean_layer_alignment_score(only_first_and_last=True), 0
 
     ### End of LayerAlignmentScoreSupport methods ###
+
+    def get_fair_darts_arch_parameters(self) -> list[torch.Tensor]:
+        return self.get_sampled_weights()
 
 
 if __name__ == "__main__":
