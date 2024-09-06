@@ -4,7 +4,9 @@ import unittest
 
 import pytest
 
+import numpy as np
 from confopt.searchspace.darts.core.genotypes import Genotype as NB301Genotype
+from confopt.searchspace.nb1_shot_1.core.search_spaces.genotypes import NASBench1Shot1ConfoptGenotype
 from confopt.searchspace.nb201.core.genotypes import Structure as NB201Genotype
 from confopt.searchspace.tnb101.core.genotypes import TNB101Genotype
 
@@ -98,6 +100,23 @@ tnb101_genotype = TNB101Genotype(
 test_tnb101_acc_top1 = 50.8658447265625
 test_tnb101_fail_acc_top1 = 29.433717727661133
 
+
+
+INPUT = 'input'
+OUTPUT = 'output'
+CONV1X1 = 'conv1x1-bn-relu'
+CONV3X3 = 'conv3x3-bn-relu'
+MAXPOOL3X3 = 'maxpool3x3'
+matrix=np.array([[0, 1, 1, 1, 0, 1, 0],    # input layer
+        [0, 0, 0, 0, 0, 0, 1],    # 1x1 conv
+        [0, 0, 0, 0, 0, 0, 1],    # 3x3 conv
+        [0, 0, 0, 0, 1, 0, 0],    # 5x5 conv (replaced by two 3x3's)
+        [0, 0, 0, 0, 0, 0, 1],    # 5x5 conv (replaced by two 3x3's)
+        [0, 0, 0, 0, 0, 0, 1],    # 3x3 max-pool
+        [0, 0, 0, 0, 0, 0, 0]])   # output layer
+# Operations at the vertices of the module, matches order of matrix
+ops=np.array([INPUT, CONV1X1, CONV3X3, CONV3X3, CONV3X3, MAXPOOL3X3, OUTPUT])
+nb101_genotype = NASBench1Shot1ConfoptGenotype(matrix=matrix, ops=ops)
 
 class TestBenchmarks(unittest.TestCase):
     @pytest.mark.benchmark()  # type: ignore
@@ -193,6 +212,25 @@ class TestBenchmarks(unittest.TestCase):
 
         assert query_result["benchmark/test_top1"] == test_tnb101_fail_acc_top1
 
+    @pytest.mark.benchmark()  # type: ignore
+    def test_nb101_benchmark(self) -> None:
+        from confopt.benchmarks import NB101Benchmark
+
+        api = NB101Benchmark("only108")
+        import random
+        random.seed(0)
+        query_result = api.query(nb101_genotype, dataset="cifar10", epochs=108)
+
+        self.assertAlmostEqual(  # noqa: PT009
+            query_result["benchmark/training_time"], 1157.675048828125, 4
+        )
+
+        self.assertAlmostEqual(  # noqa: PT009
+            query_result["benchmark/test_top1"],0.932692289352417, 4
+        )
+
+        assert query_result["benchmark/trainable_parameters"] == 2694282
+        
 
 if __name__ == "__main__":
     unittest.main()
