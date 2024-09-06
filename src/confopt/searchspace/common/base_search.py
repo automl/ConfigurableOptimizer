@@ -414,6 +414,12 @@ class GradientStatsSupport(ModelWrapper):
         for cell_grad_meter in self.cell_grads_meters.values():
             cell_grad_meter.reset()
 
+        for arch_grad_meter in self.arch_grads_meters.values():
+            arch_grad_meter.reset()
+
+        for row_grad_meter in self.arch_row_grads_meters.values():
+            row_grad_meter.reset()
+
     def _calculate_gradient_norm(self, model: nn.Module) -> float:
         total_norm = 0.0
 
