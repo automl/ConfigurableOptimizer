@@ -8,6 +8,7 @@ from torch import nn
 
 from confopt.searchspace.common.base_search import (
     ArchAttentionSupport,
+    DrNASRegTermSupport,
     FairDARTSRegTermSupport,
     GradientMatchingScoreSupport,
     GradientStatsSupport,
@@ -34,6 +35,7 @@ class TransNASBench101SearchSpace(
     OperationStatisticsSupport,
     LayerAlignmentScoreSupport,
     FairDARTSRegTermSupport,
+    DrNASRegTermSupport,
     PerturbationArchSelectionSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
@@ -145,6 +147,9 @@ class TransNASBench101SearchSpace(
 
     def get_max_input_edges_at_node(self, selected_node: int) -> int:  # noqa: ARG002
         return 1
+
+    def get_drnas_anchors(self) -> list[torch.Tensor]:
+        return [self.model.anchor_normal]
 
 
 if __name__ == "__main__":

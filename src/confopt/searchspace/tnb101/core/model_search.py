@@ -6,6 +6,7 @@ from typing import Callable
 
 import torch
 from torch import nn
+from torch.distributions import Dirichlet
 
 from confopt.searchspace.common import OperationBlock, OperationChoices
 from confopt.utils import (
@@ -114,6 +115,9 @@ class TNB101SearchModel(nn.Module):
         self.mask: None | torch.Tensor = None
         self._arch_parameters = nn.Parameter(
             1e-3 * torch.randn(self.num_edge, len(op_names))  # type: ignore
+        )
+        self.anchor_normal = Dirichlet(
+            torch.ones_like(self._arch_parameters[0]).to(DEVICE)
         )
         self._beta_parameters = nn.Parameter(1e-3 * torch.randn(self.num_edge))
 
