@@ -28,6 +28,8 @@ from .search_spaces.search_space_2 import NB1Shot1Space2
 from .search_spaces.search_space_3 import NB1Shot1Space3
 from .search_spaces.utils import CONV1X1, INPUT, OUTPUT
 
+DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
 
 class MixedOp(nn.Module):
     def __init__(self, C: int, stride: int) -> None:
@@ -237,7 +239,7 @@ class Network(nn.Module):
             self._layers,
             steps=self.search_space.num_intermediate_nodes,
             output_weights=self._output_weights,
-        ).cuda()
+        ).to(DEVICE)
         for x, y in zip(model_new.arch_parameters(), self.arch_parameters()):
             x.data.copy_(y.data)
         return model_new
@@ -309,19 +311,19 @@ class Network(nn.Module):
         self.num_ops = len(PRIMITIVES)
         self.num_edges = self._steps
         self.alphas_mixed_op = nn.Parameter(
-            1e-3 * torch.randn(self._steps, self.num_ops).cuda(), requires_grad=True
+            1e-3 * torch.randn(self._steps, self.num_ops).to(DEVICE), requires_grad=True
         )
 
         # For the alphas on the output node initialize a weighting vector for all
         # choice blocks and the input edge.
         self.alphas_output = nn.Parameter(
-            1e-3 * torch.randn(1, self._steps + 1).cuda(), requires_grad=True
+            1e-3 * torch.randn(1, self._steps + 1).to(DEVICE), requires_grad=True
         )
 
         begin = 3 if type(self.search_space) == NB1Shot1Space1 else 2
         # Initialize the weights for the inputs to each choice block.
         self.alphas_inputs = [
-            nn.Parameter(1e-3 * torch.randn(1, n_inputs).cuda(), requires_grad=True)
+            nn.Parameter(1e-3 * torch.randn(1, n_inputs).to(DEVICE), requires_grad=True)
             for n_inputs in range(begin, self._steps + 1)
         ]
         # total choice blocks + one output node
@@ -340,11 +342,13 @@ class Network(nn.Module):
         self._beta_parameters = [None]
         self._initialize_projection_params()
 
-        self.anchor_mixed_op = Dirichlet(torch.ones_like(self.alphas_mixed_op).cuda())
+        self.anchor_mixed_op = Dirichlet(
+            torch.ones_like(self.alphas_mixed_op).to(DEVICE)
+        )
         self.anchor_inputs = [
-            Dirichlet(torch.ones_like(alpha).cuda()) for alpha in self.alphas_inputs
+            Dirichlet(torch.ones_like(alpha).to(DEVICE)) for alpha in self.alphas_inputs
         ]
-        self.anchor_output = Dirichlet(torch.ones_like(self.alphas_output).cuda())
+        self.anchor_output = Dirichlet(torch.ones_like(self.alphas_output).to(DEVICE))
 
     def get_drnas_anchors(self) -> list[torch.Tensor]:
         return [

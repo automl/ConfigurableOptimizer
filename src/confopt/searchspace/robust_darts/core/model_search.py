@@ -190,7 +190,7 @@ class Network(nn.Module):
             stem_multiplier=self._stem_multiplier,
             drop_path_prob=self.drop_path_prob,
             edge_normalization=self.edge_normalization,
-        ).cuda()
+        ).to(DEVICE)
         for x, y in zip(model_new.arch_parameters(), self.arch_parameters()):
             x.data.copy_(y.data)
         return model_new

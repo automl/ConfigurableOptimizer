@@ -553,8 +553,8 @@ class Network(nn.Module):
             self.betas_reduce,
         ]
 
-        self.anchor_normal = Dirichlet(torch.ones_like(self.alphas_normal).cuda())
-        self.anchor_reduce = Dirichlet(torch.ones_like(self.alphas_reduce).cuda())
+        self.anchor_normal = Dirichlet(torch.ones_like(self.alphas_normal).to(DEVICE))
+        self.anchor_reduce = Dirichlet(torch.ones_like(self.alphas_reduce).to(DEVICE))
         self._initialize_projection_params()
 
     def arch_parameters(self) -> list[torch.nn.Parameter]:

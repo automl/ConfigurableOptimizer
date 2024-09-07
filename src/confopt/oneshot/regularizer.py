@@ -15,6 +15,8 @@ from confopt.searchspace.common import (
     SearchSpace,
 )
 
+DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
 
 class Regularizer(OneShotComponent):
     def __init__(
@@ -99,11 +101,11 @@ class FairDARTSRegularizationTerm(RegularizationTerm):
         arch_parameters = model.get_fair_darts_arch_parameters()
 
         if arch_parameters is None:
-            return torch.tensor(0.0, requires_grad=False).cuda()
+            return torch.tensor(0.0, requires_grad=False).to(DEVICE)
 
         arch_parameters = torch.cat(arch_parameters, dim=0)
         loss = -F.l1_loss(
-            arch_parameters, torch.tensor(0.5, requires_grad=False).cuda()
+            arch_parameters, torch.tensor(0.5, requires_grad=False).to(DEVICE)
         )
 
         return loss
