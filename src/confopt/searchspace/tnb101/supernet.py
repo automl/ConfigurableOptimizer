@@ -5,6 +5,8 @@ from torch import nn
 
 from confopt.searchspace.common.base_search import (
     ArchAttentionSupport,
+    FairDARTSRegTermSupport,
+    FLOPSRegTermSupport,
     GradientStatsSupport,
     SearchSpace,
 )
@@ -15,7 +17,11 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 
 class TransNASBench101SearchSpace(
-    SearchSpace, ArchAttentionSupport, GradientStatsSupport
+    SearchSpace,
+    ArchAttentionSupport,
+    GradientStatsSupport,
+    FLOPSRegTermSupport,
+    FairDARTSRegTermSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
         model = TNB101MicroModel(*args, **kwargs).to(DEVICE)
@@ -37,6 +43,12 @@ class TransNASBench101SearchSpace(
 
     def get_genotype(self) -> str:
         return self.model.genotype()
+
+    def get_weighted_flops(self) -> torch.Tensor:
+        return self.model.get_weighted_flops()
+
+    def get_fair_darts_arch_parameters(self) -> list[torch.Tensor]:
+        return self.get_sampled_weights()
 
 
 if __name__ == "__main__":

@@ -144,7 +144,9 @@ def _test_gradient_stats_support(search_space: SearchSpace,  n_extra: int) -> No
 
     values = tuple(v for v in stats.values())
 
-    assert all(original_v != new_v for original_v, new_v in zip(original_values, values))
+    assert all(
+        original_v != new_v for original_v, new_v in zip(original_values, values)
+    )
 
 
 class TestBabyDARTS(unittest.TestCase):
@@ -629,7 +631,7 @@ class TestNASBench1Shot1SearchSpace(unittest.TestCase):
 
         for arch_param in arch_params:
             assert isinstance(arch_param, nn.Parameter)
-        
+
         assert arch_params[0].shape == (4, 3)
         assert arch_params[1].shape == (1, 5)
         assert arch_params[2].shape == (1, 3)
@@ -642,13 +644,12 @@ class TestNASBench1Shot1SearchSpace(unittest.TestCase):
 
         for arch_param in arch_params:
             assert isinstance(arch_param, nn.Parameter)
-        
+
         assert arch_params[0].shape == (4, 3)
         assert arch_params[1].shape == (1, 5)
         assert arch_params[2].shape == (1, 2)
         assert arch_params[3].shape == (1, 3)
         assert arch_params[4].shape == (1, 4)
-
 
     def test_arch_parameters_s3(self) -> None:
         search_space = NASBench1Shot1SearchSpace("S3")
@@ -657,7 +658,7 @@ class TestNASBench1Shot1SearchSpace(unittest.TestCase):
 
         for arch_param in arch_params:
             assert isinstance(arch_param, nn.Parameter)
-        
+
         assert arch_params[0].shape == (5, 3)
         assert arch_params[1].shape == (1, 6)
         assert arch_params[2].shape == (1, 2)
@@ -706,19 +707,49 @@ class TestNASBench1Shot1SearchSpace(unittest.TestCase):
         assert logits.shape == torch.Size([2, num_classes])
         assert out.shape == torch.Size([2, 64])
 
-    def test_prune(self) -> None:
-        # TODO: Update NB1Shot1 later
+    def _test_prune_ss(self, search_space: NASBench1Shot1SearchSpace) -> None:
+        num_ops = search_space.get_num_ops()
+        for num_keep in range(1, num_ops - 1):
+            proxy_search_space = copy.deepcopy(search_space)
+            prune_fraction = 1 - (num_keep / num_ops)
+            proxy_search_space.prune(prune_fraction)
+            _check_pruned_alphas([proxy_search_space.arch_parameters[0]], num_keep)
+
+            mask = proxy_search_space.model.mask
+            _check_prune_mask([mask], num_keep)
+
+            # Check that operations are freezed
+            for cell in proxy_search_space.model.cells:
+                if isinstance(cell, NasBench1Shot1SearchCell):
+                    for choice_block_idx in range(cell._steps):
+                        operation_block = cell._choice_blocks[choice_block_idx].mixed_op
+                        edge_mask = mask[choice_block_idx]
+                        zero_indices = torch.nonzero(edge_mask == 0).flatten()
+                        for i in zero_indices:
+                            params = [
+                                p.requires_grad
+                                for p in operation_block.ops[i].parameters()
+                            ]
+                            if len(params) != 0:
+                                assert not all(params)
+            self._test_forward_pass(proxy_search_space)
+
+        # Check for prune fraction = 0
+        search_space.prune(prune_fraction=0)
+        masks = search_space.model.mask
+        assert masks.sum() == masks.numel()
+
+    def test_prune_s1(self) -> None:
+        search_space = NASBench1Shot1SearchSpace("S1")
+        self._test_prune_ss(search_space)
+
+    def test_prune_s2(self) -> None:
         search_space = NASBench1Shot1SearchSpace("S2")
-        search_space.prune()
-        alphas_mixed_op = search_space.arch_parameters[0]
+        self._test_prune_ss(search_space)
 
-        assert torch.count_nonzero(alphas_mixed_op) == len(alphas_mixed_op)
-        assert torch.equal(
-            torch.count_nonzero(alphas_mixed_op, dim=-1),
-            torch.ones(len(alphas_mixed_op)).to(DEVICE),
-        )
-
-        self._test_forward_pass(search_space)
+    def test_prune_s3(self) -> None:
+        search_space = NASBench1Shot1SearchSpace("S3")
+        self._test_prune_ss(search_space)
 
     def _test_optim_forward_pass(self, search_space: NASBench1Shot1SearchSpace) -> None:
         loss_fn = torch.nn.CrossEntropyLoss().to(DEVICE)

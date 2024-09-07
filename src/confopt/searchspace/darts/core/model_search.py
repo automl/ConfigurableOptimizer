@@ -238,6 +238,7 @@ class Cell(nn.Module):
                         )
                     else:
                         self._ops[idx].ops[skip_connection_index] = Identity()
+                self._ops[idx].flops = None
                 idx += 1
 
     def increase_channel_size(
@@ -249,6 +250,12 @@ class Cell(nn.Module):
             op.change_op_channel_size(
                 k=k, num_channels_to_add=num_channels_to_add, new_cell=True
             )
+
+    def get_weighted_flops(self, alphas: torch.Tensor) -> torch.Tensor:
+        flops = 0
+        for idx, op in enumerate(self._ops):
+            flops += op.get_weighted_flops(alphas[idx])
+        return flops
 
 
 class Network(nn.Module):
@@ -449,6 +456,7 @@ class Network(nn.Module):
         self.weights_grad["reduce"] = []
 
         weights_normal, weights_reduce = self.sample_weights()
+        self.sampled_weights = [weights_normal, weights_reduce]
 
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
@@ -475,6 +483,7 @@ class Network(nn.Module):
         self.weights_grad["reduce"] = []
 
         weights_normal, weights_reduce = self.sample_weights()
+        self.sampled_weights = [weights_normal, weights_reduce]
 
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
@@ -935,6 +944,26 @@ class Network(nn.Module):
     ) -> None:
         for cell in self.cells:
             cell.increase_channel_size(k=k, num_channels_to_add=num_channels_to_add)
+
+    def get_weighted_flops(self) -> torch.Tensor:
+        if self.is_arch_attention_enabled:
+            alphas_normal, alphas_reduce = self._compute_arch_attention(
+                self.alphas_normal, self.alphas_reduce
+            )
+        else:
+            alphas_normal, alphas_reduce = self.alphas_normal, self.alphas_reduce
+        weights_normal, weights_reduce = F.softmax(alphas_normal, dim=-1), F.softmax(
+            alphas_reduce, dim=-1
+        )
+        flops = 0
+        for cell in self.cells:
+            weights = weights_reduce if cell.reduction else weights_normal
+            total_cell_flops = cell.get_weighted_flops(weights)
+            # to avoid nan
+            if total_cell_flops == 0:
+                total_cell_flops = 1
+            flops += torch.log(total_cell_flops)
+        return flops / len(self.cells)
 
 
 def preserve_grads(m: nn.Module) -> None:

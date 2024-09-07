@@ -318,6 +318,7 @@ class NB201SearchModel(nn.Module):
         self.weights_grad = []
 
         weights = self.sample_weights()
+        self.sampled_weights = [weights]
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
@@ -342,6 +343,7 @@ class NB201SearchModel(nn.Module):
         self.weights_grad = []
 
         weights = self.sample_weights()
+        self.sampled_weights = [weights]
 
         feature = self.stem(inputs)
         for _i, cell in enumerate(self.cells):
@@ -474,6 +476,22 @@ class NB201SearchModel(nn.Module):
     def _compute_arch_attention(self, alphas: nn.Parameter) -> torch.Tensor:
         attn_alphas, _ = self.multihead_attention(alphas, alphas, alphas)
         return attn_alphas
+
+    def get_weighted_flops(self) -> torch.Tensor:
+        if self.is_arch_attention_enabled:
+            arch_parameters = self._compute_arch_attention(self.arch_parameters)
+        else:
+            arch_parameters = self.arch_parameters
+
+        weights = torch.softmax(arch_parameters, dim=-1)
+        flops = 0
+        for cell in self.cells:
+            if isinstance(cell, SearchCell):
+                total_cell_flops = cell.get_weighted_flops(weights)
+                if total_cell_flops == 0:
+                    total_cell_flops = 1
+                flops += torch.log(total_cell_flops)
+        return flops / len(self.cells)
 
 
 def preserve_grads(m: nn.Module) -> None:
