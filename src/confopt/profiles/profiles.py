@@ -39,7 +39,7 @@ class GDASProfile(BaseProfile, ABC):
 
     def __init__(
         self,
-        epochs: int,
+        epochs: int = 240,
         tau_min: float = 0.1,
         tau_max: float = 10,
         **kwargs: Any,
@@ -71,9 +71,9 @@ class ReinMaxProfile(GDASProfile):
 class SNASProfile(BaseProfile, ABC):
     def __init__(
         self,
-        epochs: int,
+        epochs: int = 150,
         temp_init: float = 1.0,
-        temp_min: float = 0.33,
+        temp_min: float = 0.03,
         temp_annealing: bool = True,
         **kwargs: Any,
     ) -> None:
@@ -105,7 +105,7 @@ class SNASProfile(BaseProfile, ABC):
 class DRNASProfile(BaseProfile, ABC):
     def __init__(
         self,
-        epochs: int,
+        epochs: int = 100,
         **kwargs: Any,
     ) -> None:
         PROFILE_TYPE = "DRNAS"
