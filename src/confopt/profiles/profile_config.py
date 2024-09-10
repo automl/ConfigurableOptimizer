@@ -410,8 +410,10 @@ class BaseProfile:
             "scheduler": "cosine_annealing_lr",
             "scheduler_config": {},
             "criterion": "cross_entropy",
-            "batch_size": 256,
+            "batch_size": 64,
             "learning_rate_min": 0.0,
+            "cutout": -1,
+            "cutout_length": 16,
             "train_portion": 0.5,
             "use_data_parallel": True,
             "checkpointing_freq": 1,
@@ -440,7 +442,7 @@ class BaseProfile:
             "scheduler": "cosine_annealing_lr",
             "scheduler_config": {},
             "criterion": "cross_entropy",
-            "batch_size": 256,
+            "batch_size": 64,
             "learning_rate_min": 0.001,
             "cutout": -1,
             "cutout_length": 16,
@@ -464,6 +466,8 @@ class BaseProfile:
             "use_data_parallel": True,
             "checkpointing_freq": 1,
             "seed": self.seed,
+            "cutout": -1,
+            "cutout_length": 16,
         }
         self.trainer_config = trainer_config
 
@@ -479,5 +483,7 @@ class BaseProfile:
             "use_data_parallel": True,
             "checkpointing_freq": 1,
             "seed": self.seed,
+            "cutout": -1,
+            "cutout_length": 16,
         }
         self.trainer_config = trainer_config
