@@ -72,14 +72,7 @@ class GDASProfile(BaseProfile, ABC):
                 "epochs": self.epochs,
             }
         )
-        self.trainer_config.setdefault("optim_config", {})
-        self.trainer_config.update(
-            {
-                "optim_config": {
-                    "eta_min": 0.001,
-                }
-            }
-        )
+        self.trainer_config.update({"learning_rate_min": 0.001})
 
     def _initialize_trainer_config_darts(self) -> None:
         super()._initialize_trainer_config_darts()
@@ -167,6 +160,8 @@ class DRNASProfile(BaseProfile, ABC):
             "criterion": "cross_entropy",
             "batch_size": 64,
             "learning_rate_min": 0.001,
+            "cutout": -1,
+            "cutout_length": 16,
             "train_portion": 0.5,
             "use_data_parallel": True,
             "checkpointing_freq": 1,
@@ -176,7 +171,10 @@ class DRNASProfile(BaseProfile, ABC):
         # self.tau_min = 1
         # self.tau_max = 10
         self.trainer_config = trainer_config
-        self.searchspace_config.update({"N": 5, "C": 16})
+        if hasattr(self, "searchspace_config"):
+            self.searchspace_config.update({"N": 5, "C": 16})
+        else:
+            self.searchspace_config = {"N": 5, "C": 16}
 
     def _initialize_trainer_config_darts(self) -> None:
         default_train_config = {
@@ -203,12 +201,15 @@ class DRNASProfile(BaseProfile, ABC):
             "cutout": -1,
             "cutout_length": 16,
             "train_portion": 0.5,
-            "use_ddp": True,
+            "use_data_parallel": True,
             "checkpointing_freq": 2,
             "seed": self.seed,
         }
-        self.train_config = default_train_config
-        self.searchspace_config.update({"layers": 20, "C": 36, "auxiliary": False})
+        self.trainer_config = default_train_config
+        if hasattr(self, "searchspace_config"):
+            self.searchspace_config.update({"layers": 20, "C": 36})
+        else:
+            self.searchspace_config = {"layers": 20, "C": 36}
 
 
 class DiscreteProfile:
