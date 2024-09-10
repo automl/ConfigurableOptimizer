@@ -19,7 +19,7 @@ class BaseProfile:
     def __init__(
         self,
         config_type: str,
-        epochs: int = 50,
+        epochs: int = 100,
         *,
         sampler_sample_frequency: str = "step",
         is_partial_connection: bool = False,
@@ -246,14 +246,35 @@ class BaseProfile:
 
     @abstractmethod
     def _initialize_trainer_config(self) -> None:
-        if self.searchspace_str == "nb201":
-            self._initialize_trainer_config_nb201()
-        elif self.searchspace_str == "darts":
-            self._initialize_trainer_config_darts()
-        elif self.searchspace_str == "nb1shot1":
-            self._initialize_trainer_config_1shot1()
-        elif self.searchspace_str == "tnb101":
-            self._initialize_trainer_config_tnb101()
+        trainer_config = {
+            "lr": 0.025,
+            "arch_lr": 3e-4,
+            "epochs": self.epochs,
+            "lora_warm_epochs": self.lora_warm_epochs,
+            "optim": "sgd",
+            "arch_optim": "adam",
+            "optim_config": {
+                "momentum": 0.9,
+                "nesterov": 0,
+                "weight_decay": 3e-4,
+            },
+            "arch_optim_config": {
+                "weight_decay": 1e-3,
+            },
+            "scheduler": "cosine_annealing_lr",
+            "scheduler_config": {},
+            "criterion": "cross_entropy",
+            "batch_size": 64,
+            "learning_rate_min": 0.0,
+            "cutout": -1,
+            "cutout_length": 16,
+            "train_portion": 0.7,
+            "use_data_parallel": True,
+            "checkpointing_freq": 1,
+            "seed": self.seed,
+        }
+
+        self.trainer_config = trainer_config
 
     @abstractmethod
     def _initialize_dropout_config(self) -> None:
@@ -389,101 +410,3 @@ class BaseProfile:
             name_wandb_run.append("with_oles")
         name_wandb_run_str = "-".join(name_wandb_run)
         return name_wandb_run_str
-
-    @abstractmethod
-    def _initialize_trainer_config_nb201(self) -> None:
-        trainer_config = {
-            "lr": 0.025,
-            "arch_lr": 3e-4,
-            "epochs": self.epochs,  # 200
-            "lora_warm_epochs": self.lora_warm_epochs,
-            "optim": "sgd",
-            "arch_optim": "adam",
-            "optim_config": {
-                "momentum": 0.9,
-                "nesterov": True,
-                "weight_decay": 5e-4,
-            },
-            "arch_optim_config": {
-                "weight_decay": 1e-3,
-            },
-            "scheduler": "cosine_annealing_lr",
-            "scheduler_config": {},
-            "criterion": "cross_entropy",
-            "batch_size": 64,
-            "learning_rate_min": 0.0,
-            "cutout": -1,
-            "cutout_length": 16,
-            "train_portion": 0.5,
-            "use_data_parallel": True,
-            "checkpointing_freq": 1,
-            "seed": self.seed,
-        }
-
-        self.trainer_config = trainer_config
-
-    @abstractmethod
-    def _initialize_trainer_config_darts(self) -> None:
-        trainer_config = {
-            "lr": 0.025,
-            "arch_lr": 3e-4,
-            "epochs": self.epochs,  # 50
-            "lora_warm_epochs": self.lora_warm_epochs,
-            "optim": "sgd",
-            "arch_optim": "adam",
-            "optim_config": {
-                "momentum": 0.9,
-                "nesterov": 0,
-                "weight_decay": 3e-4,
-            },
-            "arch_optim_config": {
-                "weight_decay": 1e-3,
-            },
-            "scheduler": "cosine_annealing_lr",
-            "scheduler_config": {},
-            "criterion": "cross_entropy",
-            "batch_size": 64,
-            "learning_rate_min": 0.001,
-            "cutout": -1,
-            "cutout_length": 16,
-            "train_portion": 0.5,
-            "use_data_parallel": True,
-            "checkpointing_freq": 1,
-            "seed": self.seed,
-        }
-
-        self.trainer_config = trainer_config
-
-    @abstractmethod
-    def _initialize_trainer_config_1shot1(self) -> None:
-        trainer_config = {
-            "lr": 0.025,
-            "arch_lr": 3e-4,
-            "epochs": self.epochs,  # 50
-            "lora_warm_epochs": self.lora_warm_epochs,
-            "optim": "sgd",
-            "arch_optim": "adam",
-            "use_data_parallel": True,
-            "checkpointing_freq": 1,
-            "seed": self.seed,
-            "cutout": -1,
-            "cutout_length": 16,
-        }
-        self.trainer_config = trainer_config
-
-    @abstractmethod
-    def _initialize_trainer_config_tnb101(self) -> None:
-        trainer_config = {
-            "lr": 0.025,
-            "arch_lr": 3e-4,
-            "epochs": self.epochs,  # 50
-            "lora_warm_epochs": self.lora_warm_epochs,
-            "optim": "sgd",
-            "arch_optim": "adam",
-            "use_data_parallel": True,
-            "checkpointing_freq": 1,
-            "seed": self.seed,
-            "cutout": -1,
-            "cutout_length": 16,
-        }
-        self.trainer_config = trainer_config

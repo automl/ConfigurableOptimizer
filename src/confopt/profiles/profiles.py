@@ -39,7 +39,7 @@ class GDASProfile(BaseProfile, ABC):
 
     def __init__(
         self,
-        epochs: int = 240,
+        epochs: int,
         tau_min: float = 0.1,
         tau_max: float = 10,
         **kwargs: Any,
@@ -63,20 +63,6 @@ class GDASProfile(BaseProfile, ABC):
         }
         self.sampler_config = gdas_config  # type: ignore
 
-    def _initialize_trainer_config_nb201(self) -> None:
-        # self.epochs = 250
-        super()._initialize_trainer_config_nb201()
-        self.trainer_config.update(
-            {
-                "batch_size": 64,
-                "epochs": self.epochs,
-            }
-        )
-        self.trainer_config.update({"learning_rate_min": 0.001})
-
-    def _initialize_trainer_config_darts(self) -> None:
-        super()._initialize_trainer_config_darts()
-
 
 class ReinMaxProfile(GDASProfile):
     PROFILE_TYPE = "REINMAX"
@@ -85,9 +71,9 @@ class ReinMaxProfile(GDASProfile):
 class SNASProfile(BaseProfile, ABC):
     def __init__(
         self,
-        epochs: int = 150,
+        epochs: int,
         temp_init: float = 1.0,
-        temp_min: float = 0.03,
+        temp_min: float = 0.33,
         temp_annealing: bool = True,
         **kwargs: Any,
     ) -> None:
@@ -119,7 +105,7 @@ class SNASProfile(BaseProfile, ABC):
 class DRNASProfile(BaseProfile, ABC):
     def __init__(
         self,
-        epochs: int = 100,
+        epochs: int,
         **kwargs: Any,
     ) -> None:
         PROFILE_TYPE = "DRNAS"
@@ -137,79 +123,6 @@ class DRNASProfile(BaseProfile, ABC):
             "arch_combine_fn": self.sampler_arch_combine_fn,
         }
         self.sampler_config = drnas_config  # type: ignore
-
-    def _initialize_trainer_config_nb201(self) -> None:
-        trainer_config = {
-            "lr": 0.025,
-            "arch_lr": 3e-4,
-            "epochs": self.epochs,  # 100
-            "lora_warm_epochs": self.lora_warm_epochs,
-            "optim": "sgd",
-            "arch_optim": "adam",
-            "optim_config": {
-                "momentum": 0.9,
-                "nesterov": 0,
-                "weight_decay": 3e-4,
-            },
-            "arch_optim_config": {
-                "weight_decay": 1e-3,
-                "betas": (0.5, 0.999),
-            },
-            "scheduler": "cosine_annealing_lr",
-            "scheduler_config": {},
-            "criterion": "cross_entropy",
-            "batch_size": 64,
-            "learning_rate_min": 0.001,
-            "cutout": -1,
-            "cutout_length": 16,
-            "train_portion": 0.5,
-            "use_data_parallel": True,
-            "checkpointing_freq": 1,
-            "seed": self.seed,
-        }
-
-        # self.tau_min = 1
-        # self.tau_max = 10
-        self.trainer_config = trainer_config
-        if hasattr(self, "searchspace_config"):
-            self.searchspace_config.update({"N": 5, "C": 16})
-        else:
-            self.searchspace_config = {"N": 5, "C": 16}
-
-    def _initialize_trainer_config_darts(self) -> None:
-        default_train_config = {
-            "lr": 0.1,
-            "arch_lr": 6e-4,
-            "epochs": self.epochs,  # 50
-            "lora_warm_epochs": self.lora_warm_epochs,
-            "optim": "sgd",
-            "arch_optim": "adam",
-            "optim_config": {
-                "momentum": 0.9,
-                "nesterov": 0,
-                "weight_decay": 3e-4,
-            },
-            "arch_optim_config": {
-                "weight_decay": 1e-3,
-                "betas": (0.5, 0.999),
-            },
-            "scheduler": "cosine_annealing_lr",
-            "criterion": "cross_entropy",
-            "batch_size": 64,
-            "learning_rate_min": 0.0,
-            # "drop_path_prob": 0.3,
-            "cutout": -1,
-            "cutout_length": 16,
-            "train_portion": 0.5,
-            "use_data_parallel": True,
-            "checkpointing_freq": 2,
-            "seed": self.seed,
-        }
-        self.trainer_config = default_train_config
-        if hasattr(self, "searchspace_config"):
-            self.searchspace_config.update({"layers": 20, "C": 36})
-        else:
-            self.searchspace_config = {"layers": 20, "C": 36}
 
 
 class DiscreteProfile:
