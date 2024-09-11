@@ -171,8 +171,13 @@ class OperationBlock(nn.Module):
         self.flops = None
 
     def _calculate_flops(self, x: torch.Tensor) -> None:
-        input_tensor = torch.randn_like(x)
         self.flops = []
+        if self.partial_connector is not None:
+            partial_input_channel = x.shape[1] // self.partial_connector.k
+            partial_x = x[:, :partial_input_channel, :, :]
+            input_tensor = torch.randn_like(partial_x)
+        else:
+            input_tensor = torch.randn_like(x)
         for op in self.ops:
             op_flop, _ = flop_profile(op, inputs=(input_tensor,), verbose=False)
             self.flops.append(op_flop)
