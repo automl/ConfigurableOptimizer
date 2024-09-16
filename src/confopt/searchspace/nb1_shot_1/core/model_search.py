@@ -165,6 +165,12 @@ class Cell(nn.Module):
             tensor_list, dim=1
         )
 
+    def get_weighted_flops(self, alphas: torch.Tensor) -> torch.Tensor:
+        flops = 0
+        for idx, choice_block in enumerate(self._choice_blocks):
+            flops += choice_block.mixed_op.get_weighted_flops(alphas[idx])
+        return flops
+
     def prune_ops(self, mask: torch.Tensor) -> None:
         for choice_block_idx in range(self._steps):
             edge_mask = mask[choice_block_idx]
@@ -582,6 +588,17 @@ class Network(nn.Module):
         genotype = NASBench1Shot1ConfoptGenotype(matrix=adjacency_list, ops=node_list)
 
         return genotype
+
+    def get_weighted_flops(self) -> torch.Tensor:
+        # TODO: add arch attention here
+        mixed_op_weights = torch.softmax(self.arch_parameters()[0], dim=-1)
+        flops = 0
+        for cell in self.cells:
+            total_cell_flops = cell.get_weighted_flops(mixed_op_weights)
+            if total_cell_flops == 0:
+                total_cell_flops = 1
+            flops += torch.log(total_cell_flops)
+        return flops / len(self.cells)
 
     def prune(self, prune_fraction: float) -> None:
         # mask is only applied to mixedop weights,

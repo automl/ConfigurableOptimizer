@@ -10,6 +10,7 @@ from confopt.searchspace.common.base_search import (
     ArchAttentionSupport,
     DrNASRegTermSupport,
     FairDARTSRegTermSupport,
+    FLOPSRegTermSupport,
     GradientMatchingScoreSupport,
     GradientStatsSupport,
     LayerAlignmentScoreSupport,
@@ -32,6 +33,7 @@ class TransNASBench101SearchSpace(
     GradientMatchingScoreSupport,
     ArchAttentionSupport,
     GradientStatsSupport,
+    FLOPSRegTermSupport,
     OperationStatisticsSupport,
     LayerAlignmentScoreSupport,
     FairDARTSRegTermSupport,
@@ -58,6 +60,9 @@ class TransNASBench101SearchSpace(
 
     def get_genotype(self) -> str:
         return self.model.genotype()
+
+    def get_weighted_flops(self) -> torch.Tensor:
+        return self.model.get_weighted_flops()
 
     def preserve_grads(self) -> None:
         self.model.apply(preserve_grads)

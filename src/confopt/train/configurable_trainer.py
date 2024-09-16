@@ -198,7 +198,11 @@ class ConfigurableTrainer:
                 calc_gm_score=calc_gm_score,
             )
 
-            # Logging
+            ##### Logging #####
+            # Log arch parameters
+            all_arch_params = unwrapped_network.get_arch_parameters_as_dict()
+            self.logger.update_wandb_logs(all_arch_params)
+
             # Log Search Metrics
             search_time.update(time.time() - start_time)
             self.logger.log_metrics(

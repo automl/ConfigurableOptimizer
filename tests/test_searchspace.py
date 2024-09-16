@@ -108,30 +108,29 @@ def _test_toggle_lora(search_space: SearchSpace) -> None:  # noqa: C901
             assert not hasattr(module, "_original_r")
             assert module.conv.weight.requires_grad is False
 
-
-def _test_gradient_stats_support_without_gradients(search_space: SearchSpace) -> None:
+def _test_gradient_stats_support_without_gradients(search_space: SearchSpace, n_extra: int) -> None:
     x = torch.randn(2, 3, 32, 32).to(DEVICE)
     out = search_space(x)
 
-    search_space.update_grad_stats()
+    search_space.update_cell_grad_stats()
     stats = search_space.get_grad_stats()
 
     values = tuple(v for v in stats.values())
     assert all(v == 0 for v in values)
-    assert len(values) == len(search_space.model.cells)
+    assert len(values) == (len(search_space.model.cells) + n_extra)
 
-
-def _test_gradient_stats_support(search_space: SearchSpace) -> None:
+def _test_gradient_stats_support(search_space: SearchSpace,  n_extra: int) -> None:
     x = torch.randn(2, 3, 32, 32).to(DEVICE)
     _, out = search_space(x)
     out.mean().backward()
 
-    search_space.update_grad_stats()
+    search_space.update_cell_grad_stats()
+    search_space.update_arch_params_grad_stats()
     stats = search_space.get_grad_stats()
 
     values = tuple(v for v in stats.values())
     assert all(v != 0 for v in values)
-    assert len(values) == len(search_space.model.cells)
+    assert len(values) == len(search_space.model.cells) + n_extra
 
     original_values = values
 
@@ -139,7 +138,8 @@ def _test_gradient_stats_support(search_space: SearchSpace) -> None:
     _, out = search_space(x)
     out.mean().backward()
 
-    search_space.update_grad_stats()
+    search_space.update_cell_grad_stats()
+    search_space.update_arch_params_grad_stats()
     stats = search_space.get_grad_stats()
 
     values = tuple(v for v in stats.values())
@@ -439,13 +439,15 @@ class TestNASBench201SearchSpace(unittest.TestCase):
 
     def test_gradient_stats_support_without_gradients(self) -> None:
         search_space = NASBench201SearchSpace()
-        _test_gradient_stats_support_without_gradients(search_space)
+
+        # n_extra = 7.
+        # 1 for each row of the arch parameters
+        # and 1 for the full arch parameters matrix 
+        _test_gradient_stats_support_without_gradients(search_space, n_extra=7)
 
     def test_gradient_stats_support(self) -> None:
         search_space = NASBench201SearchSpace()
-        _test_gradient_stats_support(search_space)
-
-
+        _test_gradient_stats_support(search_space, n_extra=7)
 class TestDARTSSearchSpace(unittest.TestCase):
     def test_arch_parameters(self) -> None:
         search_space = DARTSSearchSpace()
@@ -611,11 +613,14 @@ class TestDARTSSearchSpace(unittest.TestCase):
 
     def test_gradient_stats_support_without_gradients(self) -> None:
         search_space = DARTSSearchSpace()
-        _test_gradient_stats_support_without_gradients(search_space)
+        # n_extra = 30
+        # 1 for each row of the arch parameters (x2 for normal and reduction cells)
+        # and 1 for the full arch parameters matrix of each cell type
+        _test_gradient_stats_support_without_gradients(search_space, n_extra=30)
 
     def test_gradient_stats_support(self) -> None:
         search_space = DARTSSearchSpace()
-        _test_gradient_stats_support(search_space)
+        _test_gradient_stats_support(search_space, n_extra=30)
 
 
 class TestNASBench1Shot1SearchSpace(unittest.TestCase):
@@ -919,11 +924,11 @@ class TestTransNASBench101SearchSpace(unittest.TestCase):
 
     def test_gradient_stats_support_without_gradients(self) -> None:
         search_space = TransNASBench101SearchSpace()
-        _test_gradient_stats_support_without_gradients(search_space)
+        _test_gradient_stats_support_without_gradients(search_space, n_extra=7)
 
     def test_gradient_stats_support(self) -> None:
         search_space = TransNASBench101SearchSpace()
-        _test_gradient_stats_support(search_space)
+        _test_gradient_stats_support(search_space, n_extra=7)
 
 
 class TestRobustDARTSSearchSpace(unittest.TestCase):

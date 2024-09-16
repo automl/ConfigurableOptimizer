@@ -9,6 +9,7 @@ from torch import nn
 from confopt.searchspace.common import (
     ArchAttentionSupport,
     FairDARTSRegTermSupport,
+    FLOPSRegTermSupport,
     GradientMatchingScoreSupport,
     GradientStatsSupport,
     LayerAlignmentScoreSupport,
@@ -36,6 +37,7 @@ class NASBench201SearchSpace(
     LayerAlignmentScoreSupport,
     PerturbationArchSelectionSupport,
     GradientStatsSupport,
+    FLOPSRegTermSupport,
     FairDARTSRegTermSupport,
 ):
     def __init__(self, *args, **kwargs):  # type: ignore
@@ -169,6 +171,9 @@ class NASBench201SearchSpace(
 
     def is_topology_supported(self) -> bool:
         return False
+
+    def get_weighted_flops(self) -> torch.Tensor:
+        return self.model.get_weighted_flops()
 
     def get_max_input_edges_at_node(self, selected_node: int) -> int:  # noqa: ARG002
         return 1

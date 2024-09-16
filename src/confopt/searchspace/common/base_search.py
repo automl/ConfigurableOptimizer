@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Literal
 
+import numpy as np
 import torch
 import torch.nn as nn  # noqa: PLR0402
 
@@ -34,6 +35,12 @@ class SearchSpace(ModelWrapper):
     @abstractmethod
     def set_arch_parameters(self, arch_parameters: list[nn.Parameter]) -> None:
         pass
+
+    def get_arch_parameters_as_dict(self) -> dict[str, np.ndarray]:
+        return {
+            f"arch_parameters/{idx}": p.detach().cpu().numpy()
+            for idx, p in enumerate(self.arch_parameters)
+        }
 
     def get_sampled_weights(self) -> list[nn.Parameter]:
         return self.model.sampled_weights

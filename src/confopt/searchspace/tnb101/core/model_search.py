@@ -353,6 +353,22 @@ class TNB101SearchModel(nn.Module):
 
         return TNB101Genotype(node_edge_dict=node_edge_dict, op_idx_list=op_idx_list)
 
+    def get_weighted_flops(self) -> torch.Tensor:
+        if self.is_arch_attention_enabled:
+            arch_parameters = self._compute_arch_attention(self._arch_parameters)
+        else:
+            arch_parameters = self._arch_parameters
+
+        weights = torch.softmax(arch_parameters, dim=-1)
+        flops = 0
+
+        for cell in self.cells:
+            total_cell_flops = cell.get_weighted_flops(weights)
+            if total_cell_flops == 0:
+                total_cell_flops = 1
+            flops += torch.log(total_cell_flops)
+        return flops / len(self.cells)
+
     ### Layer alignment score support  methods ###
     def reset_hooks(self) -> None:
         for hook in self.grad_hook_handlers:
@@ -573,6 +589,15 @@ class TNB101SearchCell(nn.Module):
                 node_str = f"{i}<-{j}"
                 edge_mask = mask[self.edge2index[node_str]]
                 set_ops_to_prune(self.edges[node_str], edge_mask)
+
+    def get_weighted_flops(self, alphas: torch.Tensor) -> torch.Tensor:
+        flops = 0
+        for i in range(1, self.max_nodes):
+            for j in range(i):
+                node_str = f"{i}<-{j}"
+                weights = alphas[self.edge2index[node_str]]
+                flops += self.edges[node_str].get_weighted_flops(weights)
+        return flops
 
 
 def preserve_grads(m: nn.Module) -> None:

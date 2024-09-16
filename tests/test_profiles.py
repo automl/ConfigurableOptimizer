@@ -18,6 +18,22 @@ class TestBaseProfile(unittest.TestCase):
             dropout=0.5,
             perturbation="random",
             perturbator_sample_frequency="step",
+            sampler_arch_combine_fn="default",
+            entangle_op_weights=False,
+            lora_rank=0,
+            lora_warm_epochs=0,
+            lora_toggle_epochs=None,
+            lora_toggle_probability=None,
+            seed=100,
+            searchspace_str="nb201",
+            oles=False,
+            calc_gm_score=False,
+            prune_epochs=None,
+            prune_fractions=None,
+            is_arch_attention_enabled=False,
+            is_regularization_enabled=False,
+            regularization_config=None,
+            pt_select_architecture=False,
         )
 
         partial_connector_config = {"k": 2}
@@ -85,6 +101,23 @@ class TestDartsProfile(unittest.TestCase):
             sampler_sample_frequency="step",
             partial_connector_config=partial_connector_config,
             perturbator_config=perturb_config,
+            dropout=None,
+            sampler_arch_combine_fn="default",
+            entangle_op_weights=False,
+            lora_rank=0,
+            lora_warm_epochs=0,
+            lora_toggle_epochs=None,
+            lora_toggle_probability=None,
+            seed=100,
+            searchspace_str="nb201",
+            oles=False,
+            calc_gm_score=False,
+            prune_epochs=None,
+            prune_fractions=None,
+            is_arch_attention_enabled=False,
+            is_regularization_enabled=False,
+            regularization_config=None,
+            pt_select_architecture=False,
         )
 
         assert profile.sampler_config is not None
@@ -131,7 +164,7 @@ class TestDartsProfile(unittest.TestCase):
             profile.sampler_config["arch_combine_fn"] == sampler_config["arch_combine_fn"]
         )
 
-
+    
 class TestDRNASProfile(unittest.TestCase):
     def test_initialization(self) -> None:
         perturb_config = {"epsilon": 0.5}
@@ -145,6 +178,23 @@ class TestDRNASProfile(unittest.TestCase):
             sampler_sample_frequency="step",
             partial_connector_config=partial_connector_config,
             perturbator_config=perturb_config,
+            dropout=None,
+            sampler_arch_combine_fn="default",
+            entangle_op_weights=False,
+            lora_rank=0,
+            lora_warm_epochs=0,
+            lora_toggle_epochs=None,
+            lora_toggle_probability=None,
+            seed=100,
+            searchspace_str="nb201",
+            oles=False,
+            calc_gm_score=False,
+            prune_epochs=None,
+            prune_fractions=None,
+            is_arch_attention_enabled=False,
+            is_regularization_enabled=False,
+            regularization_config=None,
+            pt_select_architecture=False,
         )
 
         assert profile.sampler_config is not None
@@ -200,11 +250,30 @@ class TestGDASProfile(unittest.TestCase):
         }
         profile = GDASProfile(
             epochs=100,
+            tau_min=0.5,
+            tau_max=50,
             is_partial_connection=True,
             perturbation="random",
             sampler_sample_frequency="step",
             partial_connector_config=partial_connector_config,
             perturbator_config=perturb_config,
+            dropout=None,
+            sampler_arch_combine_fn="default",
+            entangle_op_weights=False,
+            lora_rank=0,
+            lora_warm_epochs=0,
+            lora_toggle_epochs=None,
+            lora_toggle_probability=None,
+            seed=100,
+            searchspace_str="nb201",
+            oles=False,
+            calc_gm_score=False,
+            prune_epochs=None,
+            prune_fractions=None,
+            is_arch_attention_enabled=False,
+            is_regularization_enabled=False,
+            regularization_config=None,
+            pt_select_architecture=False,
         )
 
         assert profile.sampler_config is not None
@@ -250,11 +319,31 @@ class TestSNASProfile(unittest.TestCase):
         }
         profile = SNASProfile(
             epochs=100,
+            temp_init=1.0,
+            temp_min=0.33,
+            temp_annealing=True,
             is_partial_connection=True,
             perturbation="random",
             sampler_sample_frequency="step",
             partial_connector_config=partial_connector_config,
             perturbator_config=perturb_config,
+            dropout=None,
+            sampler_arch_combine_fn="default",
+            entangle_op_weights=False,
+            lora_rank=0,
+            lora_warm_epochs=0,
+            lora_toggle_epochs=None,
+            lora_toggle_probability=None,
+            seed=100,
+            searchspace_str="nb201",
+            oles=False,
+            calc_gm_score=False,
+            prune_epochs=None,
+            prune_fractions=None,
+            is_arch_attention_enabled=False,
+            is_regularization_enabled=False,
+            regularization_config=None,
+            pt_select_architecture=False,
         )
 
         assert profile.sampler_config is not None

@@ -9,6 +9,7 @@ from confopt.searchspace.common import SearchSpace
 from confopt.searchspace.common.base_search import (
     ArchAttentionSupport,
     DrNASRegTermSupport,
+    FLOPSRegTermSupport,
     GradientStatsSupport,
     LayerAlignmentScoreSupport,
     PerturbationArchSelectionSupport,
@@ -38,6 +39,7 @@ class NASBench1Shot1SearchSpace(
     ArchAttentionSupport,
     GradientStatsSupport,
     DrNASRegTermSupport,
+    FLOPSRegTermSupport,
 ):
     def __init__(
         self, search_space: Literal["S1", "S2", "S3"], *args: Any, **kwargs: dict
@@ -74,6 +76,9 @@ class NASBench1Shot1SearchSpace(
 
     def get_genotype(self) -> Any:
         return self.model.get_genotype()
+
+    def get_weighted_flops(self) -> torch.Tensor:
+        return self.model.get_weighted_flops()
 
     def get_num_ops(self) -> int:
         return self.model.num_ops
