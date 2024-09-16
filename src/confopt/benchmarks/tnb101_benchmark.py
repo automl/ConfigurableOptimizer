@@ -36,7 +36,6 @@ class TNB101Benchmark(BenchmarkBase):
         # TODO: After TNB101 Datasets classes' names are decided, revisit this
         dataset: Literal["class_scene", "class_object"] = "class_object",
     ) -> dict:
-        dataset = "class_object"
         assert (
             dataset in self.api.task_list
         ), "The dataset is not one of valid task for TNB101SearchSpace"
