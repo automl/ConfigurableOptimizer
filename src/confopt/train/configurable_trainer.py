@@ -130,6 +130,8 @@ class ConfigurableTrainer:
         is_wandb_log: bool = True,
         lora_warm_epochs: int = 0,
         oles: bool = False,
+        oles_freq: int = 20,
+        oles_threshold: float = 0.4,
         calc_gm_score: bool = False,
     ) -> None:
         search_space_handler.adapt_search_space(self.model)
@@ -195,6 +197,8 @@ class ConfigurableTrainer:
                 self.print_freq,
                 is_warm_epoch=is_warm_epoch,
                 oles=oles,
+                oles_freq=oles_freq,
+                oles_threshold=oles_threshold,
                 calc_gm_score=calc_gm_score,
             )
 
@@ -346,6 +350,8 @@ class ConfigurableTrainer:
         print_freq: int,
         is_warm_epoch: bool = False,
         oles: bool = False,
+        oles_freq: int = 20,
+        oles_threshold: float = 0.4,
         calc_gm_score: bool = False,
     ) -> tuple[TrainingMetrics, TrainingMetrics]:
         data_time, batch_time = AverageMeter(), AverageMeter()
@@ -412,7 +418,11 @@ class ConfigurableTrainer:
             if calc_gm_score and isinstance(
                 unwrapped_network, GradientMatchingScoreSupport
             ):
-                unwrapped_network.update_gradient_matching_scores(early_stop=oles)
+                unwrapped_network.update_gradient_matching_scores(
+                    early_stop=oles,
+                    early_stop_frequency=oles_freq,
+                    early_stop_threshold=oles_threshold,
+                )  # type: ignore
 
             # update the model weights
             w_optimizer.zero_grad()
