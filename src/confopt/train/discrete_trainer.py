@@ -35,6 +35,7 @@ class DiscreteTrainer(ConfigurableTrainer):
         use_ddp: bool = False,
         print_freq: int = 2,
         drop_path_prob: float = 0.1,
+        aux_weight: float = 0.0,
         load_saved_model: bool = False,
         load_best_model: bool = False,
         start_epoch: int = 0,
@@ -62,6 +63,7 @@ class DiscreteTrainer(ConfigurableTrainer):
             debug_mode=debug_mode,
         )
         self.use_ddp = use_ddp
+        self.aux_weight = aux_weight
         # self.use_supernet_checkpoint = use_supernet_checkpoint
 
     def average_metrics_across_workers(
@@ -253,8 +255,15 @@ class DiscreteTrainer(ConfigurableTrainer):
             data_time.update(time.time() - end)
 
             self.model_optimizer.zero_grad()
-            _, logits = network(base_inputs)
+            logits_aux, logits = network(base_inputs)
             base_loss = criterion(logits, base_targets)
+            if (
+                hasattr(network, "_auxiliary")
+                and network._auxiliary
+                and self.aux_weight > 0.0
+            ):
+                loss_aux = criterion(logits_aux, base_targets)
+                base_loss += self.aux_weight * loss_aux
             base_loss.backward()
 
             torch.nn.utils.clip_grad_norm_(unwrap_model(network).parameters(), 5)
