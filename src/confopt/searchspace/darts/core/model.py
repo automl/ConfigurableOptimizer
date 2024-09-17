@@ -25,7 +25,6 @@ class Cell(nn.Module):
         reduction_prev: bool,
     ) -> None:
         super().__init__()
-        print(C_prev_prev, C_prev, C)
 
         if reduction_prev:
             self.preprocess0 = FactorizedReduce(C_prev_prev, C)
