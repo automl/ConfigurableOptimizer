@@ -773,6 +773,7 @@ class Experiment:
             use_ddp=trainer_arguments.use_ddp,  # type: ignore
             print_freq=trainer_arguments.print_freq,  # type: ignore
             drop_path_prob=trainer_arguments.drop_path_prob,  # type: ignore
+            aux_weight=trainer_arguments.auxiliary_weight,  # type: ignore
             load_saved_model=load_saved_model,
             load_best_model=load_best_model,
             start_epoch=start_epoch,
