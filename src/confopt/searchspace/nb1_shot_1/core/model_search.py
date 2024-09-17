@@ -641,7 +641,7 @@ class Network(nn.Module):
         grads = []
         if only_first_and_last:
             grads.append(self.weights_grad[0].reshape(-1))
-            grads.append(self.weights_grad[1].reshape(-1))
+            grads.append(self.weights_grad[-1].reshape(-1))
         else:
             for alphas in self.weights_grad:
                 grads.append(alphas.reshape(-1))
