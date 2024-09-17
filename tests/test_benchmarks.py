@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import unittest
 
+import numpy as np
 import pytest
 
-import numpy as np
 from confopt.searchspace.darts.core.genotypes import Genotype as NB301Genotype
-from confopt.searchspace.nb1_shot_1.core.search_spaces.genotypes import NASBench1Shot1ConfoptGenotype
+from confopt.searchspace.nb1_shot_1.core.search_spaces.genotypes import (
+    NASBench1Shot1ConfoptGenotype,
+)
 from confopt.searchspace.nb201.core.genotypes import Structure as NB201Genotype
 from confopt.searchspace.tnb101.core.genotypes import TNB101Genotype
 
@@ -102,11 +104,11 @@ test_tnb101_fail_acc_top1 = 29.433717727661133
 
 
 
-INPUT = 'input'
-OUTPUT = 'output'
-CONV1X1 = 'conv1x1-bn-relu'
-CONV3X3 = 'conv3x3-bn-relu'
-MAXPOOL3X3 = 'maxpool3x3'
+INPUT = "input"
+OUTPUT = "output"
+CONV1X1 = "conv1x1-bn-relu"
+CONV3X3 = "conv3x3-bn-relu"
+MAXPOOL3X3 = "maxpool3x3"
 matrix=np.array([[0, 1, 1, 1, 0, 1, 0],    # input layer
         [0, 0, 0, 0, 0, 0, 1],    # 1x1 conv
         [0, 0, 0, 0, 0, 0, 1],    # 3x3 conv
@@ -230,7 +232,6 @@ class TestBenchmarks(unittest.TestCase):
         )
 
         assert query_result["benchmark/trainable_parameters"] == 2694282
-        
 
 if __name__ == "__main__":
     unittest.main()
