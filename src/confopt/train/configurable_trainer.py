@@ -709,11 +709,13 @@ class ConfigurableTrainer:
             **scheduler_config,
         )
 
-        if is_gm_score_enabled and isinstance(network, GradientMatchingScoreSupport):
+        if is_gm_score_enabled and isinstance(
+            unwrapped_network, GradientMatchingScoreSupport
+        ):
             unwrapped_network.reset_gm_score_attributes()
 
         # TODO-ICLR: Check if this is needed
-        if isinstance(network, LayerAlignmentScoreSupport):
+        if isinstance(unwrapped_network, LayerAlignmentScoreSupport):
             unwrapped_network.reset_layer_alignment_scores()
 
     def get_all_running_mean_scores(self, network: torch.nn.Module) -> dict:
