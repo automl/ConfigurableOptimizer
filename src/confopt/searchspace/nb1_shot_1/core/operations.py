@@ -148,4 +148,4 @@ class MaxPool2d(nn.Module):
         """
 
 
-OLES_OPS = [nn.MaxPool2d, Conv3x3BnRelu, Conv1x1BnRelu]
+OLES_OPS = [Pooling, Conv3x3BnRelu, Conv1x1BnRelu]
