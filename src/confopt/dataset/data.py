@@ -131,9 +131,12 @@ class AbstractData(ABC):
 
 
 class CIFARData(AbstractData):
-    def __init__(self, root: str, cutout: int, train_portion: float = 1.0):
+    def __init__(
+        self, root: str, cutout: int, cutout_length: int, train_portion: float = 1.0
+    ):
         super().__init__(root, train_portion)
         self.cutout = cutout
+        self.cutout_length = cutout_length
 
     def get_transforms(self) -> tuple[Compose, Compose]:
         lists = [
@@ -144,7 +147,7 @@ class CIFARData(AbstractData):
         ]
 
         if self.cutout > 0:
-            lists += [CUTOUT(self.cutout)]
+            lists += [CUTOUT(self.cutout_length)]
         train_transform = transforms.Compose(lists)
 
         test_transform = transforms.Compose(
@@ -182,9 +185,12 @@ class CIFARData(AbstractData):
 
 
 class ImageNetData(AbstractData):
-    def __init__(self, root: str, cutout: int, train_portion: float = 1.0):
+    def __init__(
+        self, root: str, cutout: int, cutout_length: int, train_portion: float = 1.0
+    ):
         super().__init__(root, train_portion)
         self.cutout = cutout
+        self.cutout_length = cutout_length
         self.mean = [x / 255 for x in [122.68, 116.66, 104.01]]
         self.std = [x / 255 for x in [63.22, 61.26, 65.09]]
 
@@ -196,7 +202,7 @@ class ImageNetData(AbstractData):
             transforms.Normalize(self.mean, self.std),
         ]
         if self.cutout > 0:
-            lists += [CUTOUT(self.cutout)]
+            lists += [CUTOUT(self.cutout_length)]
         train_transform = transforms.Compose(lists)
         test_transform = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize(self.mean, self.std)]
@@ -230,8 +236,10 @@ class ImageNetData(AbstractData):
 
 
 class CIFAR10Data(CIFARData):
-    def __init__(self, root: str, cutout: int, train_portion: float = 1.0):
-        super().__init__(root, cutout, train_portion)
+    def __init__(
+        self, root: str, cutout: int, cutout_length: int, train_portion: float = 1.0
+    ):
+        super().__init__(root, cutout, cutout_length, train_portion)
         self.mean = [x / 255 for x in [125.3, 123.0, 113.9]]
         self.std = [x / 255 for x in [63.0, 62.1, 66.7]]
 
@@ -251,8 +259,10 @@ class CIFAR10Data(CIFARData):
 
 
 class CIFAR100Data(CIFARData):
-    def __init__(self, root: str, cutout: int, train_portion: float = 1.0):
-        super().__init__(root, cutout, train_portion)
+    def __init__(
+        self, root: str, cutout: int, cutout_length: int, train_portion: float = 1.0
+    ):
+        super().__init__(root, cutout, cutout_length, train_portion)
         self.mean = [x / 255 for x in [125.3, 123.0, 113.9]]
         self.std = [x / 255 for x in [63.0, 62.1, 66.7]]
 
@@ -272,8 +282,10 @@ class CIFAR100Data(CIFARData):
 
 
 class ImageNet16Data(ImageNetData):
-    def __init__(self, root: str, cutout: int, train_portion: float = 1.0):
-        super().__init__(root, cutout, train_portion)
+    def __init__(
+        self, root: str, cutout: int, cutout_length: int, train_portion: float = 1.0
+    ):
+        super().__init__(root, cutout, cutout_length, train_portion)
 
     def load_datasets(
         self, root: str, train_transform: Compose, test_transform: Compose
@@ -286,8 +298,10 @@ class ImageNet16Data(ImageNetData):
 
 
 class ImageNet16120Data(ImageNetData):
-    def __init__(self, root: str, cutout: int, train_portion: float = 1.0):
-        super().__init__(root, cutout, train_portion)
+    def __init__(
+        self, root: str, cutout: int, cutout_length: int, train_portion: float = 1.0
+    ):
+        super().__init__(root, cutout, cutout_length, train_portion)
 
     def load_datasets(
         self, root: str, train_transform: Compose, test_transform: Compose

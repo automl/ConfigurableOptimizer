@@ -745,6 +745,7 @@ class Experiment:
         data = self._get_dataset(self.dataset_str)(
             root="datasets",
             cutout=trainer_arguments.cutout,  # type: ignore
+            cutout_length=trainer_arguments.cutout_length,  # type: ignore
             train_portion=trainer_arguments.train_portion,  # type: ignore
         )
 
@@ -814,6 +815,7 @@ class Experiment:
         data = self._get_dataset(self.dataset_str)(
             root="datasets",
             cutout=trainer_arguments.cutout,  # type: ignore
+            cutout_length=trainer_arguments.cutout_length,  # type: ignore
             train_portion=trainer_arguments.train_portion,  # type: ignore
         )
 
