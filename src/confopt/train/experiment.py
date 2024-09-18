@@ -186,23 +186,20 @@ class Experiment:
         self.dropout = profile.dropout
         self.edge_normalization = profile.is_partial_connection
         self.entangle_op_weights = profile.entangle_op_weights
-        oles_config = config.get("oles")
-        if oles_config:
-            oles = oles_config.get("oles")
-            calc_gm_score = oles_config.get("calc_gm_score")
-        else:
-            oles = False
-            calc_gm_score = False
+        oles_config = config["oles"]
+
         assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
         return self._train_supernet(
-            config,
-            start_epoch,
-            load_saved_model,
-            load_best_model,
-            use_benchmark,
-            run_name,
-            oles,
-            calc_gm_score,
+            config=config,
+            start_epoch=start_epoch,
+            load_saved_model=load_saved_model,
+            load_best_model=load_best_model,
+            use_benchmark=use_benchmark,
+            run_name=run_name,
+            calc_gm_score=oles_config["calc_gm_score"],
+            oles=oles_config["oles"],
+            oles_frequency=oles_config["frequency"],
+            oles_threshold=oles_config["threshold"],
         )
 
     def _init_wandb(self, run_name: str, config: dict) -> None:
@@ -224,8 +221,10 @@ class Experiment:
         load_best_model: bool = False,
         use_benchmark: bool = False,
         run_name: str = "supernet_run",
-        oles: bool = False,
         calc_gm_score: bool = False,
+        oles: bool = False,
+        oles_frequency: int = 20,
+        oles_threshold: float = 0.4,
     ) -> ConfigurableTrainer:
         assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
 
@@ -285,8 +284,10 @@ class Experiment:
             lora_warm_epochs=config["trainer"].get(  # type: ignore
                 "lora_warm_epochs", 0
             ),
-            oles=oles,
             calc_gm_score=calc_gm_score,
+            oles=oles,
+            oles_frequency=oles_frequency,
+            oles_threshold=oles_threshold,
         )
 
         return trainer

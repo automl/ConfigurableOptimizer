@@ -129,10 +129,10 @@ class ConfigurableTrainer:
         search_space_handler: SearchSpaceHandler,
         is_wandb_log: bool = True,
         lora_warm_epochs: int = 0,
-        oles: bool = False,
-        oles_freq: int = 20,
-        oles_threshold: float = 0.4,
         calc_gm_score: bool = False,
+        oles: bool = False,
+        oles_frequency: int = 20,
+        oles_threshold: float = 0.4,
     ) -> None:
         search_space_handler.adapt_search_space(self.model)
         self._init_experiment_state()
@@ -196,10 +196,10 @@ class ConfigurableTrainer:
                 self.arch_optimizer,
                 self.print_freq,
                 is_warm_epoch=is_warm_epoch,
-                oles=oles,
-                oles_freq=oles_freq,
-                oles_threshold=oles_threshold,
                 calc_gm_score=calc_gm_score,
+                oles=oles,
+                oles_frequency=oles_frequency,
+                oles_threshold=oles_threshold,
             )
 
             ##### Logging #####
@@ -349,10 +349,10 @@ class ConfigurableTrainer:
         arch_optimizer: Optimizer,
         print_freq: int,
         is_warm_epoch: bool = False,
-        oles: bool = False,
-        oles_freq: int = 20,
-        oles_threshold: float = 0.4,
         calc_gm_score: bool = False,
+        oles: bool = False,
+        oles_frequency: int = 20,
+        oles_threshold: float = 0.4,
     ) -> tuple[TrainingMetrics, TrainingMetrics]:
         data_time, batch_time = AverageMeter(), AverageMeter()
         base_losses, base_top1, base_top5 = (
@@ -421,7 +421,7 @@ class ConfigurableTrainer:
             ):
                 unwrapped_network.update_gradient_matching_scores(
                     early_stop=oles,
-                    early_stop_frequency=oles_freq,
+                    early_stop_frequency=oles_frequency,
                     early_stop_threshold=oles_threshold,
                 )  # type: ignore
 

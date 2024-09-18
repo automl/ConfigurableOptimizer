@@ -150,7 +150,12 @@ class BaseProfile:
             warnings.warn(
                 "OLES needs gm_score, please pass calc_gm_score as True.", stacklevel=2
             )
-        self.oles_config = {"oles": oles, "calc_gm_score": calc_gm_score}
+        self.oles_config = {
+            "oles": oles,
+            "calc_gm_score": calc_gm_score,
+            "frequency": 20,
+            "threshold": 0.4,
+        }
 
     def _set_perturb(
         self,
