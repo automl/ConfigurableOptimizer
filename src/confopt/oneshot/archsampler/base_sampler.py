@@ -34,9 +34,8 @@ class BaseSampler(OneShotComponent):
         sampled_alphas = []
         for arch_param in self.arch_parameters:
             sampled_alphas.append(self.sample(arch_param))
-        # print(sampled_alphas)
-        if sampled_alphas is not None:
-            self.sampled_alphas = sampled_alphas
+
+        self.sampled_alphas = sampled_alphas
 
     def new_epoch(self) -> None:
         super().new_epoch()
