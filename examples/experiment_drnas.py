@@ -83,7 +83,7 @@ if __name__ == "__main__":
         "optim_config": {
             "weight_decay": 3e-4,
             "momentum": 0.9,
-            "nesterov": 0,
+            "nesterov": False,
         },
         "arch_optim_config": {
             "betas": (0.5, 0.999),

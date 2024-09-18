@@ -433,7 +433,7 @@ class BaseProfile:
             "arch_optim": "adam",
             "optim_config": {
                 "momentum": 0.9,
-                "nesterov": 0,
+                "nesterov": False,
                 "weight_decay": 3e-4,
             },
             "arch_optim_config": {

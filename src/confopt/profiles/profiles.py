@@ -148,7 +148,7 @@ class DRNASProfile(BaseProfile, ABC):
             "arch_optim": "adam",
             "optim_config": {
                 "momentum": 0.9,
-                "nesterov": 0,
+                "nesterov": False,
                 "weight_decay": 3e-4,
             },
             "arch_optim_config": {
@@ -186,7 +186,7 @@ class DRNASProfile(BaseProfile, ABC):
             "arch_optim": "adam",
             "optim_config": {
                 "momentum": 0.9,
-                "nesterov": 0,
+                "nesterov": False,
                 "weight_decay": 3e-4,
             },
             "arch_optim_config": {
@@ -232,7 +232,7 @@ class DiscreteProfile:
             "scheduler": "cosine_annealing_lr",
             "optim_config": {
                 "momentum": 0.9,
-                "nesterov": 0,
+                "nesterov": False,
                 "weight_decay": 3e-4,
             },
             "criterion": "cross_entropy",

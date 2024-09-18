@@ -32,7 +32,7 @@ if __name__ == "__main__":
         arch_optim="adam",  # arch optimizer
         optim_config={  # configuration of the model optimizer
             "momentum": 0.9,
-            "nesterov": 0,
+            "nesterov": False,
             "weight_decay": 3e-4,
         },
         arch_optim_config={  # configuration of the arch optimizer
