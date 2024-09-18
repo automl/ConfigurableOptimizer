@@ -14,6 +14,7 @@ Genotype = namedtuple("Genotype", "normal normal_concat reduce reduce_concat")
 class DARTSProfile(BaseProfile, ABC):
     def __init__(
         self,
+        searchspace_str: str,
         epochs: int,
         **kwargs: Any,
     ) -> None:
@@ -21,6 +22,7 @@ class DARTSProfile(BaseProfile, ABC):
 
         super().__init__(
             PROFILE_TYPE,
+            searchspace_str,
             epochs,
             **kwargs,
         )
@@ -39,7 +41,8 @@ class GDASProfile(BaseProfile, ABC):
 
     def __init__(
         self,
-        epochs: int = 240,
+        searchspace_str: str,
+        epochs: int,
         tau_min: float = 0.1,
         tau_max: float = 10,
         **kwargs: Any,
@@ -49,6 +52,7 @@ class GDASProfile(BaseProfile, ABC):
 
         super().__init__(
             self.PROFILE_TYPE,
+            searchspace_str,
             epochs,
             **kwargs,
         )
@@ -85,7 +89,8 @@ class ReinMaxProfile(GDASProfile):
 class SNASProfile(BaseProfile, ABC):
     def __init__(
         self,
-        epochs: int = 150,
+        searchspace_str: str,
+        epochs: int,
         temp_init: float = 1.0,
         temp_min: float = 0.03,
         temp_annealing: bool = True,
@@ -99,6 +104,7 @@ class SNASProfile(BaseProfile, ABC):
 
         super().__init__(  # type: ignore
             PROFILE_TYPE,
+            searchspace_str,
             epochs,
             **kwargs,
         )
@@ -119,13 +125,15 @@ class SNASProfile(BaseProfile, ABC):
 class DRNASProfile(BaseProfile, ABC):
     def __init__(
         self,
-        epochs: int = 100,
+        searchspace_str: str,
+        epochs: int,
         **kwargs: Any,
     ) -> None:
         PROFILE_TYPE = "DRNAS"
 
         super().__init__(  # type: ignore
             PROFILE_TYPE,
+            searchspace_str,
             epochs,
             **kwargs,
         )

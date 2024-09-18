@@ -19,6 +19,7 @@ class BaseProfile:
     def __init__(
         self,
         config_type: str,
+        searchspace_str: str,
         epochs: int = 50,
         *,
         sampler_sample_frequency: str = "step",
@@ -35,7 +36,6 @@ class BaseProfile:
         lora_toggle_epochs: list[int] | None = None,
         lora_toggle_probability: float | None = None,
         seed: int = 100,
-        searchspace_str: str = "nb201",
         oles: bool = False,
         calc_gm_score: bool = False,
         prune_epochs: list[int] | None = None,
@@ -45,6 +45,13 @@ class BaseProfile:
         regularization_config: dict | None = None,
         pt_select_architecture: bool = False,
     ) -> None:
+        assert searchspace_str in [
+            "nb201",
+            "darts",
+            "nb1shot1",
+            "tnb101",
+        ], f"Invalid searchspace {searchspace_str}!"
+        self.searchspace_str = searchspace_str
         self.config_type = config_type
         self.epochs = epochs
         self.sampler_sample_frequency = (
@@ -52,7 +59,6 @@ class BaseProfile:
         )
         self.lora_warm_epochs = lora_warm_epochs
         self.seed = seed
-        self.searchspace_str = searchspace_str
         self.sampler_arch_combine_fn = sampler_arch_combine_fn
         self._initialize_trainer_config()
         self._initialize_sampler_config()
