@@ -12,15 +12,17 @@ from torch.distributions import Dirichlet
 import torch.nn.functional as F  # noqa: N812
 
 from confopt.searchspace.common import OperationChoices
+from confopt.searchspace.common.mixop import OperationBlock
 from confopt.searchspace.darts.core.operations import ReLUConvBN
 from confopt.utils import (
     calc_layer_alignment_score,
     normalize_params,
+    preserve_gradients_in_module,
     prune,
     set_ops_to_prune,
 )
 
-from .operations import OPS, ConvBnRelu
+from .operations import OLES_OPS, OPS, ConvBnRelu
 from .search_spaces.genotypes import PRIMITIVES, NASBench1Shot1ConfoptGenotype
 from .search_spaces.search_space import NB1Shot1Space
 from .search_spaces.search_space_1 import NB1Shot1Space1
@@ -664,3 +666,17 @@ class Network(nn.Module):
     def _compute_arch_attention(self, alphas: nn.Parameter) -> torch.Tensor:
         attn_alphas, _ = self.multihead_attention(alphas, alphas, alphas)
         return attn_alphas
+
+
+### Gradient Matching Score functions ###
+def preserve_grads(m: nn.Module) -> None:
+    ignored_modules = (
+        OperationBlock,
+        OperationChoices,
+        Cell,
+        MixedOp,
+        Network,
+        ChoiceBlock,
+    )
+
+    preserve_gradients_in_module(m, ignored_modules, OLES_OPS)

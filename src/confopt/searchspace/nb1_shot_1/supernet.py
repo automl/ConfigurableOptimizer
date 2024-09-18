@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import partial
 from typing import Any, Literal
 
 import torch
@@ -10,6 +11,7 @@ from confopt.searchspace.common.base_search import (
     ArchAttentionSupport,
     DrNASRegTermSupport,
     FLOPSRegTermSupport,
+    GradientMatchingScoreSupport,
     GradientStatsSupport,
     LayerAlignmentScoreSupport,
     PerturbationArchSelectionSupport,
@@ -22,6 +24,9 @@ from confopt.searchspace.nb1_shot_1.core import (
 from confopt.searchspace.nb1_shot_1.core import (
     Network as NASBench1Shot1Network,
 )
+from confopt.searchspace.nb1_shot_1.core.model_search import preserve_grads
+from confopt.searchspace.nb1_shot_1.core.operations import OLES_OPS
+from confopt.utils import update_gradient_matching_scores
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -40,6 +45,7 @@ class NASBench1Shot1SearchSpace(
     GradientStatsSupport,
     DrNASRegTermSupport,
     FLOPSRegTermSupport,
+    GradientMatchingScoreSupport,
 ):
     def __init__(
         self, search_space: Literal["S1", "S2", "S3"], *args: Any, **kwargs: dict
@@ -149,6 +155,24 @@ class NASBench1Shot1SearchSpace(
 
     def get_drnas_anchors(self) -> list[torch.Tensor]:
         return self.model.get_drnas_anchors()
+
+    def preserve_grads(self) -> None:
+        self.model.apply(preserve_grads)
+
+    def update_gradient_matching_scores(
+        self,
+        early_stop: bool = False,
+        early_stop_frequency: int = 20,
+        early_stop_threshold: float = 0.4,
+    ) -> None:
+        partial_fn = partial(
+            update_gradient_matching_scores,
+            oles_ops=OLES_OPS,
+            early_stop=early_stop,
+            early_stop_frequency=early_stop_frequency,
+            early_stop_threshold=early_stop_threshold,
+        )
+        self.model.apply(partial_fn)
 
 
 if __name__ == "__main__":
