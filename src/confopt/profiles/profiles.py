@@ -163,7 +163,7 @@ class DRNASProfile(BaseProfile, ABC):
             "cutout": -1,
             "cutout_length": 16,
             "train_portion": 0.5,
-            "use_data_parallel": True,
+            "use_data_parallel": False,
             "checkpointing_freq": 1,
             "seed": self.seed,
         }
@@ -201,7 +201,7 @@ class DRNASProfile(BaseProfile, ABC):
             "cutout": -1,
             "cutout_length": 16,
             "train_portion": 0.5,
-            "use_data_parallel": True,
+            "use_data_parallel": False,
             "checkpointing_freq": 2,
             "seed": self.seed,
         }
