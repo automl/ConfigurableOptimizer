@@ -438,6 +438,7 @@ class BaseProfile:
             },
             "arch_optim_config": {
                 "weight_decay": 1e-3,
+                "betas": (0.5, 0.999),
             },
             "scheduler": "cosine_annealing_lr",
             "scheduler_config": {},
