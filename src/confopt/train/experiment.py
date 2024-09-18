@@ -420,7 +420,7 @@ class Experiment:
         self.weight_entangler = WeightEntangler() if self.entangle_op_weights else None
 
     def set_pruner(self, config: dict) -> None:
-        if config is not None:
+        if config:
             self.pruner = Pruner(
                 searchspace=self.search_space,
                 prune_epochs=config.get("prune_epochs", []),
