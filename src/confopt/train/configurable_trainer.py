@@ -334,7 +334,7 @@ class ConfigurableTrainer:
             epoch_time.update(time.time() - start_time)
             start_time = time.time()
 
-    def _train_epoch(  # noqa: PLR0915, C901
+    def _train_epoch(  # noqa: C901
         self,
         search_space_handler: SearchSpaceHandler,
         train_loader: DataLoader,
@@ -385,6 +385,7 @@ class ConfigurableTrainer:
             data_time.update(time.time() - end)
 
             if not is_warm_epoch:
+                arch_optimizer.zero_grad()
                 _, logits = network(arch_inputs)
                 arch_loss = criterion(logits, arch_targets)
                 arch_loss = search_space_handler.add_reg_terms(
@@ -416,7 +417,6 @@ class ConfigurableTrainer:
 
             # update the model weights
             w_optimizer.zero_grad()
-            arch_optimizer.zero_grad()
 
             _, logits = network(base_inputs)
             base_loss = criterion(logits, base_targets)
@@ -440,10 +440,6 @@ class ConfigurableTrainer:
 
             if isinstance(unwrapped_network, GradientStatsSupport):
                 unwrapped_network.update_cell_grad_stats()
-
-            w_optimizer.zero_grad()
-            if not is_warm_epoch:
-                arch_optimizer.zero_grad()
 
             self._update_meters(
                 inputs=base_inputs,
