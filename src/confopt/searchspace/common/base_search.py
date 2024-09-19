@@ -106,6 +106,16 @@ class SearchSpace(ModelWrapper):
             "get_num_nodes is not implemented for this searchpace"
         )
 
+    def get_mask(self) -> list[torch.Tensor] | None:
+        """Get the mask of the model.
+
+        Returns:
+            list[torch.Tensor]: The mask of the model.
+        """
+        if hasattr(self.model, "mask"):
+            return self.model.mask
+        return None
+
 
 class ArchAttentionSupport(ModelWrapper):
     def set_arch_attention(self, enabled: bool) -> None:
