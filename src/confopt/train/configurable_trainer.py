@@ -234,6 +234,7 @@ class ConfigurableTrainer:
             # Log architectural parameter values
             arch_values_dict = self.get_arch_values_as_dict(network)
             self.logger.update_wandb_logs(arch_values_dict)
+            self.logger.update_wandb_logs(self.get_mask_as_dict(unwrapped_network))
 
             # Log GM scores
             if calc_gm_score and isinstance(
@@ -772,3 +773,15 @@ class ConfigurableTrainer:
             arch_values_dict[f"arch_values/alpha_{i}"] = data
 
         return arch_values_dict
+
+    def get_mask_as_dict(self, model: SearchSpace) -> dict:
+        mask = model.get_mask()
+        mask_values: dict = {}
+        if mask is None:
+            return {"mask": mask_values}
+        for mask_idx in range(len(mask)):
+            for op_idx in range(mask[mask_idx].shape[0]):
+                mask_values[f"alpha_mask_{mask_idx}_edge_{op_idx}"] = mask[mask_idx][
+                    op_idx
+                ]
+        return {"mask": mask_values}
