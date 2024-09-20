@@ -626,8 +626,17 @@ class Network(nn.Module):
             alphas_normal = self.alphas_normal
             alphas_reduce = self.alphas_reduce
 
-        gene_normal = _parse(F.softmax(alphas_normal, dim=-1).data.cpu().numpy())
-        gene_reduce = _parse(F.softmax(alphas_reduce, dim=-1).data.cpu().numpy())
+        alphas_normal = F.softmax(alphas_normal, dim=-1)
+        alphas_reduce = F.softmax(alphas_reduce, dim=-1)
+
+        if self.mask is not None:
+            normal_idx = 0
+            reduce_idx = 1
+            alphas_normal = normalize_params(alphas_normal, self.mask[normal_idx])
+            alphas_reduce = normalize_params(alphas_reduce, self.mask[reduce_idx])
+
+        gene_normal = _parse(alphas_normal.data.cpu().numpy())
+        gene_reduce = _parse(alphas_reduce.data.cpu().numpy())
 
         concat = range(2 + self._steps - self._multiplier, self._steps + 2)
         genotype = DARTSGenotype(
