@@ -263,11 +263,13 @@ class PerturbationArchSelection:
 
             self.trainer.logger.update_wandb_logs(log_dict)
 
-            arch_values_dict = self.trainer.get_arch_values_as_dict(network)
+            arch_values_dict = self.get_arch_values_as_dict(network)
             self.trainer.logger.update_wandb_logs(arch_values_dict)
 
             with torch.no_grad():
-                for i, alpha in enumerate(self.model.arch_parameters):
+                for i, alpha in enumerate(
+                    unwrapped_network.get_projected_arch_parameters()
+                ):
                     self.trainer.logger.log(f"alpha {i} is {alpha}")
 
             if self.is_wandb_log:
@@ -277,7 +279,7 @@ class PerturbationArchSelection:
             self.trainer.periodic_checkpointer.step(
                 iteration=epoch, checkpointables=checkpointables
             )
-            genotype = self.model.get_genotype().tostr()  # type: ignore
+            genotype = unwrapped_network.get_genotype().tostr()  # type: ignore
             self.trainer.logger.save_genotype(
                 genotype, epoch, self.trainer.checkpointing_freq
             )
@@ -323,3 +325,21 @@ class PerturbationArchSelection:
             self.trainer.model_optimizer,
             **scheduler_config,
         )
+
+    def get_arch_values_as_dict(
+        self, model: SearchSpace | torch.nn.DataParallel
+    ) -> dict:
+        unwrapped_model = unwrap_model(model)
+        assert isinstance(unwrapped_model, PerturbationArchSelectionSupport)
+        arch_values = unwrapped_model.get_projected_arch_parameters()
+        arch_values_dict = {}
+
+        for i, alpha in enumerate(arch_values):
+            data = {}
+            alpha = alpha.detach().cpu().numpy()
+            for edge_idx in range(alpha.shape[0]):
+                for op_idx in range(alpha.shape[1]):
+                    data[f"edge_{edge_idx}_op_{op_idx}"] = alpha[edge_idx][op_idx]
+            arch_values_dict[f"arch_values/alpha_{i}"] = data
+
+        return arch_values_dict
