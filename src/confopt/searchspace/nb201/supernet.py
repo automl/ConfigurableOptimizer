@@ -8,6 +8,7 @@ from torch import nn
 
 from confopt.searchspace.common import (
     ArchAttentionSupport,
+    DrNASRegTermSupport,
     FairDARTSRegTermSupport,
     FLOPSRegTermSupport,
     GradientMatchingScoreSupport,
@@ -35,6 +36,7 @@ class NASBench201SearchSpace(
     GradientMatchingScoreSupport,
     OperationStatisticsSupport,
     LayerAlignmentScoreSupport,
+    DrNASRegTermSupport,
     PerturbationArchSelectionSupport,
     GradientStatsSupport,
     FLOPSRegTermSupport,
@@ -183,3 +185,6 @@ class NASBench201SearchSpace(
 
     def get_projected_arch_parameters(self) -> list[torch.Tensor]:
         return [self.model.get_projected_weights()]
+
+    def get_drnas_anchors(self) -> list[torch.Tensor]:
+        return [self.model.anchor]
