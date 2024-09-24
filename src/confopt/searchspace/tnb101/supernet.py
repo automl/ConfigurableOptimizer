@@ -156,6 +156,9 @@ class TransNASBench101SearchSpace(
     def get_drnas_anchors(self) -> list[torch.Tensor]:
         return [self.model.anchor_normal]
 
+    def get_projected_arch_parameters(self) -> list[torch.Tensor]:
+        return [self.model.get_projected_weights()]
+
 
 if __name__ == "__main__":
     searchspace = TransNASBench101SearchSpace()

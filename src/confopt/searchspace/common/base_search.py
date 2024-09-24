@@ -375,6 +375,14 @@ class PerturbationArchSelectionSupport(ModelWrapper):
             int: max number of edges from the nodes after discretization
         """
 
+    @abstractmethod
+    def get_projected_arch_parameters(self) -> list[torch.Tensor]:
+        """Gets the projected arch parameters used in the forward pass.
+
+        Returns:
+            list[torch.Tensor] : list of projected arch patameters
+        """
+
 
 class DrNASRegTermSupport(ModelWrapper):
     @abstractmethod

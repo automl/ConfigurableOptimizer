@@ -144,6 +144,9 @@ class NASBench1Shot1SearchSpace(
     def is_topology_supported(self) -> bool:
         return True
 
+    def get_projected_arch_parameters(self) -> list[torch.Tensor]:
+        return list(self.model.get_projected_weights())
+
     def get_max_input_edges_at_node(self, selected_node: int) -> int:
         return self.model.get_max_input_edges_at_node(selected_node)
 

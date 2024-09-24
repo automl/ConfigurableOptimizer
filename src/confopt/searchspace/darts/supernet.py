@@ -245,3 +245,10 @@ class DARTSSearchSpace(
 
     def get_fair_darts_arch_parameters(self) -> list[torch.Tensor]:
         return self.get_sampled_weights()
+
+    def get_projected_arch_parameters(self) -> list[torch.Tensor]:
+        projected_arch_params = [
+            self.model.get_projected_weights("normal"),
+            self.model.get_projected_weights("reduce"),
+        ]
+        return projected_arch_params
