@@ -241,7 +241,9 @@ class NB201SearchModel(nn.Module):
         """
         genotypes = []
 
-        if self.is_arch_attention_enabled:
+        if self.projection_mode:
+            arch_parameters = self.get_projected_weights()
+        elif self.is_arch_attention_enabled:
             arch_parameters = self._compute_arch_attention(self.arch_parameters)
         else:
             arch_parameters = self.arch_parameters

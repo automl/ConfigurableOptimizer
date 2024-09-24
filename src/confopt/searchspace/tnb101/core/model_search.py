@@ -335,6 +335,8 @@ class TNB101SearchModel(nn.Module):
         node_edge_dict: dict[int, list[tuple[str, int]]] = {}
         op_idx_list = []
 
+        if self.projection_mode:
+            arch_parameters = self.get_projected_weights()
         if self.is_arch_attention_enabled:
             arch_parameters = self._compute_arch_attention(self._arch_parameters)
         else:

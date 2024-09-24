@@ -516,7 +516,9 @@ class Network(nn.Module):
         def get_top_k(array: np.ndarray, k: int) -> list:
             return list(np.argpartition(array[0], -k)[-k:])
 
-        if self.is_arch_attention_enabled:
+        if self.projection_mode:
+            alphas_mixed_op = self.get_projected_weights()[0]
+        elif self.is_arch_attention_enabled:
             alphas_mixed_op = self._compute_arch_attention(self.arch_parameters()[0])
         else:
             alphas_mixed_op = self.arch_parameters()[0]

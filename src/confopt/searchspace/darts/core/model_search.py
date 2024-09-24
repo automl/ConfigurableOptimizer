@@ -618,22 +618,28 @@ class Network(nn.Module):
                 n += 1
             return gene
 
-        if self.is_arch_attention_enabled:
-            alphas_normal, alphas_reduce = self._compute_arch_attention(
-                self.alphas_normal, self.alphas_reduce
+        if self.projection_mode:
+            alphas_normal, alphas_reduce = (
+                self.get_projected_weights("normal"),
+                self.get_projected_weights("reduce"),
             )
         else:
-            alphas_normal = self.alphas_normal
-            alphas_reduce = self.alphas_reduce
+            if self.is_arch_attention_enabled:
+                alphas_normal, alphas_reduce = self._compute_arch_attention(
+                    self.alphas_normal, self.alphas_reduce
+                )
+            else:
+                alphas_normal = self.alphas_normal
+                alphas_reduce = self.alphas_reduce
 
-        alphas_normal = F.softmax(alphas_normal, dim=-1)
-        alphas_reduce = F.softmax(alphas_reduce, dim=-1)
+            alphas_normal = F.softmax(alphas_normal, dim=-1)
+            alphas_reduce = F.softmax(alphas_reduce, dim=-1)
 
-        if self.mask is not None:
-            normal_idx = 0
-            reduce_idx = 1
-            alphas_normal = normalize_params(alphas_normal, self.mask[normal_idx])
-            alphas_reduce = normalize_params(alphas_reduce, self.mask[reduce_idx])
+            if self.mask is not None:
+                normal_idx = 0
+                reduce_idx = 1
+                alphas_normal = normalize_params(alphas_normal, self.mask[normal_idx])
+                alphas_reduce = normalize_params(alphas_reduce, self.mask[reduce_idx])
 
         gene_normal = _parse(alphas_normal.data.cpu().numpy())
         gene_reduce = _parse(alphas_reduce.data.cpu().numpy())
