@@ -45,6 +45,7 @@ from confopt.profiles import (
 )
 from confopt.searchspace import (
     BabyDARTSSearchSpace,
+    DARTSGenotype,  # noqa: F401
     DARTSImageNetModel,
     DARTSModel,
     DARTSSearchSpace,
@@ -55,9 +56,6 @@ from confopt.searchspace import (
     RobustDARTSSearchSpace,
     SearchSpace,
     TransNASBench101SearchSpace,
-)
-from confopt.searchspace import (
-    DARTSGenotype as Genotype,  # noqa: F401
 )
 from confopt.train import ConfigurableTrainer, DiscreteTrainer, SearchSpaceHandler
 from confopt.train.projection import PerturbationArchSelection
@@ -256,12 +254,6 @@ class Experiment:
                 runtime=self.runtime,
                 use_supernet_checkpoint=True,
             )
-
-        self.logger.log(
-            "Logs and checkpoints will be saved in the following directory: "
-            + self.logger.path(None)
-        )
-        config["save_dir"] = self.logger.path(None)  # type:ignore
 
         self._enum_to_objects(
             self.search_space_str,
@@ -891,6 +883,7 @@ class Experiment:
         load_saved_model: bool = False,
         is_wandb_log: bool = False,
         run_name: str = "darts-pt",
+        src_folder_path: str | None = None,
     ) -> PerturbationArchSelection:
         # find pt_configs in the profile
         assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
@@ -921,6 +914,7 @@ class Experiment:
                 use_supernet_checkpoint=True,
                 arch_selection=arch_selection,
                 last_run=last_run,
+                custom_log_path=src_folder_path,
             )
         else:
             assert (

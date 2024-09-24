@@ -57,6 +57,7 @@ class Logger:
         use_supernet_checkpoint: bool = False,
         last_run: bool = False,
         arch_selection: bool = False,
+        custom_log_path: str | None = None,
     ) -> None:
         self.log_dir = log_dir
         self.exp_name = exp_name
@@ -69,6 +70,13 @@ class Logger:
         if self.arch_selection:
             self.supernet_str = "arch_selection"
         self.last_run = last_run
+
+        # Optionally load from the path here, this still requires runtime
+        self.custom_log_path = custom_log_path
+        if self.custom_log_path is not None:
+            assert os.path.exists(
+                self.custom_log_path
+            ), f"{self.custom_log_path} is not a valid path"
 
         assert sum([last_run, runtime is not None]) <= 1
         """Create a summary writer logging to log_dir."""
@@ -110,15 +118,18 @@ class Logger:
         self.writer = None
 
     def expr_log_path(self) -> Path:
-        path_componenets = [
-            self.log_dir,
-            self.exp_name,
-            self.search_space,
-            self.dataset,
-            self.seed,
-            self.supernet_str if self.use_supernet_checkpoint else "discrete",
-        ]
-        expr_log_path_str = "/".join(path_componenets)
+        if self.custom_log_path is None:
+            path_componenets = [
+                self.log_dir,
+                self.exp_name,
+                self.search_space,
+                self.dataset,
+                self.seed,
+                self.supernet_str if self.use_supernet_checkpoint else "discrete",
+            ]
+            expr_log_path_str = "/".join(path_componenets)
+        else:
+            expr_log_path_str = self.custom_log_path
         return Path(expr_log_path_str)
 
     def load_last_run(self) -> str:
