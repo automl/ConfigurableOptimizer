@@ -249,6 +249,11 @@ class NB201SearchModel(nn.Module):
         else:
             arch_parameters = self.arch_parameters
 
+        arch_parameters = torch.softmax(arch_parameters, dim=-1)
+
+        if self.mask is not None:
+            arch_parameters = normalize_params(arch_parameters, self.mask)
+
         for i in range(1, self.max_nodes):
             xlist = []
             for j in range(i):

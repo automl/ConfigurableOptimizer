@@ -521,7 +521,12 @@ class Network(nn.Module):
         else:
             alphas_mixed_op = self.arch_parameters()[0]
 
-        chosen_node_ops = softmax(alphas_mixed_op, axis=-1).argmax(-1)
+        alphas_mixed_op = softmax(alphas_mixed_op, axis=-1)
+
+        if self.mask is not None:
+            alphas_mixed_op = normalize_params(alphas_mixed_op, self.mask)
+
+        chosen_node_ops = alphas_mixed_op.argmax(-1)
 
         node_list = [PRIMITIVES[i] for i in chosen_node_ops]
         alphas_output = self.arch_parameters()[1]

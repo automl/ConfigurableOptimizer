@@ -339,6 +339,12 @@ class TNB101SearchModel(nn.Module):
             arch_parameters = self._compute_arch_attention(self._arch_parameters)
         else:
             arch_parameters = self._arch_parameters
+
+        arch_parameters = torch.softmax(arch_parameters, dim=-1)
+
+        if self.mask is not None:
+            arch_parameters = normalize_params(arch_parameters, self.mask)
+
         edge2index = self.cells[0].edge2index
 
         for i in range(1, self.max_nodes):
