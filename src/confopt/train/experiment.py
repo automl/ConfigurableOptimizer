@@ -255,6 +255,12 @@ class Experiment:
                 use_supernet_checkpoint=True,
             )
 
+        self.logger.log(
+            "Logs and checkpoints will be saved in the following directory: "
+            + self.logger.path(None)
+        )
+        config["save_dir"] = self.logger.path(None)  # type:ignore
+
         self._enum_to_objects(
             self.search_space_str,
             self.sampler_str,
