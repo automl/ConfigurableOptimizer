@@ -34,11 +34,11 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 
 class MixedOp(nn.Module):
-    def __init__(self, C: int, stride: int) -> None:
+    def __init__(self, C: int, stride: int, k: int = 1) -> None:
         super().__init__()
         self._ops = nn.ModuleList()
         for primitive in PRIMITIVES:
-            op = OPS[primitive](C, stride, False)
+            op = OPS[primitive](C // k, stride, False)
             """
             Not used in NASBench
             if 'pool' in primitive:
@@ -57,10 +57,10 @@ class ChoiceBlock(nn.Module):
     International Conference on Machine Learning. 2018.
     """
 
-    def __init__(self, C_in: int) -> None:
+    def __init__(self, C_in: int, k: int = 1) -> None:
         super().__init__()
         # Pre-processing 1x1 convolution at the beginning of each choice block.
-        ops = MixedOp(C_in, stride=1)._ops
+        ops = MixedOp(C_in, stride=1, k=k)._ops
         self.mixed_op = OperationChoices(ops)
 
     def forward(
@@ -84,7 +84,13 @@ class ChoiceBlock(nn.Module):
 
 class Cell(nn.Module):
     def __init__(
-        self, steps: int, C_prev: int, C: int, layer: int, search_space: NB1Shot1Space
+        self,
+        steps: int,
+        C_prev: int,
+        C: int,
+        layer: int,
+        search_space: NB1Shot1Space,
+        k: int = 1,
     ) -> None:
         super().__init__()
         # All cells are normal cells in NASBench case.
@@ -102,7 +108,7 @@ class Cell(nn.Module):
 
         # Create the choice block and the input
         for _i in range(self._steps):
-            choice_block = ChoiceBlock(C_in=C)
+            choice_block = ChoiceBlock(C_in=C, k=k)
             self._choice_blocks.append(choice_block)
             self._input_projections.append(
                 ConvBnRelu(C_in=C_in, C_out=C, kernel_size=1, stride=1, padding=0)
@@ -188,6 +194,7 @@ class Network(nn.Module):
         layers: int = 9,
         output_weights: bool = False,
         steps: int = 4,
+        k: int = 1,
     ) -> None:
         super().__init__()
         self._C = C
@@ -214,6 +221,7 @@ class Network(nn.Module):
                 C=C_curr,
                 layer=i,
                 search_space=search_space,
+                k=k,
             )
             self.cells += [cell]
             C_prev = C_curr
@@ -347,7 +355,7 @@ class Network(nn.Module):
         ]
 
         # TODO-ICLR: Beta parameters for edge normalization
-        self._beta_parameters = [None]
+        self._beta_parameters = []  # type: ignore
         self._initialize_projection_params()
 
         self.anchor_mixed_op = Dirichlet(
