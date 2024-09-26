@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
+import pickle
 import sys
 from typing import Any
 
+import gdown
 import numpy as np
 from PIL import Image
 from torch.utils import data
@@ -38,6 +39,7 @@ def check_integrity(fpath: str, md5: str | None = None) -> bool:
 
 class ImageNet16(data.Dataset):
     # http://image-net.org/download-images
+    # https://drive.google.com/drive/folders/1NE63Vdo2Nia0V7LK1CdybRLjBFY72w40
     # A Downsampled Variant of ImageNet as an Alternative to the CIFAR datasets
     # https://arxiv.org/pdf/1707.08819.pdf
 
@@ -57,6 +59,20 @@ class ImageNet16(data.Dataset):
         ["val_data", "3410e3017fdaefba8d5073aaa65e4bd6"],
     ]
 
+    drive_file_ids = {
+        "train_data_batch_1": "1qd9Fkg7MdIe3MMbHtIJC8eZ8OsWcqPYA",
+        "train_data_batch_2": "1pQBJ9exwpSG2E7m6aVvcOlJBGRhVhtg9",
+        "train_data_batch_3": "175we9AOjnGam0j4sG5Vn0SHFyBvyv2Ia",
+        "train_data_batch_4": "1FNBkOavsAP6Hvi7-41yLZwojdWfPub-R",
+        "train_data_batch_5": "1HujB1GyiBjrSdAA0he5kZtkO9WEDAwCn",
+        "train_data_batch_6": "1_vaYBQpbP6bx-G0_EiNysohqOJBJ_Ept",
+        "train_data_batch_7": "1JwQk4TE21KqvrfvnOfVcdqnEB32ULWTr",
+        "train_data_batch_8": "1T00JaN09RlNZPod8dQnF_Xdz0BWtjCWr",
+        "train_data_batch_9": "1fB2JYSZRfd8uKfKLBO9P3mn9HWIWtMOH",
+        "train_data_batch_10": "19Qvrqt-wi0UOCZBwI_Jw6-bLIXCYcPyl",
+        "val_data": "1LQNICeSrwwE2KdDxc9Z9FXmi7N4HKUsA",
+    }
+
     def __init__(
         self,
         root: str,
@@ -67,6 +83,9 @@ class ImageNet16(data.Dataset):
         self.root = root
         self.transform = transform
         self.train = train  # training set or valid set
+        self.dataset_folder = "imagenet"
+
+        self.download_dataset()
         if not self._check_integrity():
             raise RuntimeError("Dataset not found or corrupted.")
 
@@ -76,13 +95,14 @@ class ImageNet16(data.Dataset):
 
         # now load the picked numpy arrays
         for _i, (file_name, _checksum) in enumerate(downloaded_list):
-            file_path = os.path.join(self.root, file_name)
+            file_path = os.path.join(self.root, self.dataset_folder, file_name)
 
             with open(file_path, "rb") as f:
                 if sys.version_info[0] == 2:
-                    entry = json.load(f)
+                    entry = pickle.load(f)
                 else:
-                    entry = json.load(f, encoding="latin1")
+                    entry = pickle.load(f, encoding="latin1")
+
                 self.data.append(entry["data"])
                 self.targets.extend(entry["labels"])
         self.data = np.vstack(self.data).reshape(-1, 3, 16, 16)  # type: ignore
@@ -110,10 +130,9 @@ class ImageNet16(data.Dataset):
         # print ('Std  : {:}'.format(std_data))
 
     def __repr__(self) -> str:
-        return "{name}({num} images, {classes} classes)".format(
-            name=self.__class__.__name__,
-            num=len(self.data),
-            classes=len(set(self.targets)),
+        return (
+            f"{self.__class__.__name__}({len(self.data)} images,"
+            + f" {len(set(self.targets))} classes)"
         )
 
     def __getitem__(self, index: int) -> tuple[Any, Any]:
@@ -133,16 +152,31 @@ class ImageNet16(data.Dataset):
         root = self.root
         for fentry in self.train_list + self.valid_list:
             filename, md5 = fentry[0], fentry[1]
-            fpath = os.path.join(root, filename)
+            fpath = os.path.join(root, self.dataset_folder, filename)
             if not check_integrity(fpath, md5):
                 return False
         return True
 
+    def download_dataset(self) -> None:
+        root = self.root
+        dataset_folder = self.dataset_folder
+        folder_path = os.path.join(root, dataset_folder)
+        if not os.path.exists(folder_path):
+            os.mkdir(folder_path)
+
+        for file_name, file_id in self.drive_file_ids.items():
+            file_path = os.path.join(root, dataset_folder, file_name)
+            if not os.path.exists(file_path):
+                gdown.download(
+                    f"https://drive.google.com/uc?id={file_id}",
+                    output=file_path,
+                )
+
 
 """
 if __name__ == '__main__':
-  train = ImageNet16('~/.torch/cifar.python/ImageNet16', True , None)
-  valid = ImageNet16('~/.torch/cifar.python/ImageNet16', False, None)
+  train = ImageNet16('datasets/imagenet', True , None)
+  valid = ImageNet16('datasets/imagenet', False, None)
 
   print ( len(train) )
   print ( len(valid) )
