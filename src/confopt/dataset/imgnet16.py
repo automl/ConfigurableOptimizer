@@ -43,7 +43,7 @@ class ImageNet16(data.Dataset):
     # A Downsampled Variant of ImageNet as an Alternative to the CIFAR datasets
     # https://arxiv.org/pdf/1707.08819.pdf
 
-    train_list = [
+    train_checksums = [
         ["train_data_batch_1", "27846dcaa50de8e21a7d1a35f30f0e91"],
         ["train_data_batch_2", "c7254a054e0e795c69120a5727050e3f"],
         ["train_data_batch_3", "4333d3df2e5ffb114b05d2ffc19b1e87"],
@@ -55,7 +55,7 @@ class ImageNet16(data.Dataset):
         ["train_data_batch_9", "bb6dd660c38c58552125b1a92f86b5d4"],
         ["train_data_batch_10", "8f03f34ac4b42271a294f91bf480f29b"],
     ]
-    valid_list = [
+    valid_checksums = [
         ["val_data", "3410e3017fdaefba8d5073aaa65e4bd6"],
     ]
 
@@ -89,7 +89,7 @@ class ImageNet16(data.Dataset):
         if not self._check_integrity():
             raise RuntimeError("Dataset not found or corrupted.")
 
-        downloaded_list = self.train_list if self.train else self.valid_list
+        downloaded_list = self.train_checksums if self.train else self.valid_checksums
         self.data = []
         self.targets = []
 
@@ -150,7 +150,7 @@ class ImageNet16(data.Dataset):
 
     def _check_integrity(self) -> bool:
         root = self.root
-        for fentry in self.train_list + self.valid_list:
+        for fentry in self.train_checksums + self.valid_checksums:
             filename, md5 = fentry[0], fentry[1]
             fpath = os.path.join(root, self.dataset_folder, filename)
             if not check_integrity(fpath, md5):
