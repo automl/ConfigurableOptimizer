@@ -88,12 +88,14 @@ class AbstractData(ABC):
                 choose_sampler(train_data, train_sampler),
                 num_replicas=world_size,
                 rank=rank,
+                shuffle=self.shuffle,
             )
-            val_sampler = DistributedSampler(
-                choose_sampler(val_data, val_sampler),
-                num_replicas=world_size,
-                rank=rank,
-            )
+            if val_data is not None:
+                val_sampler = DistributedSampler(
+                    choose_sampler(val_data, val_sampler),
+                    num_replicas=world_size,
+                    rank=rank,
+                )
             test_sampler = DistributedSampler(
                 choose_sampler(test_data, test_sampler),
                 num_replicas=world_size,
@@ -106,7 +108,6 @@ class AbstractData(ABC):
             pin_memory=True,
             sampler=train_sampler,
             num_workers=n_workers,
-            shuffle=self.shuffle,
         )
         if val_data is not None:
             valid_queue = DataLoader(
