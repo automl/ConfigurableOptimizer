@@ -84,12 +84,19 @@ class ConfigurableTrainer:
         self.query_dataset = query_dataset
         self.benchmark_api = benchmark_api
 
-    def _init_experiment_state(self, setup_new_run: bool = True) -> None:
+    def _init_experiment_state(
+        self,
+        search_space_handler: SearchSpaceHandler | None = None,
+        setup_new_run: bool = True,
+    ) -> None:
         """Initializes the state of the experiment.
 
         If training is to continue from a previous checkpoint, then the state
         is laoded from the checkpoint. Else, empty states are initialized for
         the run.
+
+        search_space_handler is passed to activate lora modules in case lora
+        is there in checkpoint to be loaded from.
 
         Also instantiates the Checkpointer objects used throughout training.
         """
@@ -110,7 +117,22 @@ class ConfigurableTrainer:
             checkpoint = ExperimentCheckpointLoader.load_checkpoint(
                 self.logger, src, epoch
             )
-            self._load_checkpoint(checkpoint)
+
+            # activate lora modules if present
+            if (
+                search_space_handler is not None
+                and search_space_handler.lora_configs is not None
+            ):
+                self._initialize_lora_modules(
+                    -1, search_space_handler, self.model, False
+                )
+
+            # Forward model once to register flop params
+            train_queue, _, _ = self.data.get_dataloaders()
+            dummy_example, _ = next(iter(train_queue))
+            self.model(dummy_example.to(self.device))
+
+            self._load_checkpoint(checkpoint, only_model=not setup_new_run)
             if setup_new_run:
                 self.logger.set_up_new_run()
         else:
@@ -587,8 +609,10 @@ class ConfigurableTrainer:
             "valid_accs_top5": self.valid_accs_top5,
         }
 
-    def _load_checkpoint(self, checkpoint: dict) -> None:
+    def _load_checkpoint(self, checkpoint: dict, only_model: bool = False) -> None:
         self.model.load_state_dict(checkpoint["model"])
+        if only_model:
+            return
         if self.arch_optimizer:
             self.arch_optimizer.load_state_dict(checkpoint["arch_optimizer"])
         self.model_optimizer.load_state_dict(checkpoint["w_optimizer"])

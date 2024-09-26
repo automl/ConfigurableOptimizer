@@ -963,7 +963,9 @@ class Experiment:
 
         # Load from supernet
         if model_source == "supernet":
-            trainer._init_experiment_state(setup_new_run=False)
+            trainer._init_experiment_state(
+                search_space_handler=search_space_handler, setup_new_run=False
+            )
 
             # reroute logger
             self.logger = Logger(
