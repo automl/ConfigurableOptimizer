@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC
-from collections import namedtuple
 from typing import Any
 
+from confopt.searchspace.darts.core.genotypes import DARTSGenotype
 from confopt.utils import get_num_classes
 
 from .profile_config import BaseProfile
-
-Genotype = namedtuple("Genotype", "normal normal_concat reduce reduce_concat")
 
 
 class DARTSProfile(BaseProfile, ABC):
@@ -262,7 +260,7 @@ class DiscreteProfile:
 
     def _initializa_genotype(self) -> None:
         self.genotype = str(
-            Genotype(
+            DARTSGenotype(
                 normal=[
                     ("sep_conv_3x3", 1),
                     ("sep_conv_3x3", 0),
