@@ -128,25 +128,28 @@ class DiscreteTrainer(ConfigurableTrainer):
                 train_time.sum,
             )
 
-        valid_metrics = self.evaluate(val_loader, network, criterion)
-        valid_metrics = self.average_metrics_across_workers(
-            valid_metrics
-        )  # type:ignore
+        if val_loader is not None:
+            valid_metrics = self.evaluate(val_loader, network, criterion)
+            valid_metrics = self.average_metrics_across_workers(
+                valid_metrics
+            )  # type:ignore
 
         # Logging
         if rank == 0:
-            self.logger.log_metrics("[Discrete] Evaluation: ", valid_metrics, epoch_str)
+            if val_loader is not None:
+                self.logger.log_metrics(
+                    "[Discrete] Evaluation: ", valid_metrics, epoch_str
+                )
+                self.logger.add_wandb_log_metrics("discrete/eval", valid_metrics, epoch)
 
+                (
+                    self.valid_losses[epoch],
+                    self.valid_accs_top1[epoch],
+                    self.valid_accs_top5[epoch],
+                ) = valid_metrics
             self.logger.add_wandb_log_metrics(
                 "discrete/train/model", base_metrics, epoch, train_time.sum
             )
-            self.logger.add_wandb_log_metrics("discrete/eval", valid_metrics, epoch)
-
-            (
-                self.valid_losses[epoch],
-                self.valid_accs_top1[epoch],
-                self.valid_accs_top5[epoch],
-            ) = valid_metrics
 
             (
                 self.search_losses[epoch],
@@ -162,7 +165,10 @@ class DiscreteTrainer(ConfigurableTrainer):
             if is_wandb_log:
                 self.logger.push_wandb_logs()
 
-            if valid_metrics.acc_top1 > self.valid_accs_top1["best"]:
+            if (
+                val_loader is not None
+                and valid_metrics.acc_top1 > self.valid_accs_top1["best"]
+            ):
                 self.valid_accs_top1["best"] = valid_metrics.acc_top1
                 self.logger.log(
                     f"<<<--->>> The {epoch_str}-th epoch : found the highest "
