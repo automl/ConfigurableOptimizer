@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import ast
 from collections import namedtuple
 from enum import Enum
 import json
@@ -46,6 +45,7 @@ from confopt.profiles import (
 )
 from confopt.searchspace import (
     BabyDARTSSearchSpace,
+    DARTSGenotype,  # noqa: F401
     DARTSImageNetModel,
     DARTSModel,
     DARTSSearchSpace,
@@ -56,9 +56,6 @@ from confopt.searchspace import (
     RobustDARTSSearchSpace,
     SearchSpace,
     TransNASBench101SearchSpace,
-)
-from confopt.searchspace import (
-    DARTSGenotype as Genotype,  # noqa: F401
 )
 from confopt.train import ConfigurableTrainer, DiscreteTrainer, SearchSpaceHandler
 from confopt.train.projection import PerturbationArchSelection
@@ -586,7 +583,7 @@ class Experiment:
             searchspace_config["genotype"] = NAS201Genotype.str2structure(genotype_str)
             discrete_model = NASBench201Model(**searchspace_config)
         elif search_space_str == ModelType.DARTS.value:
-            searchspace_config["genotype"] = ast.literal_eval(genotype_str)
+            searchspace_config["genotype"] = eval(genotype_str)
             if self.dataset_str.value in ("cifar10", "cifar100"):
                 discrete_model = DARTSModel(**searchspace_config)
             elif self.dataset_str.value in ("imgnet16", "imgnet16_120"):
