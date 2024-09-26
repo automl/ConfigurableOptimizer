@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 from collections import namedtuple
 from enum import Enum
 import json
@@ -45,7 +46,6 @@ from confopt.profiles import (
 )
 from confopt.searchspace import (
     BabyDARTSSearchSpace,
-    DARTSGenotype,  # noqa: F401
     DARTSImageNetModel,
     DARTSModel,
     DARTSSearchSpace,
@@ -56,6 +56,9 @@ from confopt.searchspace import (
     RobustDARTSSearchSpace,
     SearchSpace,
     TransNASBench101SearchSpace,
+)
+from confopt.searchspace import (
+    DARTSGenotype as Genotype,  # noqa: F401
 )
 from confopt.train import ConfigurableTrainer, DiscreteTrainer, SearchSpaceHandler
 from confopt.train.projection import PerturbationArchSelection
@@ -560,6 +563,7 @@ class Experiment:
             self.search_space_str.value, self.dataset_str.value
         )
         genotype_str = profile.get_genotype()
+        run_name = profile.get_name_wandb_run()
 
         return self._train_discrete_model(
             searchspace_config=searchspace_config,
@@ -569,6 +573,7 @@ class Experiment:
             load_best_model=load_best_model,
             use_supernet_checkpoint=use_supernet_checkpoint,
             genotype_str=genotype_str,
+            run_name=run_name,
         )
 
     def get_discrete_model_from_genotype_str(
@@ -581,7 +586,7 @@ class Experiment:
             searchspace_config["genotype"] = NAS201Genotype.str2structure(genotype_str)
             discrete_model = NASBench201Model(**searchspace_config)
         elif search_space_str == ModelType.DARTS.value:
-            searchspace_config["genotype"] = eval(genotype_str)
+            searchspace_config["genotype"] = ast.literal_eval(genotype_str)
             if self.dataset_str.value in ("cifar10", "cifar100"):
                 discrete_model = DARTSModel(**searchspace_config)
             elif self.dataset_str.value in ("imgnet16", "imgnet16_120"):
@@ -675,6 +680,7 @@ class Experiment:
         use_supernet_checkpoint: bool = False,
         use_expr_search_space: bool = False,
         genotype_str: str | None = None,
+        run_name: str = "discrete_run",
     ) -> DiscreteTrainer:
         # should not care where the model comes from => genotype should be a
         # different function
@@ -792,6 +798,8 @@ class Experiment:
             epochs=trainer_arguments.epochs,  # type: ignore
             debug_mode=self.debug_mode,
         )
+        if self.is_wandb_log:
+            self._init_wandb(run_name, config=train_config)
 
         trainer.train(
             epochs=trainer_arguments.epochs,  # type: ignore
