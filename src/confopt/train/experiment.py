@@ -18,6 +18,8 @@ from confopt.dataset import (
     CIFAR100Data,
     ImageNet16Data,
     ImageNet16120Data,
+    TaskonomyClassObjectData,
+    TaskonomyClassSceneData,
 )
 from confopt.oneshot.archsampler import (
     DARTSSampler,
@@ -109,6 +111,7 @@ class DatasetType(Enum):
     CIFAR100 = "cifar100"
     IMGNET16 = "imgnet16"
     IMGNET16_120 = "imgnet16_120"
+    TASKONOMY = "taskonomy"
 
 
 N_CLASSES = {
@@ -143,6 +146,7 @@ class Experiment:
         debug_mode: bool = False,
         exp_name: str = "test",
         runtime: str | None = None,
+        domain: str | None = None,
     ) -> None:
         self.search_space_str = search_space
         self.dataset_str = dataset
@@ -151,6 +155,7 @@ class Experiment:
         self.debug_mode = debug_mode
         self.exp_name = exp_name
         self.runtime = runtime
+        self.domain = domain
 
     def set_seed(self, rand_seed: int) -> None:
         random.seed(rand_seed)
@@ -493,7 +498,7 @@ class Experiment:
             regularizer=self.regularizer,
         )
 
-    def _get_dataset(self, dataset: DatasetType) -> Callable | None:
+    def _get_dataset(self, dataset: DatasetType, domain: str | None = None) -> Callable:
         if dataset == DatasetType.CIFAR10:
             return CIFAR10Data
         elif dataset == DatasetType.CIFAR100:  # noqa: RET505
@@ -502,7 +507,18 @@ class Experiment:
             return ImageNet16Data
         elif dataset == DatasetType.IMGNET16_120:
             return ImageNet16120Data
-        return None
+        elif dataset == DatasetType.TASKONOMY:
+            assert domain is not None
+            return self._get_taskonomy_dataset(domain)
+        else:
+            raise ValueError("Invalid dataset")
+
+    def _get_taskonomy_dataset(self, domain: str) -> Callable:
+        if domain == "class_object":
+            return TaskonomyClassObjectData
+        elif domain == "class_scene":  # noqa: RET505
+            return TaskonomyClassSceneData
+        raise ValueError("Invalid domain for Taskonomy dataset")
 
     def _get_criterion(self, criterion_str: str) -> torch.nn.Module:
         criterion = CriterionType(criterion_str)
@@ -556,9 +572,7 @@ class Experiment:
         use_supernet_checkpoint: bool = False,
     ) -> DiscreteTrainer:
         train_config = profile.get_trainer_config()
-        searchspace_config = profile.get_searchspace_config(
-            self.search_space_str.value, self.dataset_str.value
-        )
+        searchspace_config = profile.get_searchspace_config(self.dataset_str.value)
         genotype_str = profile.get_genotype()
         run_name = profile.get_name_wandb_run()
 
@@ -751,7 +765,7 @@ class Experiment:
         )
         trainer_arguments = Arguments(**train_config)  # type: ignore
 
-        data = self._get_dataset(self.dataset_str)(
+        data = self._get_dataset(self.dataset_str, self.domain)(
             root="datasets",
             cutout=trainer_arguments.cutout,  # type: ignore
             cutout_length=trainer_arguments.cutout_length,  # type: ignore
@@ -823,7 +837,7 @@ class Experiment:
             criterion_str=trainer_arguments.criterion  # type: ignore
         )
 
-        data = self._get_dataset(self.dataset_str)(
+        data = self._get_dataset(self.dataset_str, self.domain)(
             root="datasets",
             cutout=trainer_arguments.cutout,  # type: ignore
             cutout_length=trainer_arguments.cutout_length,  # type: ignore
