@@ -109,13 +109,19 @@ def drop_path(x: torch.Tensor, drop_prob: float) -> torch.Tensor:
     return x
 
 
-def get_num_classes(dataset: str) -> int:
+def get_num_classes(dataset: str, domain: str | None = None) -> int:
     if dataset == "cifar10":
         num_classes = 10
     elif dataset == "cifar100":
         num_classes = 100
     elif dataset in ("imgnet16_120", "imgnet16"):
         num_classes = 120
+    elif dataset == "taskonomy":
+        assert domain in ["class_object", "class_scene"]
+        if "class_object" in domain:
+            num_classes = 75
+        elif "class_scene" in domain:
+            num_classes = 47
     else:
         raise ValueError("dataset is not defined.")
     return num_classes
