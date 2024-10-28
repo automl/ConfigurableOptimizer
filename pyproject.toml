@@ -12,6 +12,8 @@ dependencies = [
     "fvcore",
     "reinmax",
     "thop",
+    "seaborn",
+    "scikit-image",
 ]
 requires-python = ">=3.8"
 authors = [{ name = "Arjun Krishnakumar", email = "arjun.krishnakumar.mec@gmail.com" }]
