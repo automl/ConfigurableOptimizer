@@ -219,7 +219,14 @@ class DRNASProfile(BaseProfile, ABC):
 
 
 class DiscreteProfile:
-    def __init__(self, **kwargs) -> None:  # type: ignore
+    def __init__(
+        self,
+        searchspace_str: str,
+        domain: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self.searchspace_str = searchspace_str
+        self.domain = domain
         self._initialize_trainer_config()
         self._initializa_genotype()
         self.configure_trainer(**kwargs)
@@ -297,23 +304,30 @@ class DiscreteProfile:
     def set_search_space_config(self, config: dict) -> None:
         self.searchspace_config = config
 
-    def get_searchspace_config(self, searchspace_str: str, dataset_str: str) -> dict:
+    def get_searchspace_config(self, dataset_str: str) -> dict:
         if hasattr(self, "searchspace_config"):
             return self.searchspace_config
-        if searchspace_str == "nb201":
+        if self.searchspace_str == "nb201":
             searchspace_config = {
                 "N": 5,  # num_cells
                 "C": 16,  # channels
+                "num_classes": get_num_classes(dataset_str),
             }
-        elif searchspace_str == "darts":
+        elif self.searchspace_str == "darts":
             searchspace_config = {
                 "C": 36,  # init channels
                 "layers": 20,  # number of layers
                 "auxiliary": True,
+                "num_classes": get_num_classes(dataset_str),
+            }
+        elif self.searchspace_str == "taskonomy":
+            assert self.domain is not None, "domain must be specified"
+            searchspace_config = {
+                "domain": self.domain,
+                "num_classes": get_num_classes(dataset_str, domain=self.domain),
             }
         else:
             raise ValueError("search space is not correct")
-        searchspace_config["num_classes"] = get_num_classes(dataset_str)
         return searchspace_config
 
     def get_name_wandb_run(self) -> str:
