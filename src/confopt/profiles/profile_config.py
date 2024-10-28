@@ -44,6 +44,7 @@ class BaseProfile:
         is_regularization_enabled: bool = False,
         regularization_config: dict | None = None,
         pt_select_architecture: bool = False,
+        searchspace_domain: str | None = None,
     ) -> None:
         assert searchspace_str in [
             "nb201",
@@ -52,6 +53,14 @@ class BaseProfile:
             "tnb101",
         ], f"Invalid searchspace {searchspace_str}!"
         self.searchspace_str = searchspace_str
+        assert (
+            searchspace_str == "taskonomy"
+            and searchspace_domain in ["class_object", "class_scene"]
+        ) or (
+            searchspace_str != "taskonomy"
+        ), f"Invalid domain {searchspace_domain} for searchspace {searchspace_str}!"
+
+        self.searchspace_domain = searchspace_domain
         self.config_type = config_type
         self.epochs = epochs
         self.sampler_sample_frequency = (
@@ -204,6 +213,7 @@ class BaseProfile:
             },
             "sampler_type": self.sampler_type,
             "searchspace_str": self.searchspace_str,
+            "searchspace_domain": self.searchspace_domain,
             "weight_type": weight_type,
             "oles": self.oles_config,
             "pt_selection": self.pt_select_configs,
@@ -492,10 +502,26 @@ class BaseProfile:
             "lora_warm_epochs": self.lora_warm_epochs,
             "optim": "sgd",
             "arch_optim": "adam",
+            "optim_config": {
+                "momentum": 0.9,
+                "nesterov": False,
+                "weight_decay": 3e-4,
+            },
+            "arch_optim_config": {
+                "weight_decay": 1e-3,
+                "betas": (0.5, 0.999),
+            },
+            "scheduler": "cosine_annealing_lr",
+            "scheduler_config": {},
+            "criterion": "cross_entropy",
             "use_data_parallel": False,
             "checkpointing_freq": 1,
             "seed": self.seed,
             "cutout": -1,
             "cutout_length": 16,
+            "batch_size": 32,
+            "train_portion": 0.5,
+            "learning_rate_min": 0.001,
         }
+
         self.trainer_config = trainer_config
