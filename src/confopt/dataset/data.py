@@ -19,14 +19,14 @@ from .imgnet16 import ImageNet16
 
 DS = Tuple[Union[Dataset, None], Union[Sampler, None]]
 DOMAIN_DATA_SOURCE = {
-    "rgb": ("rgb", "png"),
-    "autoencoder": ("rgb", "png"),
-    "class_object": ("class_object", "npy"),
-    "class_scene": ("class_scene", "npy"),
-    "normal": ("normal", "png"),
-    "room_layout": ("room_layout", "npy"),
-    "segmentsemantic": ("segmentsemantic", "png"),
-    "jigsaw": ("rgb", "png"),
+    "rgb": ("rgb", "png", "rgb"),
+    "autoencoder": ("rgb", "png", "autoencoder"),
+    "class_object": ("class_object", "npy", "class_object"),
+    "class_scene": ("class_scene", "npy", "class_places"),
+    "normal": ("normal", "png", "normal"),
+    "room_layout": ("room_layout", "npy", "room_layout"),
+    "segmentsemantic": ("segmentsemantic", "png", "segmentsemantic"),
+    "jigsaw": ("rgb", "png", "jigsaw"),
 }
 
 
@@ -94,8 +94,8 @@ class AbstractData(ABC):
 
         if use_distributed_sampler:
             rank, world_size = dist_utils.get_rank(), dist_utils.get_world_size()
-            choose_sampler = (
-                lambda data, sampler: sampler if sampler is not None else data
+            choose_sampler = lambda data, sampler: (
+                sampler if sampler is not None else data
             )
             train_sampler = DistributedSampler(
                 choose_sampler(train_data, train_sampler),
@@ -351,10 +351,12 @@ class TaskonomyDataset(Dataset):
     def __len__(self) -> int:
         return len(self.all_templates)
 
-    def __getitem__(self, idx: int | torch.Tensor) -> dict:
+    def __getitem__(
+        self, idx: int | torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor | np.ndarray]:
         try:
             if torch.is_tensor(idx):
-                idx = idx.tolist()  # type: ignore
+                idx = idx.item()  # type: ignore
             template = os.path.join(self.dataset_dir, self.all_templates[idx])
             image = io.imread(".".join([template.format(domain="rgb"), "png"]))
             label = self.get_label(template)
@@ -366,12 +368,16 @@ class TaskonomyDataset(Dataset):
             raise Exception(
                 f"Error for img {'.'.join([template.format(domain='rgb'), 'png'])}"
             ) from err
-        return sample
+        return sample["image"], sample["label"]
 
     def get_label(self, template: str) -> np.ndarray:
+        template = template.replace("{domain}", "{domain_task}", 1)
         label_path = ".".join(
             [
-                template.format(domain=DOMAIN_DATA_SOURCE[self.domain][0]),
+                template.format(
+                    domain_task=DOMAIN_DATA_SOURCE[self.domain][0],
+                    domain=DOMAIN_DATA_SOURCE[self.domain][2],
+                ),
                 DOMAIN_DATA_SOURCE[self.domain][1],
             ]
         )
@@ -395,10 +401,8 @@ class TaskonomyData(AbstractData):
         self.domain = domain
         self.label_type = DOMAIN_DATA_SOURCE[domain][1]
         self.target_load_fn = target_load_fn
-        self.target_load_kwargs = {
-            "selected": target_dim < num_classes,
-            "final5k": data_split_dir.split("/")[-1] == "final5k",
-        }
+        self.num_classes = num_classes
+        self.target_dim = target_dim
         self.data_split_dir = data_split_dir
 
     def load_datasets(
@@ -407,28 +411,34 @@ class TaskonomyData(AbstractData):
         train_transform: load_ops.Compose,
         test_transform: load_ops.Compose,
     ) -> tuple[Dataset, Dataset]:
+        train_filenames_file = "train_filenames_final5k.json"
         train_templates = load_ops.get_all_templates(
             self.dataset_dir,
-            os.path.join(self.data_split_dir, "train_filenames_final5k.json"),
+            os.path.join(self.data_split_dir, train_filenames_file),
         )
+        target_load_kwargs = {
+            "selected": self.target_dim < self.num_classes,
+            "final5k": "final5k" in train_filenames_file,
+        }
         train_data = TaskonomyDataset(
             templates=train_templates,
             dataset_dir=self.dataset_dir,
             domain=self.domain,
             target_load_fn=self.target_load_fn,
-            target_load_kwargs=self.target_load_kwargs,
+            target_load_kwargs=target_load_kwargs,
             transform=train_transform,
         )
+        test_filenames_file = "test_filenames_final5k.json"
         test_templates = load_ops.get_all_templates(
             self.dataset_dir,
-            os.path.join(self.data_split_dir, "test_filenames_final5k.json"),
+            os.path.join(self.data_split_dir, test_filenames_file),
         )
         test_data = TaskonomyDataset(
             templates=test_templates,
             dataset_dir=self.dataset_dir,
             domain=self.domain,
             target_load_fn=self.target_load_fn,
-            target_load_kwargs=self.target_load_kwargs,
+            target_load_kwargs=target_load_kwargs,
             transform=test_transform,
         )
         return train_data, test_data
@@ -488,17 +498,18 @@ class TaskonomyData(AbstractData):
 class TaskonomyClassObjectData(TaskonomyData):
     def __init__(
         self,
-        root: str = "datasets/taskonomydatamini",
+        root: str = "datasets",
+        dataset_dir: str = "taskonomydata_mini",
         train_portion: float = 0.5,
         cutout: int = -1,  # noqa: ARG002
         cutout_length: int = 16,  # noqa: ARG002
         num_classes: int = 1000,
         target_dim: int = 75,
-        data_split_dir: str = "datasets/taskonomydatamini/final5K_splits",
+        data_split_dir: str = "datasets/taskonomydata_mini/final5K_splits",
     ) -> None:
         super().__init__(
             train_portion=train_portion,
-            dataset_dir=root,
+            dataset_dir=os.path.join(root, dataset_dir),
             domain="class_object",
             target_load_fn=load_ops.load_class_object_logits,
             num_classes=num_classes,
@@ -510,16 +521,17 @@ class TaskonomyClassObjectData(TaskonomyData):
 class TaskonomyClassSceneData(TaskonomyData):
     def __init__(
         self,
-        root: str = "datasets/taskonomydatamini",
+        root: str = "datasets",
+        dataset_dir: str = "taskonomydata_mini",
         train_portion: float = 0.5,
         cutout: int = -1,  # noqa: ARG002
         cutout_length: int = 16,  # noqa: ARG002
         num_classes: int = 365,
         target_dim: int = 47,
-        data_split_dir: str = "datasets/taskonomydatamini/final5K_splits",
+        data_split_dir: str = "datasets/taskonomydata_mini/final5K_splits",
     ) -> None:
         super().__init__(
-            dataset_dir=root,
+            dataset_dir=os.path.join(root, dataset_dir),
             train_portion=train_portion,
             domain="class_scene",
             target_load_fn=load_ops.load_class_scene_logits,
