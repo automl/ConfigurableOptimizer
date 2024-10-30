@@ -36,6 +36,8 @@ This project uses `mypy` for type checking, `ruff` for linting, and `black` for 
 
 The easiest way to ensure that the commits are well formatted is to commit using `cz commit` instead of `git commit`.
 
+Extract the ```taskonomydata_mini.zip``` into ```datasets/``` directory. Eventually you would have a directory ```datasets/taskonomydata_mini``` which contains all images to be sampled from the each of the domains along with their data splits.
+
 To download the Taskonomy dataset from Stanford urls run:
 ```
 bash scripts/download_taskonomy_stanford.sh
@@ -44,4 +46,3 @@ Or alternatively from the EPFL urls:
 ```
 bash scripts/download_taskonomy_epfl.sh
 ```
-Extract the ```taskonomydata_mini.zip``` into ```datasets/``` directory. Eventually you would have a directory ```datasets/taskonomydata_mini``` which contains all images to be sampled from the each of the domains along with their data splits.
