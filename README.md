@@ -35,3 +35,14 @@ python examples/searchspace.py
 This project uses `mypy` for type checking, `ruff` for linting, and `black` for formatting. VSCode extensions can be found for each of these tools. The pre-commit hooks check for `mypy`/`ruff`/`black` errors and won't let you commit until you fix the issues. The pre-commit hooks also checks for proper commit message format.
 
 The easiest way to ensure that the commits are well formatted is to commit using `cz commit` instead of `git commit`.
+
+Extract the ```taskonomydata_mini.zip``` into ```datasets/``` directory. Eventually you would have a directory ```datasets/taskonomydata_mini``` which contains all images to be sampled from the each of the domains along with their data splits.
+
+To download the Taskonomy dataset from Stanford urls run:
+```
+bash scripts/download_taskonomy.sh stanford
+```
+Or alternatively from the EPFL urls:
+```
+bash scripts/download_taskonomy.sh epfl
+```
