@@ -53,13 +53,15 @@ class BaseProfile:
             "tnb101",
         ], f"Invalid searchspace {searchspace_str}!"
         self.searchspace_str = searchspace_str
-        assert (
-            searchspace_str == "taskonomy"
-            and searchspace_domain in ["class_object", "class_scene"]
-        ) or (
-            searchspace_str != "taskonomy"
-        ), f"Invalid domain {searchspace_domain} for searchspace {searchspace_str}!"
-
+        if searchspace_str == "taskonomy":
+            assert searchspace_domain in [
+                "class_object",
+                "class_scene",
+            ], "searchspace_domain must be either class_object or class_scene"
+        else:
+            assert (
+                searchspace_domain is None
+            ), "searchspace_domain is not required for this searchspace"
         self.searchspace_domain = searchspace_domain
         self.config_type = config_type
         self.epochs = epochs
