@@ -28,6 +28,8 @@ DOMAIN_DATA_SOURCE = {
     "segmentsemantic": ("segmentsemantic", "png", "segmentsemantic"),
     "jigsaw": ("rgb", "png", "jigsaw"),
 }
+TASKONOMY_TRAIN_FILENAMES_FINAL5K = "train_filenames_final5k.json"
+TASKONOMY_TEST_FILENAMES_FINAL5K = "test_filenames_final5k.json"
 
 
 class CUTOUT:
@@ -411,14 +413,13 @@ class TaskonomyData(AbstractData):
         train_transform: load_ops.Compose,
         test_transform: load_ops.Compose,
     ) -> tuple[Dataset, Dataset]:
-        train_filenames_file = "train_filenames_final5k.json"
         train_templates = load_ops.get_all_templates(
             self.dataset_dir,
-            os.path.join(self.data_split_dir, train_filenames_file),
+            os.path.join(self.data_split_dir, TASKONOMY_TRAIN_FILENAMES_FINAL5K),
         )
         target_load_kwargs = {
             "selected": self.target_dim < self.num_classes,
-            "final5k": "final5k" in train_filenames_file,
+            "final5k": "final5k" in TASKONOMY_TRAIN_FILENAMES_FINAL5K,
         }
         train_data = TaskonomyDataset(
             templates=train_templates,
@@ -428,10 +429,9 @@ class TaskonomyData(AbstractData):
             target_load_kwargs=target_load_kwargs,
             transform=train_transform,
         )
-        test_filenames_file = "test_filenames_final5k.json"
         test_templates = load_ops.get_all_templates(
             self.dataset_dir,
-            os.path.join(self.data_split_dir, test_filenames_file),
+            os.path.join(self.data_split_dir, TASKONOMY_TEST_FILENAMES_FINAL5K),
         )
         test_data = TaskonomyDataset(
             templates=test_templates,
