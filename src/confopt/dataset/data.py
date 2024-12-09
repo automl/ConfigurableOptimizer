@@ -505,7 +505,7 @@ class TaskonomyClassObjectData(TaskonomyData):
         cutout_length: int = 16,  # noqa: ARG002
         num_classes: int = 1000,
         target_dim: int = 75,
-        data_split_dir: str = "datasets/taskonomydata_mini/final5K_splits",
+        data_split_dir: str = "final5K_splits",
     ) -> None:
         super().__init__(
             train_portion=train_portion,
@@ -514,7 +514,7 @@ class TaskonomyClassObjectData(TaskonomyData):
             target_load_fn=load_ops.load_class_object_logits,
             num_classes=num_classes,
             target_dim=target_dim,
-            data_split_dir=data_split_dir,
+            data_split_dir=os.path.join(root, dataset_dir, data_split_dir),
         )
 
 
@@ -528,7 +528,7 @@ class TaskonomyClassSceneData(TaskonomyData):
         cutout_length: int = 16,  # noqa: ARG002
         num_classes: int = 365,
         target_dim: int = 47,
-        data_split_dir: str = "datasets/taskonomydata_mini/final5K_splits",
+        data_split_dir: str = "final5K_splits",
     ) -> None:
         super().__init__(
             dataset_dir=os.path.join(root, dataset_dir),
@@ -537,5 +537,5 @@ class TaskonomyClassSceneData(TaskonomyData):
             target_load_fn=load_ops.load_class_scene_logits,
             num_classes=num_classes,
             target_dim=target_dim,
-            data_split_dir=data_split_dir,
+            data_split_dir=os.path.join(root, dataset_dir, data_split_dir),
         )
