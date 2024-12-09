@@ -534,14 +534,9 @@ class ConfigurableTrainer:
                 arch_loss = criterion(logits, arch_targets)
 
                 # record
-                if self.logger.dataset == "taskonomy":
-                    arch_prec1, arch_prec5 = calc_accuracy(
-                        logits.data, arch_targets.data.argmax(dim=-1), topk=(1, 5)
-                    )
-                else:
-                    arch_prec1, arch_prec5 = calc_accuracy(
-                        logits.data, arch_targets.data, topk=(1, 5)
-                    )
+                arch_prec1, arch_prec5 = calc_accuracy(
+                    logits.data, arch_targets.data, topk=(1, 5)
+                )
 
                 arch_losses.update(arch_loss.item(), arch_inputs.size(0))
                 arch_top1.update(arch_prec1.item(), arch_inputs.size(0))
