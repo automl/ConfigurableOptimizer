@@ -508,7 +508,7 @@ class Experiment:
         elif dataset == DatasetType.IMGNET16_120:
             return ImageNet16120Data
         elif dataset == DatasetType.TASKONOMY:
-            assert domain is not None
+            assert domain is not None, "Domain should be provided for Taskonomy dataset"
             return self._get_taskonomy_dataset(domain)
         else:
             raise ValueError("Invalid dataset")
