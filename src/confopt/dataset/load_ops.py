@@ -430,6 +430,7 @@ def load_class_object_label(
         label_path, selected=selected, normalize=False, final5k=final5k
     )
     target = np.asarray(logits.argmax())
+    target = np.argmax(target, axis=-1)
     return target
 
 
@@ -463,6 +464,7 @@ def load_class_scene_logits(
         if normalize:
             logits = logits / logits.sum()
     target = np.asarray(logits)
+    target = np.argmax(target, axis=-1)
     return target
 
 
