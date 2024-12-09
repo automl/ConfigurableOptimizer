@@ -501,11 +501,10 @@ class TaskonomyClassObjectData(TaskonomyData):
         root: str = "datasets",
         dataset_dir: str = "taskonomydata_mini",
         train_portion: float = 0.5,
-        cutout: int = -1,  # noqa: ARG002
-        cutout_length: int = 16,  # noqa: ARG002
         num_classes: int = 1000,
         target_dim: int = 75,
         data_split_dir: str = "datasets/taskonomydata_mini/final5K_splits",
+        **_args: dict,
     ) -> None:
         super().__init__(
             train_portion=train_portion,
@@ -524,11 +523,10 @@ class TaskonomyClassSceneData(TaskonomyData):
         root: str = "datasets",
         dataset_dir: str = "taskonomydata_mini",
         train_portion: float = 0.5,
-        cutout: int = -1,  # noqa: ARG002
-        cutout_length: int = 16,  # noqa: ARG002
         num_classes: int = 365,
         target_dim: int = 47,
         data_split_dir: str = "datasets/taskonomydata_mini/final5K_splits",
+        **_args: dict,
     ) -> None:
         super().__init__(
             dataset_dir=os.path.join(root, dataset_dir),
