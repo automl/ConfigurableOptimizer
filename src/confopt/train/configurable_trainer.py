@@ -637,14 +637,7 @@ class ConfigurableTrainer:
         top1_meter: AverageMeter,
         top5_meter: AverageMeter,
     ) -> None:
-        if self.logger.dataset == "taskonomy":
-            base_prec1, base_prec5 = calc_accuracy(
-                logits.data, targets.data.argmax(dim=-1), topk=(1, 5)
-            )
-        else:
-            base_prec1, base_prec5 = calc_accuracy(
-                logits.data, targets.data, topk=(1, 5)
-            )
+        base_prec1, base_prec5 = calc_accuracy(logits.data, targets.data, topk=(1, 5))
         loss_meter.update(loss.item(), inputs.size(0))
         top1_meter.update(base_prec1.item(), inputs.size(0))
         top5_meter.update(base_prec5.item(), inputs.size(0))
