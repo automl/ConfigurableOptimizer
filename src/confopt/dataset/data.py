@@ -409,6 +409,7 @@ class TaskonomyData(AbstractData):
 
     def load_datasets(
         self,
+        # TODO: Remove the unused argument
         root: str,  # noqa: ARG002
         train_transform: load_ops.Compose,
         test_transform: load_ops.Compose,
@@ -501,6 +502,7 @@ class TaskonomyClassObjectData(TaskonomyData):
         root: str = "datasets",
         dataset_dir: str = "taskonomydata_mini",
         train_portion: float = 0.5,
+        # TODO: Remove the unused argument
         cutout: int = -1,  # noqa: ARG002
         cutout_length: int = 16,  # noqa: ARG002
         num_classes: int = 1000,
@@ -524,6 +526,7 @@ class TaskonomyClassSceneData(TaskonomyData):
         root: str = "datasets",
         dataset_dir: str = "taskonomydata_mini",
         train_portion: float = 0.5,
+        # TODO: Remove the unused argument
         cutout: int = -1,  # noqa: ARG002
         cutout_length: int = 16,  # noqa: ARG002
         num_classes: int = 365,
