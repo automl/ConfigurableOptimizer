@@ -83,6 +83,9 @@ def calc_accuracy(
 
     _, pred = output.topk(maxk, 1, True, True)
     pred = pred.t()
+    # when target has shape (batch_size, num_classes) apply softmax
+    if len(target.shape) == 2 and target.shape[1] == output.shape[1]:
+        target = target.argmax(dim=-1)
     correct = pred.eq(target.view(1, -1).expand_as(pred))
 
     res = []
