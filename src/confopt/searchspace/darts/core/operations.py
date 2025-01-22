@@ -145,11 +145,11 @@ class ReLUConvBN(nn.Module):
     def increase_out_channel_size(
         self, num_channels_to_add: int, device: torch.device = DEVICE
     ) -> None:
-        self.op[1], _ = ch.increase_out_channel_size_conv(
+        self.op[1], index = ch.increase_out_channel_size_conv(
             self.op[1], num_channels_to_add, device=device
         )
         self.op[2], _ = ch.increase_num_features_bn(
-            self.op[2], num_channels_to_add, device=device
+            self.op[2], num_channels_to_add, index=index, device=device
         )
         self.C_out += num_channels_to_add
 
@@ -778,13 +778,18 @@ class FactorizedReduce(nn.Module):
     def increase_out_channel_size(
         self, num_channels_to_add: int, device: torch.device = DEVICE
     ) -> None:
-        self.conv_1 = ch.increase_out_channel_size_conv(
-            self.conv_1, num_channels_to_add - num_channels_to_add // 2, device
+        self.conv_1, index1 = ch.increase_out_channel_size_conv(
+            self.conv_1, num_channels_to_add - num_channels_to_add // 2, device=device
         )
-        self.conv_2 = ch.increase_out_channel_size_conv(
-            self.conv_2, num_channels_to_add // 2, device
+        self.conv_2, index2 = ch.increase_out_channel_size_conv(
+            self.conv_2, num_channels_to_add // 2, device=device
         )
-        self.bn = ch.increase_num_features_bn(self.bn, num_channels_to_add, device)
+        self.bn, _ = ch.increase_num_features_bn(
+            self.bn,
+            num_channels_to_add,
+            index=torch.cat([index1, index2]),
+            device=device,
+        )
         self.C_out += num_channels_to_add
 
     def change_stride_size(self, new_stride: int) -> None:
