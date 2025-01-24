@@ -54,8 +54,7 @@ class ConfigurableTrainer:
         use_data_parallel: bool = False,
         print_freq: int = 20,
         drop_path_prob: float = 0.1,
-        load_saved_model: bool = False,
-        load_best_model: bool = False,
+        model_to_load: str | None = None,
         start_epoch: int = 0,
         checkpointing_freq: int = 2,
         epochs: int = 100,
@@ -75,8 +74,7 @@ class ConfigurableTrainer:
         self.print_freq = print_freq
         self.batch_size = batch_size
         self.drop_path_prob = drop_path_prob
-        self.load_saved_model = load_saved_model
-        self.load_best_model = load_best_model
+        self.model_to_load = model_to_load
         self.start_epoch = start_epoch
         self.checkpointing_freq = checkpointing_freq
         self.epochs = epochs
@@ -100,16 +98,11 @@ class ConfigurableTrainer:
 
         Also instantiates the Checkpointer objects used throughout training.
         """
-        if self.load_saved_model or self.load_best_model or self.start_epoch != 0:
-            assert (
-                sum([self.start_epoch > 0, self.load_best_model, self.load_saved_model])
-                == 1
-            )
+        if (self.model_to_load is not None) or self.start_epoch != 0:
+            assert sum([self.start_epoch > 0, self.model_to_load is not None]) == 1
             epoch = None
-            if self.load_best_model is True:
-                src = "best"
-            elif self.load_saved_model is True:
-                src = "last"
+            if self.model_to_load is not None:
+                src = self.model_to_load
             else:
                 src = "epoch"
                 epoch = self.start_epoch
