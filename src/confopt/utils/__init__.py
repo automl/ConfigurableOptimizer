@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 from typing import Iterable, Literal
 
 import torch
@@ -319,6 +320,17 @@ def get_pos_new_cell_darts(layers: int) -> int:
     return pos
 
 
+def model_to_load_values(value: str) -> str | int:
+    if value in ["best", "last"]:
+        return value
+    try:
+        return int(value)
+    except ValueError as err:
+        raise argparse.ArgumentTypeError(
+            "model_to_load must be either 'best', 'last', or an integer"
+        ) from err
+
+
 __all__ = [
     "calc_accuracy",
     "save_checkpoint",
@@ -344,4 +356,5 @@ __all__ = [
     "get_pos_reductions_darts",
     "get_pos_new_cell_darts",
     "TransNASBenchAPI",
+    "model_to_load_values",
 ]
