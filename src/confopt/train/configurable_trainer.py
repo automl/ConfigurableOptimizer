@@ -54,8 +54,7 @@ class ConfigurableTrainer:
         use_data_parallel: bool = False,
         print_freq: int = 20,
         drop_path_prob: float = 0.1,
-        model_to_load: str | None = None,
-        start_epoch: int = 0,
+        model_to_load: str | int | None = None,
         checkpointing_freq: int = 2,
         epochs: int = 100,
         debug_mode: bool = False,
@@ -75,7 +74,6 @@ class ConfigurableTrainer:
         self.batch_size = batch_size
         self.drop_path_prob = drop_path_prob
         self.model_to_load = model_to_load
-        self.start_epoch = start_epoch
         self.checkpointing_freq = checkpointing_freq
         self.epochs = epochs
         self.debug_mode = debug_mode
@@ -98,14 +96,13 @@ class ConfigurableTrainer:
 
         Also instantiates the Checkpointer objects used throughout training.
         """
-        if (self.model_to_load is not None) or self.start_epoch != 0:
-            assert sum([self.start_epoch > 0, self.model_to_load is not None]) == 1
+        if self.model_to_load is not None:
             epoch = None
-            if self.model_to_load is not None:
+            if self.model_to_load == "best" or self.model_to_load == "last":
                 src = self.model_to_load
             else:
                 src = "epoch"
-                epoch = self.start_epoch
+                epoch = self.model_to_load
 
             checkpoint = ExperimentCheckpointLoader.load_checkpoint(
                 self.logger, src, epoch
@@ -559,7 +556,7 @@ class ConfigurableTrainer:
     def _init_empty_exp_state_info(self) -> None:
         self.start_epoch = 0
         self.search_losses: dict[int, float] = {}
-        self.search_accs_top1: dict[int, float] = {}
+        self.search_accs_top1: dict[int | str, float | int] = {"best": -1}
         self.search_accs_top5: dict[int, float] = {}
         self.valid_losses: dict[int, float] = {}
         self.valid_accs_top1: dict[int | str, float | int] = {"best": -1}
