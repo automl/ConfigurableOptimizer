@@ -129,9 +129,6 @@ if __name__ == "__main__":
 
     discret_trainer = experiment.train_discrete_model(
         discrete_profile,
-        # start_epoch=args.eval_epochs,
-        # load_saved_model=args.load_saved_model,
-        # load_best_model=args.load_best_model,
     )
     if IS_WANDB_LOG:
         wandb.finish()  # type: ignore
