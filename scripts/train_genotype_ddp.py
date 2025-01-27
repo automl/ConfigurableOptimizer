@@ -23,7 +23,6 @@ if __name__ == "__main__":
     experiment.init_ddp()
     trainer = experiment.train_discrete_model(
         profile,
-        start_epoch=0,
-        load_saved_model=False,
+        model_to_load=0,
     )
     experiment.cleanup_ddp()
