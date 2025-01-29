@@ -54,9 +54,7 @@ class ConfigurableTrainer:
         use_data_parallel: bool = False,
         print_freq: int = 20,
         drop_path_prob: float = 0.1,
-        load_saved_model: bool = False,
-        load_best_model: bool = False,
-        start_epoch: int = 0,
+        model_to_load: str | int | None = None,
         checkpointing_freq: int = 2,
         epochs: int = 100,
         debug_mode: bool = False,
@@ -75,9 +73,7 @@ class ConfigurableTrainer:
         self.print_freq = print_freq
         self.batch_size = batch_size
         self.drop_path_prob = drop_path_prob
-        self.load_saved_model = load_saved_model
-        self.load_best_model = load_best_model
-        self.start_epoch = start_epoch
+        self.model_to_load = model_to_load
         self.checkpointing_freq = checkpointing_freq
         self.epochs = epochs
         self.debug_mode = debug_mode
@@ -100,22 +96,21 @@ class ConfigurableTrainer:
 
         Also instantiates the Checkpointer objects used throughout training.
         """
-        if self.load_saved_model or self.load_best_model or self.start_epoch != 0:
-            assert (
-                sum([self.start_epoch > 0, self.load_best_model, self.load_saved_model])
-                == 1
-            )
+        if self.model_to_load is not None:
             epoch = None
 
             src: Literal["best", "last", "epoch"] = "best"
 
-            if self.load_best_model is True:
-                src = "best"
-            elif self.load_saved_model is True:
+            if self.model_to_load == "last":
                 src = "last"
+            elif self.model_to_load == "best":
+                src = "best"
             else:
+                assert isinstance(
+                    self.model_to_load, int
+                ), "Model to load should be either 'best', 'last' or an integer"
                 src = "epoch"
-                epoch = self.start_epoch
+                epoch = self.model_to_load
 
             checkpoint = ExperimentCheckpointLoader.load_checkpoint(
                 self.logger, src, epoch

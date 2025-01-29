@@ -7,6 +7,7 @@ import wandb
 
 from confopt.profile import DiscreteProfile
 from confopt.train import DatasetType, Experiment, SearchSpaceType
+from confopt.utils import model_to_load_values
 
 dataset_size = {
     "cifar10": 10,
@@ -47,14 +48,10 @@ def read_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--start_epoch", default=0, help="which epoch to start the training from"
-    )
-
-    parser.add_argument(
-        "--load_saved_model",
-        default=False,
-        action="store_true",
-        help="load from last saved checkpoint (based on seed)",
+        "--model_to_load",
+        type=model_to_load_values,
+        help="if str, could be best, last. If int, then load the checkpoint of that epoch",
+        default=None,
     )
 
     parser.add_argument(
@@ -129,9 +126,7 @@ if __name__ == "__main__":
 
     discret_trainer = experiment.train_discrete_model(
         discrete_profile,
-        start_epoch=int(args.start_epoch),
-        load_saved_model=args.load_saved_model,
-        # load_best_model=args.load_best_model,
+        model_to_load=args.model_to_load,
     )
 
     if IS_WANDB_LOG:

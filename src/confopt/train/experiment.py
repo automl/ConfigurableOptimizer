@@ -66,7 +66,7 @@ from confopt.searchspace import (
 from confopt.train import ConfigurableTrainer, DiscreteTrainer
 from confopt.train.projection import PerturbationArchSelection
 from confopt.train.search_space_handler import SearchSpaceHandler
-from confopt.utils import Logger
+from confopt.utils import Logger, model_to_load_values
 from confopt.utils import distributed as dist_utils
 from confopt.utils.time import check_date_format
 
@@ -113,9 +113,7 @@ class Experiment:
     def train_supernet(
         self,
         profile: BaseProfile,
-        start_epoch: int = 0,
-        load_saved_model: bool = False,
-        load_best_model: bool = False,
+        model_to_load: str | int | None = None,
         exp_runtime_to_load: str | None = None,
         use_benchmark: bool = False,
     ) -> ConfigurableTrainer:
@@ -132,12 +130,9 @@ class Experiment:
         self.entangle_op_weights = profile.entangle_op_weights
         oles_config = config["oles"]
 
-        assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
         return self._train_supernet(
             config=config,
-            start_epoch=start_epoch,
-            load_saved_model=load_saved_model,
-            load_best_model=load_best_model,
+            model_to_load=model_to_load,
             exp_runtime_to_load=exp_runtime_to_load,
             use_benchmark=use_benchmark,
             run_name=run_name,
@@ -161,9 +156,7 @@ class Experiment:
     def _train_supernet(
         self,
         config: dict | None = None,
-        start_epoch: int = 0,
-        load_saved_model: bool = False,
-        load_best_model: bool = False,
+        model_to_load: str | int | None = None,
         exp_runtime_to_load: str | None = None,
         use_benchmark: bool = False,
         run_name: str = "supernet_run",
@@ -172,12 +165,9 @@ class Experiment:
         oles_frequency: int = 20,
         oles_threshold: float = 0.4,
     ) -> ConfigurableTrainer:
-        assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
-
         self._set_seed(self.seed)
 
-        should_load_model = load_saved_model or load_best_model or start_epoch > 0
-        load_last_run = should_load_model and not exp_runtime_to_load
+        load_last_run = model_to_load is not None and not exp_runtime_to_load
 
         self.logger = Logger(
             log_dir="logs",
@@ -208,9 +198,7 @@ class Experiment:
 
         trainer = self._initialize_configurable_trainer(
             config=config,  # type: ignore
-            start_epoch=start_epoch,
-            load_saved_model=load_saved_model,
-            load_best_model=load_best_model,
+            model_to_load=model_to_load,
         )
 
         config_str = json.dumps(config, indent=2, default=str)
@@ -472,9 +460,7 @@ class Experiment:
     def train_discrete_model(
         self,
         profile: DiscreteProfile,
-        start_epoch: int = 0,
-        load_saved_model: bool = False,
-        load_best_model: bool = False,
+        model_to_load: str | int | None = None,
         exp_runtime_to_load: str | None = None,
         use_supernet_checkpoint: bool = False,
     ) -> DiscreteTrainer:
@@ -486,9 +472,7 @@ class Experiment:
         return self._train_discrete_model(
             searchspace_config=searchspace_config,
             train_config=train_config,
-            start_epoch=start_epoch,
-            load_saved_model=load_saved_model,
-            load_best_model=load_best_model,
+            model_to_load=model_to_load,
             exp_runtime_to_load=exp_runtime_to_load,
             use_supernet_checkpoint=use_supernet_checkpoint,
             genotype_str=genotype_str,
@@ -531,16 +515,12 @@ class Experiment:
     # logger load_genotype function handles for both supernet and discrete model
     def get_genotype_str_from_checkpoint(
         self,
-        start_epoch: int = 0,
-        load_saved_model: bool = False,
-        load_best_model: bool = False,
+        model_to_load: str | int | None = None,
         use_supernet_checkpoint: bool = False,
     ) -> str:
-        if load_best_model or load_saved_model or (start_epoch > 0):
+        if model_to_load is not None:
             genotype_str = self.logger.load_genotype(
-                start_epoch,
-                load_saved_model,
-                load_best_model,
+                model_to_load=model_to_load,
                 use_supernet_checkpoint=use_supernet_checkpoint,
             )
             return genotype_str
@@ -550,9 +530,7 @@ class Experiment:
     def get_discrete_model(
         self,
         searchspace_config: dict,
-        start_epoch: int = 0,
-        load_saved_model: bool = False,
-        load_best_model: bool = False,
+        model_to_load: str | int | None = None,
         use_supernet_checkpoint: bool = False,
         use_expr_search_space: bool = False,
         genotype_str: str | None = None,
@@ -561,18 +539,14 @@ class Experiment:
         if use_expr_search_space:
             model = self.get_discrete_model_from_supernet()
             return model, model.get_genotype()  # type: ignore
-        if sum([load_best_model, load_saved_model, (start_epoch > 0)]) == 1:
+        if model_to_load is not None:
             genotype_str = self.get_genotype_str_from_checkpoint(
-                start_epoch,
-                load_saved_model,
-                load_best_model,
-                use_supernet_checkpoint,
+                model_to_load=model_to_load,
+                use_supernet_checkpoint=use_supernet_checkpoint,
             )
         elif sum(
             [
-                load_best_model,
-                load_saved_model,
-                (start_epoch > 0),
+                (model_to_load is not None),
                 use_supernet_checkpoint,
             ],
         ) == 0 and hasattr(self, "search_space"):
@@ -610,9 +584,7 @@ class Experiment:
         self,
         searchspace_config: dict,
         train_config: dict,
-        start_epoch: int = 0,
-        load_saved_model: bool = False,
-        load_best_model: bool = False,
+        model_to_load: str | int | None = None,
         exp_runtime_to_load: str | None = None,
         use_supernet_checkpoint: bool = False,
         use_expr_search_space: bool = False,
@@ -621,12 +593,9 @@ class Experiment:
     ) -> DiscreteTrainer:
         # should not care where the model comes from => genotype should be a
         # different function
-        assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
-
         self._set_seed(self.seed)
 
-        should_load_model = load_saved_model or load_best_model or start_epoch > 0
-        load_last_run = should_load_model and not exp_runtime_to_load
+        load_last_run = model_to_load is not None and not exp_runtime_to_load
         self.logger = Logger(
             log_dir="logs",
             exp_name=self.exp_name,
@@ -647,9 +616,7 @@ class Experiment:
 
         model, genotype_str = self.get_discrete_model(
             searchspace_config=searchspace_config,
-            start_epoch=start_epoch,
-            load_saved_model=load_saved_model,
-            load_best_model=load_best_model,
+            model_to_load=model_to_load,
             use_supernet_checkpoint=use_supernet_checkpoint,
             use_expr_search_space=use_expr_search_space,
             genotype_str=genotype_str,
@@ -661,9 +628,7 @@ class Experiment:
 
         # TODO: do i need this line?
         if use_supernet_checkpoint:
-            start_epoch = 0
-            load_saved_model = False
-            load_best_model = False
+            model_to_load = None
             use_supernet_checkpoint = False
             self.logger.use_supernet_checkpoint = False
             self.logger.set_up_new_run()
@@ -717,9 +682,7 @@ class Experiment:
             print_freq=trainer_arguments.print_freq,  # type: ignore
             drop_path_prob=trainer_arguments.drop_path_prob,  # type: ignore
             aux_weight=trainer_arguments.auxiliary_weight,  # type: ignore
-            load_saved_model=load_saved_model,
-            load_best_model=load_best_model,
-            start_epoch=start_epoch,
+            model_to_load=model_to_load,
             checkpointing_freq=trainer_arguments.checkpointing_freq,  # type: ignore
             epochs=trainer_arguments.epochs,  # type: ignore
             debug_mode=self.debug_mode,
@@ -739,9 +702,7 @@ class Experiment:
     def _initialize_configurable_trainer(
         self,
         config: dict,
-        start_epoch: int = 0,
-        load_saved_model: bool = False,
-        load_best_model: bool = False,
+        model_to_load: str | int | None = None,
     ) -> ConfigurableTrainer:
         Arguments = namedtuple(  # type: ignore
             "Configure", " ".join(config["trainer"].keys())  # type: ignore
@@ -801,9 +762,7 @@ class Experiment:
             logger=self.logger,
             batch_size=trainer_arguments.batch_size,  # type: ignore
             use_data_parallel=trainer_arguments.use_data_parallel,  # type: ignore
-            load_saved_model=load_saved_model,
-            load_best_model=load_best_model,
-            start_epoch=start_epoch,
+            model_to_load=model_to_load,
             checkpointing_freq=trainer_arguments.checkpointing_freq,  # type: ignore
             epochs=trainer_arguments.epochs,  # type: ignore
             debug_mode=self.debug_mode,
@@ -817,18 +776,14 @@ class Experiment:
         self,
         profile: BaseProfile,
         model_source: Literal["supernet", "arch_selection"] = "supernet",
-        start_epoch: int = 0,
-        load_best_model: bool = False,
-        load_saved_model: bool = False,
+        model_to_load: str | int | None = None,
         exp_runtime_to_load: str | None = None,
         log_with_wandb: bool = False,
         run_name: str = "darts-pt",
         src_folder_path: str | None = None,
     ) -> PerturbationArchSelection:
         # find pt_configs in the profile
-        assert sum([load_best_model, load_saved_model, (start_epoch > 0)]) <= 1
-
-        if load_best_model or load_saved_model or start_epoch:
+        if model_to_load is not None:
             # self.searchspace is not trained
             last_run = False
             if not exp_runtime_to_load:
@@ -838,7 +793,7 @@ class Experiment:
                 arch_selection = False
             elif model_source == "arch_selection":
                 assert (
-                    load_best_model is False
+                    model_to_load != "best"
                 ), "Cannot load best model for arch selection"
                 arch_selection = True
             else:
@@ -883,9 +838,7 @@ class Experiment:
         # Load model from trainer's init
         trainer = self._initialize_configurable_trainer(
             config=config,
-            start_epoch=start_epoch,
-            load_saved_model=load_saved_model,
-            load_best_model=load_best_model,
+            model_to_load=model_to_load,
         )
         search_space_handler = self.search_space_handler
         search_space_handler.adapt_search_space(trainer.model)
@@ -906,8 +859,8 @@ class Experiment:
                 use_supernet_checkpoint=True,
                 arch_selection=True,
             )
-            trainer.load_saved_model = False
-            trainer.load_best_model = False
+            trainer.model_to_load = None
+            # TODO: do we need to have the next line?
             trainer.start_epoch = 0
             trainer.logger = self.logger
 
@@ -967,30 +920,16 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", default=3, type=int)
     parser.add_argument("--exp_name", default="test", type=str)
     parser.add_argument(
-        "--load_best_model",
-        action="store_true",
-        default=False,
-        help="Load the best model found from the previous run",
-    )
-    parser.add_argument(
-        "--load_saved_model",
-        action="store_true",
-        default=False,
-        help="Load the last saved model in the last run of training them",
-    )
-    parser.add_argument(
-        "--start_epoch",
-        default=0,
-        help="Specify the start epoch to continue the training of the model from the"
-        + "previous run",
-        type=int,
+        "--model_to_load",
+        type=model_to_load_values,
+        help="if str, could be best, last. If int, load the checkpoint of that epoch",
+        default=None,
     )
     parser.add_argument(
         "--use_supernet_checkpoint",
         action="store_true",
         default=False,
-        help="If you would like to load_best_model, load_saved_model, or start_epoch"
-        + "from the supernets checkpoint pass True",
+        help="If you would like to load from last, best, or a specific epoch",
     )
     parser.add_argument(
         "--runtime",
@@ -1047,9 +986,7 @@ if __name__ == "__main__":
 
     # trainer = experiment.run_with_profile(
     #     profile,
-    #     start_epoch=args.start_epoch,
-    #     load_saved_model=args.load_saved_model,
-    #     load_best_model=args.load_best_model,
+    #     model_to_load=args.model_to_load,
     # )
 
     discrete_profile = DiscreteProfile(searchspace.value)
@@ -1057,9 +994,7 @@ if __name__ == "__main__":
     exp_runtime_to_load = args.runtime if args.runtime != "" else None
     discret_trainer = experiment.train_discrete_model(
         discrete_profile,
-        start_epoch=args.start_epoch,
-        load_saved_model=args.load_saved_model,
-        load_best_model=args.load_best_model,
+        model_to_load=args.model_to_load,
         use_supernet_checkpoint=args.use_supernet_checkpoint,
         exp_runtime_to_load=exp_runtime_to_load,
     )
