@@ -157,14 +157,11 @@ class DiscreteTrainer(ConfigurableTrainer):
             if log_with_wandb:
                 self.logger.push_wandb_logs()
 
-            if (
-                val_loader is not None
-                and valid_metrics.acc_top1 > self.valid_accs_top1["best"]
-            ):
-                self.valid_accs_top1["best"] = valid_metrics.acc_top1
+            if base_metrics.acc_top1 > self.search_accs_top1["best"]:
+                self.search_accs_top1["best"] = base_metrics.acc_top1
                 self.logger.log(
                     f"<<<--->>> The {epoch_str}-th epoch : found the highest "
-                    + f"validation accuracy : {valid_metrics.acc_top1:.2f}%."
+                    + f"validation accuracy : {base_metrics.acc_top1:.2f}%."
                 )
 
                 self.best_model_checkpointer.save(

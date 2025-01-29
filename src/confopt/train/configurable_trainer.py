@@ -563,7 +563,7 @@ class ConfigurableTrainer:
     def _init_empty_exp_state_info(self) -> None:
         self.start_epoch = 0
         self.search_losses: dict[int, float] = {}
-        self.search_accs_top1: dict[int, float] = {}
+        self.search_accs_top1: dict[int | str, float | int] = {"best": -1}
         self.search_accs_top5: dict[int, float] = {}
         self.valid_losses: dict[int, float] = {}
         self.valid_accs_top1: dict[int | str, float | int] = {"best": -1}
