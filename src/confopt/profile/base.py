@@ -46,6 +46,7 @@ class BaseProfile:
         pt_select_architecture: bool = False,
         searchspace_domain: str | None = None,
         use_auxiliary_skip_connection: bool = False,
+        searchspace_nb1shot1: str | None = None,
     ) -> None:
         self.searchspace_type = (
             SearchSpaceType(searchspace)
@@ -72,6 +73,17 @@ class BaseProfile:
             assert (
                 searchspace_domain is None
             ), "searchspace_domain is not required for this searchspace"
+        if searchspace == "nb1shot1" or searchspace == SearchSpaceType.NB1SHOT1:
+            assert searchspace_nb1shot1 in [
+                "S1",
+                "S2",
+                "S3",
+            ], "searchspace_nb1shot1 must be S1, S2 or S3"
+        else:
+            assert (
+                searchspace_nb1shot1 is None
+            ), "searchspace_nb1shot1 is not required for this searchspace"
+
         self.searchspace_domain = searchspace_domain
         self.epochs = epochs
         self.sampler_sample_frequency = (
@@ -108,6 +120,10 @@ class BaseProfile:
             self.configure_perturbator(**perturbator_config)
 
         self.use_auxiliary_skip_connection = use_auxiliary_skip_connection
+        if searchspace_nb1shot1 is not None:
+            # TODO: why can't I directly have the dict as an argument?
+            searchspace_nb1shot1_dict = {"search_space": searchspace_nb1shot1}
+            self.configure_searchspace(**searchspace_nb1shot1_dict)
 
     def _set_pt_select_configs(
         self,
