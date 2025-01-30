@@ -210,7 +210,7 @@ class DiscreteTrainer(ConfigurableTrainer):
             use_distributed_sampler=self.use_ddp,
         )
 
-        for epoch in range(self.start_epoch + 1, epochs):
+        for epoch in range(self.start_epoch + 1, epochs + 1):
             self._train_epoch(
                 network=network,
                 train_loader=train_loader,
