@@ -212,18 +212,22 @@ class Logger:
         model_to_load: str | int | None = None,
         use_supernet_checkpoint: bool = False,
     ) -> str:
+        assert not (not use_supernet_checkpoint and model_to_load is None)
         if not use_supernet_checkpoint:
             file_path = self.path(mode="genotypes")
-        elif (model_to_load is not None) and (model_to_load == "best"):
-            file_path = self.path(mode="best_genotype")
-        elif (model_to_load is not None) and type(model_to_load) == int:
-            file_path = self.path("genotypes")
-            file_path = "{}/{}_{:07d}.txt".format(file_path, "genotype", model_to_load)
-        elif (model_to_load is not None) and (model_to_load == "last"):
-            file_path = self.path("genotypes")
-            last_file_path = "{}/{}".format(file_path, "last_genotype.txt")
-            with open(last_file_path) as f:
-                file_path = f"{file_path}/{f.read().strip()}"
+        elif model_to_load is not None:
+            if model_to_load == "best":
+                file_path = self.path(mode="best_genotype")
+            elif type(model_to_load) == int:
+                file_path = self.path("genotypes")
+                file_path = "{}/{}_{:07d}.txt".format(
+                    file_path, "genotype", model_to_load
+                )
+            elif model_to_load == "last":
+                file_path = self.path("genotypes")
+                last_file_path = "{}/{}".format(file_path, "last_genotype.txt")
+                with open(last_file_path) as f:
+                    file_path = f"{file_path}/{f.read().strip()}"
 
         with open(file_path) as f:
             genotype = f.read().strip()
