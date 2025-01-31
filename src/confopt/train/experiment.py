@@ -66,7 +66,7 @@ from confopt.searchspace import (
 from confopt.train import ConfigurableTrainer, DiscreteTrainer
 from confopt.train.projection import PerturbationArchSelection
 from confopt.train.search_space_handler import SearchSpaceHandler
-from confopt.utils import Logger, model_to_load_values
+from confopt.utils import Logger, validate_model_to_load_value
 from confopt.utils import distributed as dist_utils
 from confopt.utils.time import check_date_format
 
@@ -921,7 +921,7 @@ if __name__ == "__main__":
     parser.add_argument("--exp_name", default="test", type=str)
     parser.add_argument(
         "--model_to_load",
-        type=model_to_load_values,
+        type=validate_model_to_load_value,
         help="if str, could be best, last. If int, load the checkpoint of that epoch",
         default=None,
     )

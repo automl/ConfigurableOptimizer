@@ -320,7 +320,7 @@ def get_pos_new_cell_darts(layers: int) -> int:
     return pos
 
 
-def model_to_load_values(value: str) -> str | int:
+def validate_model_to_load_value(value: str) -> str | int:
     if value in ["best", "last"]:
         return value
     try:
@@ -356,5 +356,5 @@ __all__ = [
     "get_pos_reductions_darts",
     "get_pos_new_cell_darts",
     "TransNASBenchAPI",
-    "model_to_load_values",
+    "validate_model_to_load_value",
 ]

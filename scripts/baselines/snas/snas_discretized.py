@@ -7,7 +7,7 @@ import wandb
 
 from confopt.profile import DiscreteProfile
 from confopt.train import DatasetType, Experiment, SearchSpaceType
-from confopt.utils import model_to_load_values
+from confopt.utils import validate_model_to_load_value
 
 dataset_size = {
     "cifar10": 10,
@@ -49,7 +49,7 @@ def read_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--model_to_load",
-        type=model_to_load_values,
+        type=validate_model_to_load_value,
         help="if str, could be best, last. If int, then load the checkpoint of that epoch",
         default=None,
     )
