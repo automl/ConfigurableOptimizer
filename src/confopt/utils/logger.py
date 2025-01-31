@@ -212,7 +212,9 @@ class Logger:
         model_to_load: str | int | None = None,
         use_supernet_checkpoint: bool = False,
     ) -> str:
-        assert not (not use_supernet_checkpoint and model_to_load is None)
+        assert not (
+            not use_supernet_checkpoint and model_to_load is None
+        ), "model_to_load must be provided when using discretized network."
         if not use_supernet_checkpoint:
             file_path = self.path(mode="genotypes")
         elif model_to_load is not None:
