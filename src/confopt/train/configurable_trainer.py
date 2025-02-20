@@ -189,6 +189,9 @@ class ConfigurableTrainer:
             )
             is_warm_epoch = True
 
+        if self.start_epoch > warm_epochs:
+            is_warm_epoch = False
+
         for epoch in range(self.start_epoch + 1, self.epochs + 1):
             epoch_str = f"{epoch:03d}-{self.epochs:03d}"
             if epoch == warm_epochs + 1:
