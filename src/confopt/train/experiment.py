@@ -849,7 +849,11 @@ class Experiment:
         # Load from supernet
         if model_source == "supernet":
             trainer._init_experiment_state(
-                search_space_handler=search_space_handler, setup_new_run=False
+                search_space_handler=search_space_handler,
+                setup_new_run=False,
+                warm_epochs=config["trainer"].get(  # type: ignore
+                    "lora_warm_epochs", 0
+                ),
             )
 
             # reroute logger

@@ -84,6 +84,7 @@ class ConfigurableTrainer:
         self,
         search_space_handler: SearchSpaceHandler | None = None,
         setup_new_run: bool = True,
+        warm_epochs: int = 0,
     ) -> None:
         """Initializes the state of the experiment.
 
@@ -116,14 +117,20 @@ class ConfigurableTrainer:
                 self.logger, src, epoch
             )
 
-            # activate lora modules if present
-            if (
-                search_space_handler is not None
-                and search_space_handler.lora_configs is not None
-            ):
-                self._initialize_lora_modules(
-                    -1, search_space_handler, self.model, False
-                )
+            # calculate the start epoch and compare with current epoch
+            if search_space_handler is not None:
+                start_epoch: int = checkpoint["checkpointables"]["epoch"]
+                if search_space_handler.partial_connector:
+                    warm_epochs = max(
+                        search_space_handler.partial_connector.num_warm_epoch,
+                        warm_epochs,
+                    )
+
+                # activate lora modules if present
+                if start_epoch >= warm_epochs + 1:
+                    self._initialize_lora_modules(
+                        -1, search_space_handler, self.model, False
+                    )
 
             # Forward model once to register flop params
             train_queue, _, _ = self.data.get_dataloaders()
@@ -155,7 +162,9 @@ class ConfigurableTrainer:
         oles_threshold: float = 0.4,
     ) -> None:
         search_space_handler.adapt_search_space(self.model)
-        self._init_experiment_state()
+        self._init_experiment_state(
+            search_space_handler=search_space_handler, warm_epochs=lora_warm_epochs
+        )
 
         network: DataParallel | SearchSpace = (
             self._load_onto_data_parallel(self.model)
@@ -200,6 +209,10 @@ class ConfigurableTrainer:
                         lora_warm_epochs, search_space_handler, network, calc_gm_score
                     )
                 is_warm_epoch = False
+                self.checkpointer.checkpointables["w_optimizer"] = self.model_optimizer
+                self.best_model_checkpointer.checkpointables[
+                    "w_optimizer"
+                ] = self.model_optimizer
 
             self._component_new_step_or_epoch(network, calling_frequency="epoch")
             self.update_sample_function(
