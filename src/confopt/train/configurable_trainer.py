@@ -127,7 +127,7 @@ class ConfigurableTrainer:
                     )
 
                 # activate lora modules if present
-                if start_epoch >= warm_epochs + 1:
+                if start_epoch > warm_epochs:
                     self._initialize_lora_modules(
                         -1, search_space_handler, self.model, False
                     )
