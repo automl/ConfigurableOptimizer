@@ -486,6 +486,7 @@ class Experiment:
         model_to_load: str | int | None = None,
         exp_runtime_to_load: str | None = None,
         use_supernet_checkpoint: bool = False,
+        use_expr_search_space: bool = False,
     ) -> DiscreteTrainer:
         train_config = profile.get_trainer_config()
         searchspace_config = profile.get_searchspace_config(self.dataset.value)
@@ -498,6 +499,7 @@ class Experiment:
             model_to_load=model_to_load,
             exp_runtime_to_load=exp_runtime_to_load,
             use_supernet_checkpoint=use_supernet_checkpoint,
+            use_expr_search_space=use_expr_search_space,
             genotype_str=genotype_str,
             run_name=run_name,
         )
