@@ -62,11 +62,22 @@ def configure_profile_with_search_space(
     profile.configure_searchspace(**search_space, **operations)
 
     if opset == BenchSuiteOpSet.ALL_SKIP:
-        if isinstance(profile, DARTSProfile):
-            profile.use_auxiliary_skip_connection = True
-        elif isinstance(profile, DiscreteProfile):
-            trainer_config = {"use_auxiliary_skip_connection": True}        
-            profile.configure_trainer(**trainer_config)
+        profile.use_auxiliary_skip_connection = True
+
+def configure_discrete_profile_with_search_space(
+    profile: BaseProfile,
+    space: BenchSuiteSpace,
+    opset: BenchSuiteOpSet,
+) -> None:
+    search_space = search_space_configs[space]
+
+    if space == BenchSuiteSpace.SINGLE_CELL:
+        search_space.pop("steps", None)
+
+    if opset == BenchSuiteOpSet.ALL_SKIP:
+        searchspace_config = {"use_auxiliary_skip_connection": True}        
+        profile.configure_searchspace(**searchspace_config)
+
 
 
 if __name__ == "__main__":
