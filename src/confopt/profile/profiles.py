@@ -266,7 +266,7 @@ class DiscreteProfile:
             "cutout": 1,
             "cutout_length": 16,
             "train_portion": 1,
-            "use_ddp": True,
+            "use_ddp": False,
             "checkpointing_freq": 2,
             "seed": 0,
             "use_auxiliary_skip_connection": False,
@@ -319,8 +319,6 @@ class DiscreteProfile:
             self.searchspace_config.update(config)
 
     def get_searchspace_config(self, dataset_str: str) -> dict:
-        if hasattr(self, "searchspace_config"):
-            return self.searchspace_config
         if self.searchspace == SearchSpaceType.NB201:
             searchspace_config = {
                 "N": 5,  # num_cells
@@ -342,6 +340,8 @@ class DiscreteProfile:
             }
         else:
             raise ValueError("search space is not correct")
+        if hasattr(self, "searchspace_config"):
+            searchspace_config.update(self.searchspace_config)
         return searchspace_config
 
     def get_run_description(self) -> str:
