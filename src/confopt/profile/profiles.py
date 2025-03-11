@@ -226,7 +226,9 @@ class DiscreteProfile:
         **kwargs: Any,
     ) -> None:
         self.searchspace = (
-            searchspace if isinstance(searchspace, SearchSpaceType) else searchspace
+            SearchSpaceType(searchspace)
+            if isinstance(searchspace, str)
+            else searchspace
         )
         assert isinstance(
             self.searchspace, SearchSpaceType
@@ -244,7 +246,7 @@ class DiscreteProfile:
 
     def _initialize_trainer_config(self) -> None:
         default_train_config = {
-            "searchspace": "darts",
+            "searchspace": self.searchspace,
             "lr": 0.025,
             "epochs": 100,
             "optim": "sgd",
@@ -257,7 +259,7 @@ class DiscreteProfile:
             "criterion": "cross_entropy",
             "batch_size": 96,
             "learning_rate_min": 0.0,
-            "channel": 36,
+            # "channel": 36,
             "print_freq": 2,
             "drop_path_prob": 0.2,
             "auxiliary_weight": 0.4,
@@ -267,6 +269,7 @@ class DiscreteProfile:
             "use_ddp": True,
             "checkpointing_freq": 2,
             "seed": 0,
+            "use_auxiliary_skip_connection": False,
         }
         self.train_config = default_train_config
 
@@ -309,6 +312,12 @@ class DiscreteProfile:
     def set_search_space_config(self, config: dict) -> None:
         self.searchspace_config = config
 
+    def configure_searchspace(self, **config: Any) -> None:
+        if not hasattr(self, "searchspace_config"):
+            self.searchspace_config = config
+        else:
+            self.searchspace_config.update(config)
+
     def get_searchspace_config(self, dataset_str: str) -> dict:
         if hasattr(self, "searchspace_config"):
             return self.searchspace_config
@@ -322,7 +331,7 @@ class DiscreteProfile:
             searchspace_config = {
                 "C": 36,  # init channels
                 "layers": 20,  # number of layers
-                "auxiliary": True,
+                "auxiliary": False,
                 "num_classes": get_num_classes(dataset_str),
             }
         elif self.searchspace == SearchSpaceType.TNB101:
