@@ -3,6 +3,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
+from confopt.searchspace.common.mixop import AuxiliarySkipConnection
 from confopt.searchspace.darts.core.operations import (
     OPS,
     FactorizedReduce,
@@ -12,6 +13,20 @@ from confopt.searchspace.darts.core.operations import (
 from confopt.utils import drop_path
 
 from .genotypes import Genotype
+
+DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+
+class AuxilaryNetworkSkipConnection(nn.Module):
+    def __init__(self, operation: nn.Module, stride: int, C: int | None = None) -> None:
+        super().__init__()
+        self.operation = operation
+        self.aux_skip = AuxiliarySkipConnection(
+            stride=stride, C_in=C, C_out=C, affine=True
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.aux_skip(x) + self.operation(x)
 
 
 class Cell(nn.Module):
@@ -23,6 +38,7 @@ class Cell(nn.Module):
         C: int,
         reduction: bool,
         reduction_prev: bool,
+        use_auxiliary_skip_connection: bool = False,
     ) -> None:
         super().__init__()
 
@@ -31,7 +47,7 @@ class Cell(nn.Module):
         else:
             self.preprocess0 = ReLUConvBN(C_prev_prev, C, 1, 1, 0)
         self.preprocess1 = ReLUConvBN(C_prev, C, 1, 1, 0)
-
+        self.use_auxiliary_skip_connection = use_auxiliary_skip_connection
         if reduction:
             op_names, indices = zip(*genotype.reduce)
             concat = genotype.reduce_concat
@@ -52,6 +68,9 @@ class Cell(nn.Module):
         for name, index in zip(op_names, indices):
             stride = 2 if reduction and index < 2 else 1
             op = OPS[name](C, stride, True)
+            if self.use_auxiliary_skip_connection:
+                op = AuxilaryNetworkSkipConnection(op, stride, C)
+
             self._ops += [op]
         self._indices = indices
 
@@ -136,6 +155,7 @@ class NetworkCIFAR(nn.Module):
         auxiliary: bool,
         genotype: Genotype,
         drop_path_prob: float = 0.0,
+        use_auxiliary_skip_connection: bool = False,
         # TODO: Verify that 0. is the correct default value for drop_path_prob
     ) -> None:
         super().__init__()
@@ -159,7 +179,13 @@ class NetworkCIFAR(nn.Module):
             else:
                 reduction = False
             cell = Cell(
-                genotype, C_prev_prev, C_prev, C_curr, reduction, reduction_prev
+                genotype,
+                C_prev_prev,
+                C_prev,
+                C_curr,
+                reduction,
+                reduction_prev,
+                use_auxiliary_skip_connection,
             )
             reduction_prev = reduction
             self.cells += [cell]
