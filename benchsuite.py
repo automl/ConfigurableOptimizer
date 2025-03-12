@@ -65,7 +65,7 @@ def configure_profile_with_search_space(
         profile.use_auxiliary_skip_connection = True
 
 def configure_discrete_profile_with_search_space(
-    profile: BaseProfile,
+    profile: DiscreteProfile,
     space: BenchSuiteSpace,
     opset: BenchSuiteOpSet,
 ) -> None:
