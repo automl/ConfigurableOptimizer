@@ -488,6 +488,58 @@ class Experiment:
         use_supernet_checkpoint: bool = False,
         use_expr_search_space: bool = False,
     ) -> DiscreteTrainer:
+        """Trains a discrete model using the given profile with options for loading
+        specific training states.
+
+        Args:
+            profile (DiscreteProfile): Contains configurations for training the model,
+            including hyperparameters and architecture details.The genotype could be
+            set in the profile, or the default genotype will be used.
+
+
+            model_to_load (str | int | None): Specifies the training state to load.
+            Acceptable string values are "last" or "best", representing the most recent
+            or the best-performing model checkpoint, respectively.
+            If an integer is provided, it represents the epoch number from which
+            training should be continued.
+            If `None`, behavior is determined by other parameters.
+
+            exp_runtime_to_load (str | None): The experiment runtime to load the model
+            from.
+            If `None`, the model will be loaded from the most recent runtime.
+
+            use_supernet_checkpoint (bool): If `True`, initializes the model's weights
+            from a supernet checkpoint.
+            If `False`, the model will use checkpoints from the discrete network
+            instead.
+
+            use_expr_search_space (bool): If `True`, gets discretized model of the
+            search space from the experiment.
+
+        Returns:
+            DiscreteTrainer: The trained discrete model.
+
+        Behavior Notes:
+            - If none of the parameters are provided the default profile genotype will
+            be used.
+            - The default genotype in the profile refers to the best architecture found
+            after 50 epochs using the DARTS optimizer on the CIFAR-10 dataset within the
+            DARTS search space.
+            - If none of the other parameters are set, the model will be trained using
+            the default genotype.
+            - Setting `use_supernet_checkpoint` to `True` allows loading from the
+            supernet, while `False` defaults to using checkpoints from the discrete
+            network.
+
+        Example:
+            >>> trainer = experiment.train_discrete_model(
+                profile=profile,
+                model_to_load="last",
+                exp_runtime_to_load=None,
+                use_supernet_checkpoint=True,
+                use_expr_search_space=False,
+                )
+        """
         train_config = profile.get_trainer_config()
         searchspace_config = profile.get_searchspace_config(self.dataset.value)
         genotype_str = profile.get_genotype()
