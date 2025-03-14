@@ -151,6 +151,7 @@ class NB201SearchModel(nn.Module):
         self.multihead_attention = nn.MultiheadAttention(
             embed_dim=len(self.op_names), num_heads=1
         )
+        self.lambda_perturbations = None
 
     def get_weights(self) -> list[nn.Parameter]:
         """Get a list of learnable parameters in the model. (does not include alpha or
@@ -210,6 +211,14 @@ class NB201SearchModel(nn.Module):
             return "beta-parameters:\n{:}".format(
                 nn.functional.softmax(self.beta_parameters, dim=-1).cpu()
             )
+
+    def get_cells(self, cell_type: str | None) -> torch.nn.Module | None:
+        assert (
+            cell_type == "normal" or cell_type is None
+        ), f"Illegal cell type: {cell_type}"
+        cells = [cell for cell in self.cells if isinstance(cell, SearchCell)]
+
+        return cells
 
     def get_message(self) -> str:
         """Gets a message describing the model and its cells.
@@ -331,13 +340,21 @@ class NB201SearchModel(nn.Module):
         self.sampled_weights = [weights]
 
         feature = self.stem(inputs)
-        for _i, cell in enumerate(self.cells):
+        _i = 0
+        for cell in self.cells:
             if isinstance(cell, SearchCell):
                 alphas = weights.clone()
                 self.save_weight_grads(alphas)
+
+                if self.lambda_perturbations is not None:
+                    weights = weights - self.lambda_perturbations[_i]
+
                 feature = cell(feature, alphas)
+                _i += 1
             else:
                 feature = cell(feature)
+
+        self.lambda_perturbations = None
 
         out = self.lastact(feature)
         out = self.global_pooling(out)
@@ -382,7 +399,9 @@ class NB201SearchModel(nn.Module):
 
         return out, logits
 
-    def get_arch_grads(self, only_first_and_last: bool = False) -> list[torch.Tensor]:
+    def get_arch_grads(
+        self, only_first_and_last: bool = False
+    ) -> tuple[list[torch.Tensor], list[torch.Tensor] | None]:
         grads = []
         if only_first_and_last:
             grads.append(self.weights_grad[0].reshape(-1))
@@ -391,12 +410,12 @@ class NB201SearchModel(nn.Module):
             for alphas in self.weights_grad:
                 grads.append(alphas.reshape(-1))
 
-        return grads
+        return grads, None
 
     def get_mean_layer_alignment_score(
         self, only_first_and_last: bool = False
     ) -> float:
-        grads = self.get_arch_grads(only_first_and_last)
+        grads, _ = self.get_arch_grads(only_first_and_last)
         mean_score = calc_layer_alignment_score(grads)
 
         if math.isnan(mean_score):
@@ -502,6 +521,9 @@ class NB201SearchModel(nn.Module):
                     total_cell_flops = 1
                 flops += torch.log(total_cell_flops)
         return flops / len(self.cells)
+
+    def set_lambda_perturbations(self, lambda_perturbations: torch.Tensor) -> None:
+        self.lambda_perturbations = lambda_perturbations
 
 
 def preserve_grads(m: nn.Module) -> None:

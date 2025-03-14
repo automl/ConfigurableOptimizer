@@ -4,6 +4,7 @@ from .profiles import (
     DiscreteProfile,
     DRNASProfile,
     GDASProfile,
+    LambdaDARTSProfile,
     ReinMaxProfile,
     SNASProfile,
 )
@@ -11,6 +12,7 @@ from .profiles import (
 __all__ = [
     "BaseProfile",
     "DARTSProfile",
+    "LambdaDARTSProfile",
     "GDASProfile",
     "DRNASProfile",
     "SNASProfile",

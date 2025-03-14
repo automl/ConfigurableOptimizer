@@ -12,12 +12,16 @@ from confopt.oneshot.regularizer import Regularizer
 from confopt.oneshot.weightentangler import WeightEntangler
 from confopt.searchspace import DARTSSearchSpace
 from confopt.searchspace.common import (
+    LambdaReg,
     LoRALayer,
     OperationBlock,
     OperationChoices,
     SearchSpace,
 )
-from confopt.searchspace.common.base_search import ArchAttentionSupport
+from confopt.searchspace.common.base_search import (
+    ArchAttentionSupport,
+    LambdaDARTSSupport,
+)
 
 
 class SearchSpaceHandler:
@@ -34,6 +38,7 @@ class SearchSpaceHandler:
         lora_toggler: LoRAToggler | None = None,
         is_arch_attention_enabled: bool = False,
         regularizer: Regularizer | None = None,
+        lambda_regularizer: LambdaReg | None = None,
         use_auxiliary_skip_connection: bool = False,
     ) -> None:
         self.sampler = sampler
@@ -46,6 +51,7 @@ class SearchSpaceHandler:
         self.pruner = pruner
         self.lora_toggler = lora_toggler
         self.regularizer = regularizer
+        self.lambda_regularizer = lambda_regularizer
 
         self.is_argmax_sampler = False
         if isinstance(self.sampler, GDASSampler):
@@ -86,6 +92,14 @@ class SearchSpaceHandler:
             search_space, ArchAttentionSupport
         ):
             search_space.set_arch_attention(True)
+
+        if (
+            isinstance(search_space, LambdaDARTSSupport)
+            and isinstance(self.lambda_regularizer, LambdaReg)
+            and self.lambda_regularizer.enabled
+        ):
+            search_space.enable_lambda_darts()
+            search_space.set_lambda_darts_params(self.lambda_regularizer)
 
     def perturb_parameter(self, search_space: SearchSpace) -> None:
         if self.perturbation is not None:

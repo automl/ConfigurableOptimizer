@@ -1,12 +1,15 @@
+from dataclasses import asdict
 import unittest
 
 from confopt.profile import (
     BaseProfile,
     DARTSProfile,
+    LambdaDARTSProfile,
     DRNASProfile,
     GDASProfile,
     SNASProfile,
 )
+from confopt.searchspace.common.base_search import LambdaReg
 
 
 class TestBaseProfile(unittest.TestCase):
@@ -167,7 +170,19 @@ class TestDartsProfile(unittest.TestCase):
             profile.sampler_config["arch_combine_fn"] == sampler_config["arch_combine_fn"]
         )
 
-    
+class TestLambdaDARTSProfile(unittest.TestCase):
+    def test_initialization(self) -> None:
+        profile = LambdaDARTSProfile(
+            epochs=100,
+            searchspace="nb201",
+            sampler_sample_frequency="step",
+        )
+
+        config = profile.get_config()
+        assert "lambda_regularizer" in config
+        assert config["lambda_regularizer"] == asdict(LambdaReg())
+        assert config["lambda_regularizer"]["enabled"] is True
+
 class TestDRNASProfile(unittest.TestCase):
     def test_initialization(self) -> None:
         perturb_config = {"epsilon": 0.5}

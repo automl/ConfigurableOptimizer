@@ -19,6 +19,7 @@ class SamplerType(Enum):
     DARTS = "darts"
     DRNAS = "drnas"
     GDAS = "gdas"
+    LAMBDADARTS = "lambda_darts"
     SNAS = "snas"
     REINMAX = "reinmax"
 

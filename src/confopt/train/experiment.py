@@ -65,6 +65,7 @@ from confopt.searchspace import (
     SearchSpace,
     TransNASBench101SearchSpace,
 )
+from confopt.searchspace.common import LambdaReg
 from confopt.train import ConfigurableTrainer, DiscreteTrainer
 from confopt.train.projection import PerturbationArchSelection
 from confopt.train.search_space_handler import SearchSpaceHandler
@@ -262,6 +263,7 @@ class Experiment:
         self._set_lora_toggler(config.get("lora", {}), config.get("lora_extra", {}))
         self._set_weight_entangler()
         self._set_regularizer(config.get("regularization", {}))
+        self._set_lambda_regularizer(config.get("lambda_regularizer", {}))
         self._set_profile(config)
         self._set_early_stopper(
             config["early_stopper"], config.get("early_stopper_config", {})
@@ -317,7 +319,7 @@ class Experiment:
     ) -> None:
         arch_params = self.search_space.arch_parameters
         self.sampler: BaseSampler | None = None
-        if sampler == SamplerType.DARTS:
+        if sampler in (SamplerType.DARTS, SamplerType.LAMBDADARTS):
             self.sampler = DARTSSampler(**config, arch_parameters=arch_params)
         elif sampler == SamplerType.DRNAS:
             self.sampler = DRNASSampler(**config, arch_parameters=arch_params)
@@ -405,6 +407,11 @@ class Experiment:
             loss_weight=config["loss_weight"],
         )
 
+    def _set_lambda_regularizer(self, config: dict) -> None:
+        self.lambda_regularizer = (
+            None if (config is None or len(config) == 0) else LambdaReg(**config)
+        )
+
     def _set_profile(self, config: dict) -> None:
         assert self.sampler is not None
 
@@ -420,6 +427,7 @@ class Experiment:
             pruner=self.pruner,
             is_arch_attention_enabled=config.get("is_arch_attention_enabled", False),
             regularizer=self.regularizer,
+            lambda_regularizer=self.lambda_regularizer,
             use_auxiliary_skip_connection=config.get(
                 "use_auxiliary_skip_connection", False
             ),

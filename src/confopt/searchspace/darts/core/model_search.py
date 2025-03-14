@@ -357,9 +357,24 @@ class Network(nn.Module):
         self.multihead_attention = nn.MultiheadAttention(
             embed_dim=len(self.primitives), num_heads=1
         )
-
+        self.lambda_perturbations = None
         # mask for pruning
         self._initialize_parameters()
+
+    def get_cells(self, cell_type: str | None) -> torch.nn.Module | None:
+        assert cell_type in [
+            "normal",
+            "reduce",
+            None,
+        ], f"Illegal cell type: {cell_type}"
+        if cell_type == "normal":
+            cells = [cell for cell in self.cells if not cell.is_reduction_cell]
+        elif cell_type == "reduce":
+            cells = [cell for cell in self.cells if cell.is_reduction_cell]
+        else:
+            cells = self.cells
+
+        return cells
 
     def new(self) -> Network:
         """Get a new object with same arch and beta parameters.
@@ -460,7 +475,12 @@ class Network(nn.Module):
                 weights = weights_normal.clone()
                 self.save_weight_grads(weights, cell_type="normal")
 
+            if self.lambda_perturbations is not None:
+                weights = weights - self.lambda_perturbations[_i]
+
             s0, s1 = s1, cell(s0, s1, weights)
+
+        self.lambda_perturbations = None
 
         out = self.global_pooling(s1)
         logits = self.classifier(out.view(out.size(0), -1))
@@ -980,6 +1000,9 @@ class Network(nn.Module):
                 total_cell_flops = 1
             flops += torch.log(total_cell_flops)
         return flops / len(self.cells)
+
+    def set_lambda_perturbations(self, lambda_perturbations: torch.Tensor) -> None:
+        self.lambda_perturbations = lambda_perturbations
 
 
 def preserve_grads(m: nn.Module) -> None:
