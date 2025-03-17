@@ -621,20 +621,19 @@ class Experiment:
         # A) Use the experiment's self.search_space of the experiment.
         if use_expr_search_space:
             model = self.get_discrete_model_from_supernet()
-            return model, model.get_genotype()  # type: ignore
+            return model, self.search_space.get_genotype()  # type: ignore
+        # B, C) Use a checkpoint (discrete net or supernet) to load the model.
         if model_to_load is not None:
             genotype_str = self.get_genotype_str_from_checkpoint(
                 model_to_load=model_to_load,
                 use_supernet_checkpoint=use_supernet_checkpoint,
             )
-        elif sum(
-            [
-                (model_to_load is not None),
-                use_supernet_checkpoint,
-            ],
-        ) == 0 and hasattr(self, "search_space"):
-            genotype_str = self.search_space.get_genotype().tostr()  # type: ignore
-
+        # E) Use the default genotype which is set in the discrete_profile.
+        # if you don't set the genotype in the profile the genotype
+        # is the best model found by darts
+        # elif genotype_str is None:
+        # genotype_str = searchspace_config.get("genotype")
+        # assert the according genotype_str is the one for the search space.
         elif genotype_str is None:
             raise ValueError("genotype cannot be empty")
 
