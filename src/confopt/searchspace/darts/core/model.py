@@ -22,7 +22,7 @@ class AuxilaryNetworkSkipConnection(nn.Module):
         super().__init__()
         self.operation = operation
         self.aux_skip = AuxiliarySkipConnection(
-            stride=stride, C_in=C, C_out=C, affine=True
+            stride=stride, C_in=C, C_out=C, affine=False
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
