@@ -80,19 +80,19 @@ class Experiment:
     the supernet and discrete models. It initializes the necessary components, and
     manages the states to load, and handles the training process.
 
-    Attributes:
+    Parameters:
         search_space (SearchSpace): The search space type used for the experiment.
         dataset (DatasetType): The dataset type used for the experiment.
         seed (int): The random seed for reproducibility of the runs.
         log_with_wandb (bool): Flag to enable logging with Weights & Biases.
-        debug_mode (bool): Flag to enable debug mode, where we only do 5 steps for
-        each epoch.
+        debug_mode (bool): Flag to enable debug mode, where we only do 5 steps for \
+            each epoch.
         exp_name (str): The name of the experiment.
-        dataset_domain (str | None): The domain of the dataset used for the Taskonomy
-        dataset. Valid values are 'class_object' and 'class_scene'.
+        dataset_domain (str | None): The domain of the dataset used for the Taskonomy \
+            dataset. Valid values are 'class_object' and 'class_scene'.
         dataset_dir (str): The directory where the dataset is stored.
-        api_dir (str): The directory where the API is stored to used when we are using
-        the benchmarks.
+        api_dir (str): The directory where the API is stored to used when we are using \
+            the benchmarks.
     """
 
     def __init__(
