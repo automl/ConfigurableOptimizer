@@ -30,7 +30,7 @@ class BaseProfile:
     Parameters:
         sampler_type (SamplerType or str): Type of sampler to use, converted to \
             SamplerType if passed as string.
-        searchspace (SearchSpaceType or str): Type of search space, converted to \
+        searchspace_type (SearchSpaceType or str): Type of search space, converted to \
             SearchSpaceType if passed as string.
         epochs (int): Number of training epochs. Defaults to 50.
         sampler_sample_frequency (str): Frequency of sampling. Valid values are \
