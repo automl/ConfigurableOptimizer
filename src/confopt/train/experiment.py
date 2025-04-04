@@ -1203,7 +1203,7 @@ if __name__ == "__main__":
     args.epochs = 3
 
     profile = GDASProfile(
-        searchspace=searchspace.value,
+        searchspace_type=searchspace.value,
         epochs=args.epochs,
         is_partial_connection=args.is_partial_connector,
         perturbation=args.perturbator,

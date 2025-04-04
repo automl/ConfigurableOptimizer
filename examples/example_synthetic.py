@@ -2,7 +2,7 @@ from __future__ import annotations
 import argparse
 
 from confopt.profile import DARTSProfile, DRNASProfile, GDASProfile
-from confopt.profile.base import BaseProfile
+from typing import Callable
 from confopt.profile.profiles import ReinMaxProfile
 from confopt.train import Experiment
 from confopt.enums import SearchSpaceType, DatasetType
@@ -58,7 +58,7 @@ def read_args() -> argparse.Namespace:
     return args
 
 
-def get_profile(args: argparse.Namespace) -> BaseProfile:
+def get_profile(args: argparse.Namespace) -> Callable:  # type: ignore
     if args.sampler == "darts":
         return DARTSProfile
 
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     searchspace = SearchSpaceType.BABYDARTS
     dataset = DatasetType.SYNTHETIC
 
-    profile = get_profile(args)(searchspace=searchspace, epochs=args.search_epochs)
+    profile = get_profile(args)(searchspace_type=searchspace, epochs=args.search_epochs)
 
     profile.configure_synthetic_dataset(
         signal_width=args.signal_width,

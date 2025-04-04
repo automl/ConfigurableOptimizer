@@ -54,7 +54,7 @@ class BabyDARTSSearchSpace(SearchSpace):
         ]
 
     def discretize(self) -> nn.Module:
-        return self.model._discretize()  # type: ignore
+        return self.model.discretize()  # type: ignore
 
     def get_genotype(self) -> DARTSGenotype:
         return self.model.genotype()

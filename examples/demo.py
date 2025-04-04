@@ -20,7 +20,7 @@ if __name__ == "__main__":
     }
 
     profile = DRNASProfile(
-        searchspace=searchspace,
+        searchspace_type=searchspace,
         epochs=10,
         oles=True,
         calc_gm_score=True,

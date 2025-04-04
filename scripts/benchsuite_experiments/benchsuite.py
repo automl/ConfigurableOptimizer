@@ -52,23 +52,14 @@ OPSET_CONFIGS = {
 }
 
 MODEL_TRAIN_HYPERPARAMETERS = {
-    0: {
-        "lr": 0.025,
-        "batch_size": 512,
-        "optim_config": {
-            "momentum": 0.9,
-            "nesterov": False,
-            "weight_decay": 1e-4,
-        }
-    },
     1: {
         "lr": 0.025,
         "batch_size": 512,
         "optim_config": {
             "momentum": 0.9,
             "nesterov": False,
-            "weight_decay": 3e-4,
-        }
+            "weight_decay": 1e-4,
+        },
     },
     2: {
         "lr": 0.025,
@@ -76,17 +67,17 @@ MODEL_TRAIN_HYPERPARAMETERS = {
         "optim_config": {
             "momentum": 0.9,
             "nesterov": False,
-            "weight_decay": 1e-3,
-        }
+            "weight_decay": 3e-4,
+        },
     },
     3: {
-        "lr": 0.1,
+        "lr": 0.025,
         "batch_size": 512,
         "optim_config": {
             "momentum": 0.9,
             "nesterov": False,
-            "weight_decay": 1e-4,
-        }
+            "weight_decay": 1e-3,
+        },
     },
     4: {
         "lr": 0.1,
@@ -94,8 +85,8 @@ MODEL_TRAIN_HYPERPARAMETERS = {
         "optim_config": {
             "momentum": 0.9,
             "nesterov": False,
-            "weight_decay": 3e-4,
-        }
+            "weight_decay": 1e-4,
+        },
     },
     5: {
         "lr": 0.1,
@@ -103,17 +94,17 @@ MODEL_TRAIN_HYPERPARAMETERS = {
         "optim_config": {
             "momentum": 0.9,
             "nesterov": False,
-            "weight_decay": 1e-3,
-        }
+            "weight_decay": 3e-4,
+        },
     },
     6: {
-        "lr": 0.01,
+        "lr": 0.1,
         "batch_size": 512,
         "optim_config": {
             "momentum": 0.9,
             "nesterov": False,
-            "weight_decay": 1e-4,
-        }
+            "weight_decay": 1e-3,
+        },
     },
     7: {
         "lr": 0.01,
@@ -121,8 +112,8 @@ MODEL_TRAIN_HYPERPARAMETERS = {
         "optim_config": {
             "momentum": 0.9,
             "nesterov": False,
-            "weight_decay": 3e-4,
-        }
+            "weight_decay": 1e-4,
+        },
     },
     8: {
         "lr": 0.01,
@@ -130,8 +121,17 @@ MODEL_TRAIN_HYPERPARAMETERS = {
         "optim_config": {
             "momentum": 0.9,
             "nesterov": False,
+            "weight_decay": 3e-4,
+        },
+    },
+    9: {
+        "lr": 0.01,
+        "batch_size": 512,
+        "optim_config": {
+            "momentum": 0.9,
+            "nesterov": False,
             "weight_decay": 1e-3,
-        }
+        },
     },
 }
 
@@ -147,6 +147,7 @@ def configure_profile_with_search_space(
 
     if opset == BenchSuiteOpSet.ALL_SKIP:
         profile.use_auxiliary_skip_connection = True
+
 
 def configure_discrete_profile_with_search_space(
     profile: DiscreteProfile,
@@ -168,6 +169,7 @@ def configure_discrete_profile_with_search_space(
         searchspace_config = {"use_auxiliary_skip_connection": True}
         profile.configure_searchspace(**searchspace_config)
 
+
 def configure_discrete_profile_with_hp_set(
     profile: DiscreteProfile,
     hyperparameter_set: int,
@@ -178,7 +180,7 @@ def configure_discrete_profile_with_hp_set(
 
 if __name__ == "__main__":
     profile = DARTSProfile(
-        searchspace=SearchSpaceType.DARTS,
+        searchspace_type=SearchSpaceType.DARTS,
         epochs=10,
     )
 
