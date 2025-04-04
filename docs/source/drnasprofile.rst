@@ -1,10 +1,8 @@
-DRNAS Profile Documentation
-===========================
-
-This module contains the DRNASProfile class, which is used to define a profile for the DRNAS (Differentiable Reinforcement Learning Neural Architecture Search) algorithm.
+DRNAS Profile
+=============
 
 .. autoclass:: confopt.profile.DRNASProfile
    :members:
    :undoc-members:
    :show-inheritance:
-   :private-members:
+   :exclude-members: SAMPLER_TYPE

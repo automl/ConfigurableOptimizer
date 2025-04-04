@@ -1,5 +1,5 @@
-BaseProfile Class Documentation
-===============================
+BaseProfile
+===========
 
 .. autoclass:: confopt.profile.BaseProfile
    :members:

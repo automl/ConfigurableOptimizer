@@ -57,3 +57,9 @@ extensions = [
 
 napoleon_google_docstring = True
 napoleon_numpy_docstring = False  # Disable if you're only using Google style
+
+napoleon_use_param = True
+napoleon_use_ivar = True
+napoleon_include_private_with_doc = False
+napoleon_include_special_with_doc = False
+napoleon_use_rtype = False  # Set to False so the return type is in the same line as the description

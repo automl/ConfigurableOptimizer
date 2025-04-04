@@ -1,11 +1,12 @@
 Profiles
 ========
 
-This section provides detailed documentation on the different profiles available in our application. Each profile has specific characteristics and usage guidelines.
+This section provides detailed documentation on the different train profiles available in our application. 
+Each profile has specific characteristics and usage guidelines.
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    baseprofile
    dartsprofile
