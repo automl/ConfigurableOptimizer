@@ -17,6 +17,7 @@ dependencies = [
     "myst-parser",
     "sphinx_rtd_theme",
     "sphinx-panels",
+    "gdown",
 ]
 requires-python = ">=3.8"
 authors = [{ name = "Arjun Krishnakumar", email = "arjun.krishnakumar.mec@gmail.com" }]
