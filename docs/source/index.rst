@@ -1,7 +1,7 @@
 Quick Start
 ===========
 
-.. include:: ../../README.md
+.. include:: README.md
    :parser: myst_parser.sphinx_
 
 
@@ -9,5 +9,6 @@ Quick Start
    :maxdepth: 1
    :caption: Important Links:
 
-   profiles
-   experiment
+   Benchsuite Documentation <benchsuite_doc>
+   Profiles <profiles>
+   Experiment <experiment>
