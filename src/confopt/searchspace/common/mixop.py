@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from thop import profile as flop_profile
 import torch
 from torch import nn
+import torch.nn.functional as F  # noqa: N812
 
 if TYPE_CHECKING:
     from confopt.oneshot.dropout import Dropout
@@ -30,6 +31,24 @@ class OperationChoices(nn.Module):
         self.flops: list[float] | None = None
         self.use_aux_skip = use_aux_skip
         self._init_aux_skip_connection()
+        self._init_dan()
+
+    def _init_dan(self) -> None:
+        C = None
+        for op in self.ops:
+            # targeting the SepConv Block
+            if hasattr(op, "stride") and hasattr(op, "op"):
+                for in_op in op.op:
+                    if hasattr(in_op, "in_channels"):
+                        C = in_op.in_channels
+                        break
+                break
+
+        self.dan = DynamicAttentionNetwork(
+            C=C,  # type: ignore
+            num_ops=len(self.ops),
+            attention_weight=1,
+        )
 
     def _init_aux_skip_connection(self) -> None:
         stride = 1
@@ -127,6 +146,7 @@ class OperationBlock(nn.Module):
         device: torch.device = DEVICE,
         is_argmax_sampler: bool = False,
         aux_skip: nn.Module | None = None,
+        dan: nn.Module | None = None,
     ) -> None:
         super().__init__()
         self.device = device
@@ -140,6 +160,7 @@ class OperationBlock(nn.Module):
         self.flops: list[float] | None = None
         self.use_aux_skip = aux_skip is not None
         self.aux_skip = aux_skip
+        self.dan = dan
 
     def forward_method(
         self, x: torch.Tensor, ops: list[nn.Module], alphas: list[torch.Tensor]
@@ -176,6 +197,9 @@ class OperationBlock(nn.Module):
     ) -> torch.Tensor:
         if self.flops is None:
             self._calculate_flops(x)
+
+        if self.dan:
+            alphas = alphas + self.dan(x)
 
         if self.dropout:
             alphas = self.dropout.apply_mask(alphas)
@@ -303,3 +327,24 @@ class AuxiliarySkipConnection(nn.Module):
         out = torch.cat([self.conv_1(x), self.conv_2(x[:, :, 1:, 1:])], dim=1)
         out = self.bn(out)
         return out
+
+
+class DynamicAttentionNetwork(nn.Module):
+    def __init__(self, C: int, num_ops: int, attention_weight: float) -> None:
+        super().__init__()
+        self.fc1 = nn.Linear(C, C // 4)
+        self.fc2 = nn.Linear(C // 4, num_ops)
+        self._attention_weight = attention_weight
+
+    def update_attention_weight(self, attention_weight: float) -> None:
+        self._attention_weight = attention_weight
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = F.adaptive_avg_pool2d(x, output_size=(1, 1))
+        out = out.view(x.size(0), -1)  # shape (N, C)
+
+        out = F.relu(self.fc1(out))
+        out = F.relu(self.fc2(out))
+
+        out = out.mean(dim=0)
+        return self._attention_weight * F.softmax(out, dim=-1)

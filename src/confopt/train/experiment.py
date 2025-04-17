@@ -46,6 +46,7 @@ from confopt.oneshot.archsampler import (
     ReinMaxSampler,
     SNASSampler,
 )
+from confopt.oneshot.dynamic_exploration import DynamicAttentionExplorer
 from confopt.profile import (
     BaseProfile,
     DiscreteProfile,
@@ -320,6 +321,7 @@ class Experiment:
         self._set_lora_toggler(config.get("lora", {}), config.get("lora_extra", {}))
         self._set_weight_entangler()
         self._set_regularizer(config.get("regularization", {}))
+        self._set_dynamic_explorer(config.get("dynamic_exploration", {}))
         self._set_profile(config)
         self._set_early_stopper(
             config["early_stopper"], config.get("early_stopper_config", {})
@@ -463,6 +465,16 @@ class Experiment:
             loss_weight=config["loss_weight"],
         )
 
+    def _set_dynamic_explorer(self, config: dict) -> None:
+        self.dynamic_explorer: DynamicAttentionExplorer | None = None
+        if config:
+            self.dynamic_explorer = DynamicAttentionExplorer(
+                self.search_space,
+                total_epochs=config.get("total_epochs"),  # type: ignore
+                attention_weight=config.get("attention_weight", 1),
+                min_attention_weight=config.get("min_attention_weight", 1e-4),
+            )
+
     def _set_profile(self, config: dict) -> None:
         assert self.sampler is not None
 
@@ -481,6 +493,7 @@ class Experiment:
             use_auxiliary_skip_connection=config.get(
                 "use_auxiliary_skip_connection", False
             ),
+            dynamic_explorer=self.dynamic_explorer,
         )
 
     def _get_criterion(self, criterion_str: str) -> torch.nn.Module:

@@ -4,6 +4,7 @@ import torch
 
 from confopt.oneshot.archsampler import BaseSampler, DARTSSampler, GDASSampler
 from confopt.oneshot.dropout import Dropout
+from confopt.oneshot.dynamic_exploration import DynamicAttentionExplorer
 from confopt.oneshot.lora_toggler import LoRAToggler
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import BasePerturbator
@@ -35,6 +36,7 @@ class SearchSpaceHandler:
         is_arch_attention_enabled: bool = False,
         regularizer: Regularizer | None = None,
         use_auxiliary_skip_connection: bool = False,
+        dynamic_explorer: DynamicAttentionExplorer | None = None,
     ) -> None:
         self.sampler = sampler
         self.edge_normalization = edge_normalization
@@ -54,6 +56,8 @@ class SearchSpaceHandler:
         self.is_arch_attention_enabled = is_arch_attention_enabled
         self.use_auxiliary_skip_connection = use_auxiliary_skip_connection
 
+        self.dynamic_explorer = dynamic_explorer
+
     def adapt_search_space(self, search_space: SearchSpace) -> None:
         if hasattr(search_space.model, "edge_normalization"):
             search_space.model.edge_normalization = self.edge_normalization
@@ -61,7 +65,10 @@ class SearchSpaceHandler:
         for name, module in search_space.named_modules(remove_duplicate=False):
             if isinstance(module, OperationChoices):
                 new_module = self._initialize_operation_block(
-                    module.ops, module.aux_skip, module.is_reduction_cell
+                    module.ops,
+                    module.is_reduction_cell,
+                    module.aux_skip,
+                    module.dan,
                 )
                 parent_name, attribute_name = self.get_parent_and_attribute(name)
                 setattr(
@@ -87,6 +94,9 @@ class SearchSpaceHandler:
         ):
             search_space.set_arch_attention(True)
 
+        if self.dynamic_explorer:
+            search_space.components.append(self.dynamic_explorer)
+
     def perturb_parameter(self, search_space: SearchSpace) -> None:
         if self.perturbation is not None:
             self.perturbation._perturb_and_update_alphas()
@@ -104,8 +114,9 @@ class SearchSpaceHandler:
     def _initialize_operation_block(
         self,
         ops: torch.nn.Module,
-        aux_skip: torch.nn.Module | None,
         is_reduction_cell: bool = False,
+        aux_skip: torch.nn.Module | None = None,
+        dan: torch.nn.Module | None = None,
     ) -> OperationBlock:
         op_block = OperationBlock(
             ops,
@@ -115,6 +126,7 @@ class SearchSpaceHandler:
             weight_entangler=self.weight_entangler,
             is_argmax_sampler=self.is_argmax_sampler,
             aux_skip=aux_skip if self.use_auxiliary_skip_connection else None,
+            dan=dan if self.dynamic_explorer else None,
         )
         return op_block
 
