@@ -40,11 +40,11 @@ class NB201SearchModel(nn.Module):
         steps (int, optional): Number of steps. Defaults to 3.
         search_space (list[str], optional): List of search space options. Defaults to
         NAS_BENCH_201.
-        affine (bool, optional): Whether to use affine transformations in BatchNorm in
+        affine (bool, optional): Flag to  use affine transformations in BatchNorm in
         cells. Defaults to False.
-        track_running_stats (bool, optional): Whether to track running statistics in
+        track_running_stats (bool, optional): Flag to  track running statistics in
         BatchNorm in cells. Defaults to False.
-        edge_normalization (bool, optional): Whether to enable edge normalization for
+        edge_normalization (bool, optional): Flag to  enable edge normalization for
         partial connection. Defaults to False.
         with one operation on each edge
 

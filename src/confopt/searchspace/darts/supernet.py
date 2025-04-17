@@ -62,7 +62,7 @@ class DARTSSearchSpace(
             steps (int): Number of steps in the search space cell.
             multiplier (int): Multiplier for channels in the cells.
             stem_multiplier (int): Stem multiplier for channels.
-            edge_normalization (bool): Whether to use edge normalization.
+            edge_normalization (bool): Flag to  use edge normalization.
 
         Methods:
             - arch_parameters: Get architectural parameters.

@@ -137,8 +137,8 @@ class ReLUConvBN(ConvolutionalWEModule):
         stride (int or tuple[int, int]): Stride for the convolution operation.
         padding (int or tuple[int, int]): Padding for the convolution operation.
         dilation (int or tuple[int, int]): Dilation rate for the convolution operation.
-        affine (bool): Whether to apply affine transformations in BatchNorm.
-        track_running_stats (bool, optional): Whether to track running statistics in
+        affine (bool): Flag to  apply affine transformations in BatchNorm.
+        track_running_stats (bool, optional): Flag to  track running statistics in
         BatchNorm. Defaults to True.
 
     Attributes:
@@ -254,8 +254,8 @@ class SepConv(ConvolutionalWEModule):
         stride (int or tuple[int, int]): Stride for the convolution operation.
         padding (int or tuple[int, int]): Padding for the convolution operation.
         dilation (int or tuple[int, int]): Dilation rate for the convolution operation.
-        affine (bool): Whether to apply affine transformations in BatchNorm.
-        track_running_stats (bool, optional): Whether to track running statistics
+        affine (bool): Flag to  apply affine transformations in BatchNorm.
+        track_running_stats (bool, optional): Flag to  track running statistics
         in BatchNorm. Defaults to True.
 
     Attributes:
@@ -372,8 +372,8 @@ class DualSepConv(nn.Module):
         stride (int or tuple[int, int]): Stride for the convolution operation.
         padding (int or tuple[int, int]): Padding for the convolution operation.
         dilation (int or tuple[int, int]): Dilation rate for the convolution operation.
-        affine (bool): Whether to apply affine transformations in BatchNorm.
-        track_running_stats (bool, optional): Whether to track running statistics in
+        affine (bool): Flag to  apply affine transformations in BatchNorm.
+        track_running_stats (bool, optional): Flag to  track running statistics in
         BatchNorm. Defaults to True.
 
     Attributes:
@@ -479,9 +479,9 @@ class ResNetBasicblock(nn.Module):
         inplanes (int): Number of input channels.
         planes (int): Number of output channels.
         stride (int): Stride for the convolution operation.
-        affine (bool, optional): Whether to apply affine transformations in BatchNorm.
+        affine (bool, optional): Flag to  apply affine transformations in BatchNorm.
         Defaults to True.
-        track_running_stats (bool, optional): Whether to track running statistics in
+        track_running_stats (bool, optional): Flag to  track running statistics in
         BatchNorm. Defaults to True.
 
     Attributes:
@@ -604,9 +604,9 @@ class Pooling(nn.Module):
         stride (int or tuple[int, int]): Stride for the pooling operation.
         mode (str): Pooling mode, either "avg" for average pooling or "max" for
         max pooling.
-        affine (bool, optional): Whether to apply affine transformations in BatchNorm
+        affine (bool, optional): Flag to  apply affine transformations in BatchNorm
         (if preprocess is used). Defaults to True.
-        track_running_stats (bool, optional): Whether to track running statistics in
+        track_running_stats (bool, optional): Flag to  track running statistics in
         BatchNorm (if preprocess is used). Defaults to True.
 
     Attributes:
@@ -845,8 +845,8 @@ class FactorizedReduce(nn.Module):
         C_in (int): Number of input channels.
         C_out (int): Number of output channels.
         stride (int or tuple[int, int]): Stride for the factorized reduce operation.
-        affine (bool): Whether to apply affine transformations in BatchNorm.
-        track_running_stats (bool): Whether to track running statistics in BatchNorm.
+        affine (bool): Flag to  apply affine transformations in BatchNorm.
+        track_running_stats (bool): Flag to  track running statistics in BatchNorm.
 
     Attributes:
         stride (int or tuple[int, int]): Stride for the factorized reduce operation.

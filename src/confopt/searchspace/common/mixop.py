@@ -258,7 +258,7 @@ class AuxiliarySkipConnection(nn.Module):
             stride (int): stride to apply
             C_in (int): Number of input channels.
             C_out (int): Number of output channels.
-            affine (bool): Whether to apply affine transformations in BatchNorm.
+            affine (bool): Flag to  apply affine transformations in BatchNorm.
             device (torch.device): torch device to use
         """
         super().__init__()
