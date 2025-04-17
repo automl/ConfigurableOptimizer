@@ -207,7 +207,7 @@ if __name__ == "__main__":
 
     epochs = 3 if args.dryrun is True else epochs_profiles[args.optimizer]
     profile = profile_classes[args.optimizer](
-        searchspace=SEARCHSPACE,
+        searchspace_type=SEARCHSPACE,
         epochs=epochs,
         is_partial_connection=args.pcdarts,
         perturbation=args.sdarts,
@@ -216,7 +216,6 @@ if __name__ == "__main__":
         seed=args.seed,
         oles=args.oles,
         calc_gm_score=True,
-        is_regularization_enabled=args.fairdarts,
         regularization_config=regularization_config,
         sampler_arch_combine_fn=arch_combine_fn,
     )

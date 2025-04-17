@@ -67,7 +67,7 @@ class ReLUConvBN(nn.Module):
             kernel_size (int or tuple[int, int]): Size of the convolutional kernel.
             stride (int or tuple[int, int]): Stride for the convolution operation.
             padding (int or tuple[int, int]): Padding for the convolution operation.
-            affine (bool): Whether to apply affine transformations in BatchNorm.
+            affine (bool): Flag to  apply affine transformations in BatchNorm.
 
         Attributes:
             op (nn.Sequential): Sequential block containing ReLU, Convolution,
@@ -193,7 +193,7 @@ class Pooling(nn.Module):
             stride (int or tuple[int, int]): Stride for the pooling operation.
             mode (str): Pooling mode, either "avg" for average pooling or "max" for
             max pooling.
-            affine (bool, optional): Whether to apply affine transformations in
+            affine (bool, optional): Flag to  apply affine transformations in
             BatchNorm (if preprocess is used). Defaults to True.
 
         Attributes:
@@ -407,7 +407,7 @@ class SepConv(ConvolutionalWEModule):
             padding (int or tuple[int, int]): Padding for the convolution operation.
             dilation (int or tuple[int, int]): Dilation rate for the convolution
             operation.
-            affine (bool): Whether to apply affine transformations in BatchNorm.
+            affine (bool): Flag to  apply affine transformations in BatchNorm.
 
         Attributes:
             op (nn.Sequential): Sequential block containing ReLU, Depthwise Convolution,
@@ -685,7 +685,7 @@ class FactorizedReduce(nn.Module):
         Args:
             C_in (int): Number of input channels.
             C_out (int): Number of output channels.
-            affine (bool): Whether to apply affine transformations in BatchNorm.
+            affine (bool): Flag to  apply affine transformations in BatchNorm.
 
         Attributes:
             relu (nn.ReLU): ReLU activation layer.

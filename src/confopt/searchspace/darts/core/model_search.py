@@ -281,7 +281,7 @@ class Network(nn.Module):
             steps (int): Number of steps in the search space cell. Defaults to 4.
             multiplier (int): Multiplier for channels in the cells. Defaults to 4.
             stem_multiplier (int): Stem multiplier for channels. Defaults to 3.
-            edge_normalization (bool): Whether to use edge normalization. Defaults to False.
+            edge_normalization (bool): Flag to  use edge normalization. Defaults to False.
             discretized (bool): Whether supernet is discretized to only have one operation on
             each edge or not.
             primitives (list): The list of primitives to use for generating cell.

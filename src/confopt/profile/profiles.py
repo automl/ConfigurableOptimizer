@@ -11,6 +11,15 @@ from .base import BaseProfile
 
 
 class DARTSProfile(BaseProfile, ABC):
+    """Train Profile class for DARTS (Differentiable Architecture Search).
+    It inherits from the BaseProfile class and sets the sampler config for DARTS
+    sampler.
+
+    Methods:
+        __init__: Initializes the DARTSProfile object.
+        _initialize_sampler_config: Initializes the sampler configuration for DARTS.
+    """
+
     SAMPLER_TYPE = SamplerType.DARTS
 
     def __init__(
@@ -27,14 +36,64 @@ class DARTSProfile(BaseProfile, ABC):
         )
 
     def _initialize_sampler_config(self) -> None:
+        """Initializes the sampler configuration for DARTS.
+
+        The sampler configuration includes the sample frequency and the architecture
+        combine function.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         darts_config = {
             "sample_frequency": self.sampler_sample_frequency,
             "arch_combine_fn": self.sampler_arch_combine_fn,
         }
         self.sampler_config = darts_config  # type: ignore
 
+    def configure_sampler(self, **kwargs) -> None:  # type: ignore
+        """Configures the sampler settings based on provided keyword arguments.
+
+        The configuration options are passed as keyword arguments.
+
+        Args:
+            **kwargs: Arbitrary keyword arguments. Possible keys include:
+                sample_frequency (str): The rate at which samples should be taken
+                arch_combine_fn (str): The function used to combine architectures \
+                when FairDARTS is used, this should be 'sigmoid'. Default value is
+                'default'.
+
+        Example:
+            >>> from confopt.profile import DARTSProfile
+            >>> darts_profile = DARTSProfile(searchspace='darts', epochs=50)
+            >>> darts_profile.configure_sampler(arch_combine_fn='sigmoid')
+
+        The accepted keyword arguments should align with the sampler's configuration and
+        the attributes can be configured dynamically.
+
+        Raises:
+            ValueError: If an unrecognized keyword is passed in kwargs.
+
+
+        Returns:
+            None
+        """
+        super().configure_sampler(**kwargs)
+
 
 class GDASProfile(BaseProfile, ABC):
+    """Train Profile class for GDAS
+    (Gradient-based search using Differentiable Architecture Sampler)
+    It inherits from the BaseProfile class and sets the sampler config for
+    DARTS sampler.
+
+    Attributes:
+        tau_min (float): Minimum temperature for sampling.
+        tau_max (float): Maximum temperature for sampling.
+    """
+
     SAMPLER_TYPE = SamplerType.GDAS
 
     def __init__(
@@ -78,12 +137,64 @@ class GDASProfile(BaseProfile, ABC):
     def _initialize_trainer_config_darts(self) -> None:
         super()._initialize_trainer_config_darts()
 
+    def configure_sampler(self, **kwargs) -> None:  # type: ignore
+        """Configures the sampler settings based on provided keyword arguments.
+
+        The configuration options are passed as keyword arguments.
+
+        Args:
+            **kwargs: Arbitrary keyword arguments. Possible keys include:
+
+                sample_frequency (str): The rate at which samples should be taken
+
+                arch_combine_fn (str): The function used to combine architectures \
+                (str) when FairDARTS is used, this should be 'sigmoid'. Default value \
+                is 'default'.
+
+                tau_min (float): Minimum temperature for sampling.
+
+                tau_max (float): Maximum temperature for sampling.
+
+
+        Example:
+            >>> from confopt.profile import GDASProfile
+            >>> gdas_profile = GDASProfile(searchspace='darts', epochs=50)
+            >>> gdas_profile.configure_sampler(tau_min=02, tau_max=20)
+
+        The accepted keyword arguments should align with the sampler's configuration and
+        the attributes can be configured dynamically.
+
+        Raises:
+            ValueError: If an unrecognized keyword is passed in kwargs.
+
+
+        Returns:
+            None
+        """
+        super().configure_sampler(**kwargs)
+
 
 class ReinMaxProfile(GDASProfile):
+    """Train Profile class for ReinMax (Multi-objective Differentiable Neural
+    Architecture Search).
+    It inherits from the GDASProfile class and sets the sampler config for ReinMax
+    sampler.
+    """
+
     SAMPLER_TYPE = SamplerType.REINMAX
 
 
 class SNASProfile(BaseProfile, ABC):
+    """Train Profile class for SNAS (Stochastic Neural Architecture Search)..
+    It inherits from the BaseProfile class and sets the sampler config for SNAS sampler.
+
+    Attributes:
+        temp_init (float): Initial temperature for sampling.
+        temp_min (float): Minimum temperature for sampling.
+        temp_annealing (bool): Flag to  use temperature annealing.
+        total_epochs (int): Total number of epochs for training.
+    """
+
     SAMPLER_TYPE = SamplerType.SNAS
 
     def __init__(
@@ -118,8 +229,49 @@ class SNASProfile(BaseProfile, ABC):
         }
         self.sampler_config = snas_config  # type: ignore
 
+    def configure_sampler(self, **kwargs) -> None:  # type: ignore
+        """Configures the sampler settings based on provided keyword arguments.
+
+        The configuration options are passed as keyword arguments.
+
+        Args:
+            **kwargs: Arbitrary keyword arguments. Possible keys \
+                include:
+
+                sample_frequency (str): The rate at which samples should be taken.
+
+                arch_combine_fn (str): The function used to combine architectures \
+                (str). when FairDARTS is used, this should be 'sigmoid'. Default value \
+                is 'default'.
+
+                temp_init (float): Initial temperature for sampling.
+
+                temp_min (float): Minimum temperature for sampling.
+
+                temp_annealing (bool): Flag to  use temperature annealing.
+
+                total_epochs (int): Total number of epochs for training.
+
+        The accepted keyword arguments should align with the sampler's configuration and
+        the attributes can be configured dynamically.
+
+        Raises:
+            ValueError: If an unrecognized keyword is passed in kwargs.
+
+
+        Returns:
+            None
+        """
+        super().configure_sampler(**kwargs)
+
 
 class DRNASProfile(BaseProfile, ABC):
+    """Train Profile class for DRNAS (Dirichlet Neural Architecture Search).
+    It inherits from the BaseProfile class and sets the sampler config for DRNAS
+    sampler.
+
+    """
+
     SAMPLER_TYPE = SamplerType.DRNAS
 
     def __init__(
@@ -217,6 +369,38 @@ class DRNASProfile(BaseProfile, ABC):
         else:
             self.searchspace_config = searchspace_config
 
+    def configure_sampler(self, **kwargs) -> None:  # type: ignore
+        """Configures the sampler settings based on provided keyword arguments.
+
+        The configuration options are passed as keyword arguments.
+
+        Args:
+            **kwargs: Arbitrary keyword arguments. Possible keys include:
+
+                sample_frequency (str): The rate at which samples should be taken \
+                (int).
+
+                arch_combine_fn (str): The function used to combine architectures.\
+                when FairDARTS is used, this should be 'sigmoid'. Default value is
+                'default'.
+
+        Example:
+            >>> from confopt.profile import DRNASProfile
+            >>> drnas_profile = DRNASProfile(searchspace='darts', epochs=50)
+            >>> drnas_profile.configure_sampler(arch_combine_fn='sigmoid')
+
+        The accepted keyword arguments should align with the sampler's configuration and
+        the attributes can be configured dynamically.
+
+        Raises:
+            ValueError: If an unrecognized keyword is passed in kwargs.
+
+
+        Returns:
+            None
+        """
+        super().configure_sampler(**kwargs)
+
 
 class DiscreteProfile:
     def __init__(
@@ -239,12 +423,38 @@ class DiscreteProfile:
         self.configure_trainer(**kwargs)
 
     def get_trainer_config(self) -> dict:
+        """Returns the trainer configuration for the discrete profile.
+
+        Args:
+            None
+
+        Returns:
+            dict: A dictionary containing the trainer configuration.
+        """
         return self.train_config
 
     def get_genotype(self) -> str:
+        """Returns the genotype of the discrete profile.
+
+        Args:
+            None
+
+        Returns:
+            str: The genotype of the discrete profile.
+        """
         return self.genotype
 
     def _initialize_trainer_config(self) -> None:
+        """Initializes the trainer configuration for the discrete profile.
+        This method sets the default training configuration parameters for the
+        discrete model.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         default_train_config = {
             "searchspace": self.searchspace_type,
             "lr": 0.025,
@@ -274,6 +484,17 @@ class DiscreteProfile:
         self.train_config = default_train_config
 
     def _initializa_genotype(self) -> None:
+        """Initializes the genotype for the discrete profile.
+        This method sets the genotype of the best DARTS supernet found
+        after 50 epochs of running the DARTS optimizer. Thus it is only
+        a valid genotype if the search space is of type DARTS.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         self.genotype = str(
             DARTSGenotype(
                 normal=[
@@ -302,6 +523,27 @@ class DiscreteProfile:
         )
 
     def configure_trainer(self, **kwargs) -> None:  # type: ignore
+        """Configure the trainer component for the supernet.
+
+        Args:
+            **kwargs: Arbitrary keyword arguments. Possible keys include:
+
+                lr (float): Learning rate for the optimizer.
+
+                epochs (int): Number of training epochs.
+
+                optim (str): Optimizer type. Can be 'sgd', 'adam', etc.
+
+                optim_config (dict): Additional configuration for the optimizer.
+
+                ...
+
+        Raises:
+            AssertionError: If any of the provided configuration keys are not valid.
+
+        Returns:
+            None
+        """
         for config_key in kwargs:
             assert (
                 config_key in self.train_config
@@ -310,21 +552,64 @@ class DiscreteProfile:
             self.train_config[config_key] = kwargs[config_key]
 
     def set_search_space_config(self, config: dict) -> None:
+        """Sets the search space configuration for the discrete profile.
+        This method allows the user to set custom configuration parameters.
+
+        Args:
+            config (dict): A dictionary containing the search space configuration.
+
+        Returns:
+            None
+        """
         self.searchspace_config = config
 
     def configure_searchspace(self, **config: Any) -> None:
+        """Configure the search space for the supernet.
+
+        Args:
+            **config: Arbitrary keyword arguments. Possible depend on the \
+                the search space type. For more information please check the \
+                Parameters of the supernet of each search space.
+
+
+        Returns:
+            None
+        """
         if not hasattr(self, "searchspace_config"):
             self.searchspace_config = config
         else:
             self.searchspace_config.update(config)
 
     def configure_extra(self, **config: Any) -> None:
+        """Configure any extra settings for the supernet.
+        Could be useful for tracking Weights & Biases metadata.
+
+        Args:
+            **config: Arbitrary keyword arguments.
+
+        Returns:
+            None
+        """
         if not hasattr(self, "extra_config"):
             self.extra_config = config
         else:
             self.extra_config.update(config)
 
     def get_searchspace_config(self, dataset_str: str) -> dict:
+        """Returns the search space configuration based on the search space type.
+
+        Args:
+            dataset_str (str): The dataset string.
+
+        Raises:
+            ValueError: If the search space is not any of the valid values of
+            NasBench201, DARTS, NasBench1Shot1 or TransNasBench101.
+
+        Returns:
+            dict: A dictionary containing the search space configuration which
+            would be passed to as the arguments for creating the new discrete
+            model object.
+        """
         if self.searchspace_type == SearchSpaceType.NB201:
             searchspace_config = {
                 "N": 5,  # num_cells
@@ -351,9 +636,27 @@ class DiscreteProfile:
         return searchspace_config
 
     def get_extra_config(self) -> dict:
+        """This method returns the extra configuration parameters for the
+        discrete profile for example could be used for Weights & Biases metadata.
+
+        Args:
+            None
+
+        Returns:
+            dict: A dictionary containing extra configuration parameters.
+        """
         return self.extra_config if hasattr(self, "extra_config") else {}
 
     def get_run_description(self) -> str:
+        """This method returns a string description of the run configuration.
+        The description is used for tracking purposes in Weights & Biases.
+
+        Args:
+            None
+
+        Returns:
+            str: A string describing the run configuration.
+        """
         run_configs = []
         run_configs.append(f"train_model_{self.train_config.get('searchspace')}")
         run_configs.append(f"epochs_{self.train_config.get('epochs')}")

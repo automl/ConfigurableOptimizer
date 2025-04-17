@@ -31,7 +31,6 @@ class TestBaseProfile(unittest.TestCase):
             prune_epochs=None,
             prune_fractions=None,
             is_arch_attention_enabled=False,
-            is_regularization_enabled=False,
             regularization_config=None,
             pt_select_architecture=False,
         )
@@ -116,7 +115,6 @@ class TestDartsProfile(unittest.TestCase):
             prune_epochs=None,
             prune_fractions=None,
             is_arch_attention_enabled=False,
-            is_regularization_enabled=False,
             regularization_config=None,
             pt_select_architecture=False,
         )
@@ -195,7 +193,6 @@ class TestDRNASProfile(unittest.TestCase):
             prune_epochs=None,
             prune_fractions=None,
             is_arch_attention_enabled=False,
-            is_regularization_enabled=False,
             regularization_config=None,
             pt_select_architecture=False,
         )
@@ -276,7 +273,6 @@ class TestGDASProfile(unittest.TestCase):
             prune_epochs=None,
             prune_fractions=None,
             is_arch_attention_enabled=False,
-            is_regularization_enabled=False,
             regularization_config=None,
             pt_select_architecture=False,
         )
@@ -348,7 +344,6 @@ class TestSNASProfile(unittest.TestCase):
             prune_epochs=None,
             prune_fractions=None,
             is_arch_attention_enabled=False,
-            is_regularization_enabled=False,
             regularization_config=None,
             pt_select_architecture=False,
         )

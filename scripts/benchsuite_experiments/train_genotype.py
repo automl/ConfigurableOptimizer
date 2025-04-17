@@ -12,9 +12,10 @@ from benchsuite import (  # type: ignore
 )
 from confopt.enums import SearchSpaceType, DatasetType
 
-WANDB_LOG = True
 DEBUG_MODE = False
 
+def bool_type(x: str) -> bool:
+    return x.lower() in ["true", "1", "yes"]
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -88,6 +89,13 @@ def parse_args() -> argparse.Namespace:
         help="path to the file of the genotype you want to run.",
     )
 
+    parser.add_argument(
+       "--log_with_wandb",
+        type=bool_type,
+        default="false",
+        help="test things out with dryrun argument",
+    )
+
     return parser.parse_args()
 
 
@@ -150,4 +158,5 @@ def main(args: argparse.Namespace, hpset: int) -> None:
 
 if __name__ == "__main__":
     args = parse_args()
+    WANDB_LOG = args.log_with_wandb
     main(args, args.hpset)

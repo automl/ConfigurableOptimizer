@@ -77,6 +77,25 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 
 class Experiment:
+    """The Experiment class is responsible for managing the training and evaluation of
+    the supernet and discrete models. It initializes the necessary components,
+    manages the states to load, and handles the training process.
+
+    Parameters:
+        search_space (SearchSpace): The search space type used for the experiment.
+        dataset (DatasetType): The dataset type used for the experiment.
+        seed (int): The random seed for reproducibility of the runs.
+        log_with_wandb (bool): Flag to enable logging with Weights & Biases.
+        debug_mode (bool): Flag to enable debug mode, where we only do 5 steps for \
+            each epoch.
+        exp_name (str): The name of the experiment.
+        dataset_domain (str | None): The domain of the dataset used for the Taskonomy \
+            dataset. Valid values are 'class_object' and 'class_scene'.
+        dataset_dir (str): The directory where the dataset is stored.
+        api_dir (str): The directory where the API is stored to used when we are using \
+            the benchmarks.
+    """
+
     def __init__(
         self,
         search_space: SearchSpaceType,
@@ -108,9 +127,25 @@ class Experiment:
         torch.cuda.manual_seed(rand_seed)
 
     def init_ddp(self) -> None:
+        """Initializes the distributed data parallel (DDP) environment.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         dist_utils.init_distributed()
 
     def cleanup_ddp(self) -> None:
+        """Kills the distributed data parallel (DDP) process.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         dist_utils.cleanup()
 
     def train_supernet(
@@ -120,6 +155,29 @@ class Experiment:
         exp_runtime_to_load: str | None = None,
         use_benchmark: bool = False,
     ) -> ConfigurableTrainer:
+        """Trains a supernet using the given profile with options for loading previous
+        runs.
+
+        Args:
+            profile (BaseProfile): Contains configurations for training the supernet,
+            including component settings and architectural specifications.
+
+            model_to_load (str | int | None): Specifies the training state to load the
+            supernet from. Valid values are "last" or "best", representing the most
+            recent or the best-performing model checkpoint, respectively.
+            If an integer is provided, it represents the epoch number from which
+            training should be continued.
+            If `None`, then it starts training the model from scratch.
+
+            exp_runtime_to_load (str | None): The particular experiment runtime to
+            load the model from.If `None`, the model will be loaded from the last
+            runtime.
+
+            use_benchmark (bool): If `True`, uses a benchmark API for evaluation.
+
+        Returns:
+            ConfigurableTrainer: The trained supernet.
+        """
         config = profile.get_config()
         run_name = profile.get_run_description()
         config["dataset"] = self.dataset.value
@@ -577,6 +635,21 @@ class Experiment:
         genotype_str: str,
         searchspace_config: dict,
     ) -> torch.nn.Module:
+        """Returns a discrete model based on the given genotype string.
+
+        Args:
+            search_space_str (str): The search space type.
+            genotype_str (str): The genotype string to use for creating the discrete
+            model.
+            searchspace_config (dict): Configuration for the search space.
+
+        Raises:
+            ValueError: If the search space type is not recognized or if the dataset
+            is not supported.
+
+        Returns:
+            torch.nn.Module: The discrete model.
+        """
         if search_space_str == SearchSpaceType.NB201.value:
             searchspace_config["genotype"] = NAS201Genotype.str2structure(genotype_str)
             discrete_model = NASBench201Model(**searchspace_config)
@@ -602,6 +675,18 @@ class Experiment:
     def get_discrete_model_from_supernet(
         self,
     ) -> SearchSpace:
+        """Returns a discrete model from experiment's supernet(search space).
+
+        Args:
+            None
+
+        Raises:
+            Exception: If the experiment does not have a search space or the
+            search space is not a supernet.
+
+        Returns:
+            SearchSpace: A discrete model.
+        """
         # A) Use the experiment's self.search_space of the experiment.
         if hasattr(self, "search_space"):
             if self.search_space.arch_parameters:
@@ -616,6 +701,20 @@ class Experiment:
         model_to_load: str | int | None = None,
         use_supernet_checkpoint: bool = False,
     ) -> str:
+        """Returns the genotype string from the checkpoint.
+
+        Args:
+            model_to_load (str | int | None): Specifies the training state to load.
+            Can be "last", "best", or specific epoch.
+            use_supernet_checkpoint (bool): If `True`, initializes the model's weights
+            from a supernet checkpoint.
+
+        Raises:
+            ValueError: If `model_to_load` is not given
+
+        Returns:
+            str: The genotype string.
+        """
         if model_to_load is not None:
             genotype_str = self.logger.load_genotype(
                 model_to_load=model_to_load,
@@ -633,6 +732,23 @@ class Experiment:
         use_expr_search_space: bool = False,
         genotype_str: str | None = None,
     ) -> tuple[torch.nn.Module, str]:
+        """Returns a discrete model based on the given parameters.
+
+        Args:
+            searchspace_config (dict): Configuration for the search space.
+            model_to_load (str | int | None): Specifies the training state to load. Can
+            be "last", "best", or specific epoch.
+            use_supernet_checkpoint (bool): If `True`, initializes the model's weights
+            from a supernet checkpoint.
+            use_expr_search_space (bool): If `True`, gets the discretized model from
+            self.search_space.
+            genotype_str (str | None): The genotype string to use for creating the
+            discrete model.
+
+        Returns:
+            tuple[torch.nn.Module, str]: A tuple containing the discrete model and its
+            genotype string.
+        """
         # A) Use the experiment's self.search_space of the experiment.
         if use_expr_search_space:
             model = self.get_discrete_model_from_supernet()
@@ -894,6 +1010,28 @@ class Experiment:
         run_name: str = "darts-pt",
         src_folder_path: str | None = None,
     ) -> PerturbationArchSelection:
+        """Creates and returns an architecture based on perturbation.
+
+        Args:
+            profile (BaseProfile): The profile containing the configuration for the
+            experiment.
+            model_source (str): The source of the model to load. Can be "supernet"
+            or a PerturbationArchSelection object.
+            model_to_load (str | int | None): The model to load. Can be "last",
+            "best", or specific epoch.
+            exp_runtime_to_load (str | None): The runtime to load the model from.
+            log_with_wandb (bool): Flag to  log with wandb.
+            run_name (str): The name of the run.
+            src_folder_path (str | None): The source folder path of experiment's run.
+
+        Raises:
+            AttributeError: If an illegal model source is provided.
+            AssertionError: If the model source is "arch_selection" and model_to_load
+            is "best".
+
+        Returns:
+            PerturbationArchSelection: The architecture selection object.
+        """
         # find pt_configs in the profile
         if model_to_load is not None:
             # self.searchspace is not trained

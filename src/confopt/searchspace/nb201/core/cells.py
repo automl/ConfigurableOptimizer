@@ -26,9 +26,9 @@ class NAS201SearchCell(nn.Module):
         stride (int): Stride for convolutional operations.
         max_nodes (int): Maximum number of nodes in the cell.
         op_names (list[str]): List of operation names to choose from.
-        affine (bool, optional): Whether to use affine transformations in BatchNorm.
+        affine (bool, optional): Flag to  use affine transformations in BatchNorm.
         Defaults to False.
-        track_running_stats (bool, optional): Whether to track running statistics in
+        track_running_stats (bool, optional): Flag to  track running statistics in
         BatchNorm. Defaults to True.
 
     Attributes:
@@ -193,9 +193,9 @@ class InferCell(nn.Module):
         C_in (int): Number of input channels.
         C_out (int): Number of output channels.
         stride (int): Stride for convolutional operations.
-        affine (bool, optional): Whether to use affine transformations in BatchNorm.
+        affine (bool, optional): Flag to  use affine transformations in BatchNorm.
         Defaults to True.
-        track_running_stats (bool, optional): Whether to track running statistics in
+        track_running_stats (bool, optional): Flag to  track running statistics in
         BatchNorm. Defaults to True.
 
     Attributes:

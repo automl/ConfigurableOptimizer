@@ -24,7 +24,6 @@ if __name__ == "__main__":
         oles=True,
         calc_gm_score=True,
         is_arch_attention_enabled=True,
-        is_regularization_enabled=True,
         regularization_config=reg_config,
     )
     profile.configure_searchspace(layers=8, C=2)
