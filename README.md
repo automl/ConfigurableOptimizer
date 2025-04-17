@@ -4,6 +4,9 @@
 
 Break down one-shot optimizers into their core ideas, modularize them, and then search the space of optimizers for the best one.
 
+[![API Docs](https://img.shields.io/badge/docs-API-blue)](https://automl.github.io/ConfigurableOptimizer/index.html)
+
+
 ## Installation and Development
 First, install the dependencies required for development and testing in your environment. You can skip running the last line as it might take long.
 
