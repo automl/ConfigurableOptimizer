@@ -1,0 +1,841 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BaseProfile &mdash; ConfigurableOptimizer  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9a2dae69"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="DARTS Profile" href="dartsprofile.html" />
+    <link rel="prev" title="Profiles" href="profiles.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            ConfigurableOptimizer
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Important Links:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="benchsuite_doc.html">Benchsuite Documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="profiles.html">Profiles</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">BaseProfile</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#confopt.profile.BaseProfile"><code class="docutils literal notranslate"><span class="pre">BaseProfile</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._initialize_dropout_config"><code class="docutils literal notranslate"><span class="pre">BaseProfile._initialize_dropout_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._initialize_partial_connector_config"><code class="docutils literal notranslate"><span class="pre">BaseProfile._initialize_partial_connector_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._initialize_perturbation_config"><code class="docutils literal notranslate"><span class="pre">BaseProfile._initialize_perturbation_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._initialize_regularization_config"><code class="docutils literal notranslate"><span class="pre">BaseProfile._initialize_regularization_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._initialize_sampler_config"><code class="docutils literal notranslate"><span class="pre">BaseProfile._initialize_sampler_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._initialize_trainer_config"><code class="docutils literal notranslate"><span class="pre">BaseProfile._initialize_trainer_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._initialize_trainer_config_1shot1"><code class="docutils literal notranslate"><span class="pre">BaseProfile._initialize_trainer_config_1shot1()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._initialize_trainer_config_darts"><code class="docutils literal notranslate"><span class="pre">BaseProfile._initialize_trainer_config_darts()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._initialize_trainer_config_nb201"><code class="docutils literal notranslate"><span class="pre">BaseProfile._initialize_trainer_config_nb201()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._initialize_trainer_config_tnb101"><code class="docutils literal notranslate"><span class="pre">BaseProfile._initialize_trainer_config_tnb101()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._set_dropout"><code class="docutils literal notranslate"><span class="pre">BaseProfile._set_dropout()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._set_lora_configs"><code class="docutils literal notranslate"><span class="pre">BaseProfile._set_lora_configs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._set_oles_configs"><code class="docutils literal notranslate"><span class="pre">BaseProfile._set_oles_configs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._set_partial_connector"><code class="docutils literal notranslate"><span class="pre">BaseProfile._set_partial_connector()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._set_perturb"><code class="docutils literal notranslate"><span class="pre">BaseProfile._set_perturb()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._set_pruner_configs"><code class="docutils literal notranslate"><span class="pre">BaseProfile._set_pruner_configs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile._set_pt_select_configs"><code class="docutils literal notranslate"><span class="pre">BaseProfile._set_pt_select_configs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile.configure_dropout"><code class="docutils literal notranslate"><span class="pre">BaseProfile.configure_dropout()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile.configure_early_stopper"><code class="docutils literal notranslate"><span class="pre">BaseProfile.configure_early_stopper()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile.configure_extra"><code class="docutils literal notranslate"><span class="pre">BaseProfile.configure_extra()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile.configure_lora"><code class="docutils literal notranslate"><span class="pre">BaseProfile.configure_lora()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile.configure_oles"><code class="docutils literal notranslate"><span class="pre">BaseProfile.configure_oles()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile.configure_partial_connector"><code class="docutils literal notranslate"><span class="pre">BaseProfile.configure_partial_connector()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile.configure_perturbator"><code class="docutils literal notranslate"><span class="pre">BaseProfile.configure_perturbator()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile.configure_pt_selection"><code class="docutils literal notranslate"><span class="pre">BaseProfile.configure_pt_selection()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile.configure_regularization"><code class="docutils literal notranslate"><span class="pre">BaseProfile.configure_regularization()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile.configure_sampler"><code class="docutils literal notranslate"><span class="pre">BaseProfile.configure_sampler()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile.configure_searchspace"><code class="docutils literal notranslate"><span class="pre">BaseProfile.configure_searchspace()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile.configure_synthetic_dataset"><code class="docutils literal notranslate"><span class="pre">BaseProfile.configure_synthetic_dataset()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile.configure_trainer"><code class="docutils literal notranslate"><span class="pre">BaseProfile.configure_trainer()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile.get_config"><code class="docutils literal notranslate"><span class="pre">BaseProfile.get_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.BaseProfile.get_run_description"><code class="docutils literal notranslate"><span class="pre">BaseProfile.get_run_description()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dartsprofile.html">DARTS Profile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gdasprofile.html">GDAS Profile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reinmaxprofile.html">Reinmax Profile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="snasprofile.html">SNAS Profile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="drnasprofile.html">DRNAS Profile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="discreteprofile.html">Discrete Profile</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="experiment.html">Experiment</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">ConfigurableOptimizer</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="profiles.html">Profiles</a></li>
+      <li class="breadcrumb-item active">BaseProfile</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/baseprofile.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="baseprofile">
+<h1>BaseProfile<a class="headerlink" href="#baseprofile" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">confopt.profile.</span></span><span class="sig-name descname"><span class="pre">BaseProfile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sampler_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SamplerType</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">searchspace_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SearchSpaceType</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epochs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">50</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sampler_sample_frequency</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'step'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_partial_connection</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">partial_connector_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dropout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">perturbation</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">perturbator_sample_frequency</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'epoch'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">perturbator_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entangle_op_weights</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lora_rank</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lora_warm_epochs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lora_toggle_epochs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lora_toggle_probability</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">oles</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">calc_gm_score</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prune_epochs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prune_fractions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_arch_attention_enabled</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">regularization_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sampler_arch_combine_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'default'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pt_select_architecture</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">searchspace_domain</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_auxiliary_skip_connection</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">searchspace_subspace</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">early_stopper</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">early_stopper_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">synthetic_dataset_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extra_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#confopt.profile.BaseProfile" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Base class for configuring the supernet and the experiment’s Profile.</p>
+<p>This class serves as a foundational component for setting up various aspects of
+training the supernet, including search spaces, epochs, and more advanced
+configurations such as dropout rates, perturbation settings, regularization
+settings, pruning and LoRA configurations. It offers flexibility in modifying
+the training experiment of the supernet through multiple setup methods. For
+further details on the specific configurations, please refer to the individual
+methods. The examples provided in each of the components presents how can each
+component be used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sampler_type</strong> (<em>SamplerType</em><em> or </em><em>str</em>) – Type of sampler to use.</p></li>
+<li><p><strong>searchspace</strong> (<em>SearchSpaceType</em><em> or </em><em>str</em>) – Type of search space.</p></li>
+<li><p><strong>epochs</strong> (<em>int</em>) – Number of training epochs.</p></li>
+<li><p><strong>sampler_sample_frequency</strong> (<em>str</em>) – Frequency of sampling. Valid values are             ‘step’ or ‘epoch’. Defaults to ‘step’.</p></li>
+<li><p><strong>is_partial_connection</strong> (<em>bool</em>) – Flag to enable partial connections in the             supernet. Defaults to False.</p></li>
+<li><p><strong>partial_connector_config</strong> (<em>dict</em><em>, </em><em>optional</em>) – Configuration for partial             connector if is_partial_connection is True.</p></li>
+<li><p><strong>dropout</strong> (<em>float</em><em>, </em><em>optional</em>) – Dropout operation rate for architectural             parameters. Defaults to None.</p></li>
+<li><p><strong>perturbation</strong> (<em>str</em><em>, </em><em>optional</em>) – Type of perturbation to apply. Valid values             are ‘adversarial’ and ‘random’. Defaults to None.</p></li>
+<li><p><strong>perturbator_sample_frequency</strong> (<em>str</em>) – Sampling frequency for perturbator.             Defaults to ‘epoch’.</p></li>
+<li><p><strong>perturbator_config</strong> (<em>dict</em><em>, </em><em>optional</em>) – Configuration for the perturbator.</p></li>
+<li><p><strong>entangle_op_weights</strong> (<em>bool</em>) – Flag to enable weight entanglement             between candidate operations. Defaults to False.</p></li>
+<li><p><strong>lora_rank</strong> (<em>int</em>) – Rank for LoRA configuration. Defaults to 0.</p></li>
+<li><p><strong>lora_warm_epochs</strong> (<em>int</em>) – Number of warm-up epochs for LoRA. Defaults to 0.</p></li>
+<li><p><strong>lora_toggle_epochs</strong> (<em>list</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – Specific epochs to toggle LoRA             configuration. Defaults to None.</p></li>
+<li><p><strong>lora_toggle_probability</strong> (<em>float</em><em>, </em><em>optional</em>) – Probability to toggle LoRA             configuration. Defaults to None.</p></li>
+<li><p><strong>seed</strong> (<em>int</em>) – Seed for random number generators to ensure reproducibility.             Defaults to 100.</p></li>
+<li><p><strong>oles</strong> (<em>bool</em>) – Flag to enable OLES. Defaults to False.</p></li>
+<li><p><strong>calc_gm_score</strong> (<em>bool</em>) – Flag to calculate GM score for OLES. Required if               oles is True.</p></li>
+<li><p><strong>prune_epochs</strong> (<em>list</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – List of epochs to apply pruning at.             Defaults to None.</p></li>
+<li><p><strong>prune_fractions</strong> (<em>list</em><em>[</em><em>float</em><em>]</em><em>, </em><em>optional</em>) – Fractions to prune in specified             epochs. Defaults to None.</p></li>
+<li><p><strong>is_arch_attention_enabled</strong> (<em>bool</em>) – Flag to enable Multi-head attention for             architectural parameters Defaults to False.</p></li>
+<li><p><strong>is_regularization_enabled</strong> (<em>bool</em>) – Flag to enable regularization during             training. Defaults to False.</p></li>
+<li><p><strong>regularization_config</strong> (<em>dict</em><em>, </em><em>optional</em>) – Configuration for regularization if             regularization is enabled.</p></li>
+<li><p><strong>sampler_arch_combine_fn</strong> (<em>str</em>) – Function to combine architecture samples.             Used in FairDARTS. Defaults to ‘default’.</p></li>
+<li><p><strong>pt_select_architecture</strong> (<em>bool</em>) – Flag to enable supernet’s projection.             Defaults to False.</p></li>
+<li><p><strong>searchspace_domain</strong> (<em>str</em><em>, </em><em>optional</em>) – Domain/Task of the search space             TransNasBench101. Defaults to None.</p></li>
+<li><p><strong>use_auxiliary_skip_connection</strong> (<em>bool</em>) – Flag to use auxiliary skip             connections in the supernet’s edges(OperationBlock). Defaults to False.</p></li>
+<li><p><strong>searchspace_subspace</strong> (<em>str</em><em>, </em><em>optional</em>) – Subspace of the search space NB1Shot1.             Defaults to None.</p></li>
+<li><p><strong>early_stopper</strong> (<em>str</em><em>, </em><em>optional</em>) – Strategy for early stopping. Defaults to None.</p></li>
+<li><p><strong>early_stopper_config</strong> (<em>dict</em><em>, </em><em>optional</em>) – Configuration for early stopping if             early_stopper is not None.</p></li>
+<li><p><strong>synthetic_dataset_config</strong> (<em>dict</em><em>, </em><em>optional</em>) – Configuration for using a synthetic             dataset. Defaults to None.</p></li>
+<li><p><strong>extra_config</strong> (<em>dict</em><em>, </em><em>optional</em>) – Any additional configurations that may be             needed for example could be used for Weights &amp; Biases metadata.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._initialize_dropout_config">
+<span class="sig-name descname"><span class="pre">_initialize_dropout_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._initialize_dropout_config" title="Link to this definition"></a></dt>
+<dd><p>Initialize the configuration for the dropout module.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._initialize_partial_connector_config">
+<span class="sig-name descname"><span class="pre">_initialize_partial_connector_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._initialize_partial_connector_config" title="Link to this definition"></a></dt>
+<dd><p>Initialize the configuration for the partial connector.
+If the is_partial_connection flag is disabled, the configuration is set
+to None, otherwise it is set to a default configuration.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The default configuration for the partial connector includes:
+- <cite>k</cite>: 4 (1/k of the number of channels would be used during training)
+- <cite>num_warm_epoch</cite>: 15 (indicates the number of warm-up epochs)</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._initialize_perturbation_config">
+<span class="sig-name descname"><span class="pre">_initialize_perturbation_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._initialize_perturbation_config" title="Link to this definition"></a></dt>
+<dd><p>Initialize the configuration for the perturbation based on the perturb_type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._initialize_regularization_config">
+<span class="sig-name descname"><span class="pre">_initialize_regularization_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._initialize_regularization_config" title="Link to this definition"></a></dt>
+<dd><p>Initialize the configuration for the regularization module.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._initialize_sampler_config">
+<span class="sig-name descname"><span class="pre">_initialize_sampler_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._initialize_sampler_config" title="Link to this definition"></a></dt>
+<dd><p>Initializes the configuration for the sampler.
+The inherited classes override this with their own implementations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._initialize_trainer_config">
+<span class="sig-name descname"><span class="pre">_initialize_trainer_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._initialize_trainer_config" title="Link to this definition"></a></dt>
+<dd><p>Initialize the configuration for the trainer based on the
+searchspace_type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._initialize_trainer_config_1shot1">
+<span class="sig-name descname"><span class="pre">_initialize_trainer_config_1shot1</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._initialize_trainer_config_1shot1" title="Link to this definition"></a></dt>
+<dd><p>Initialize the configuration for the trainer based on the NasBench1Shot1             search space.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._initialize_trainer_config_darts">
+<span class="sig-name descname"><span class="pre">_initialize_trainer_config_darts</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._initialize_trainer_config_darts" title="Link to this definition"></a></dt>
+<dd><p>Initialize the configuration for the trainer based on the DARTS search space.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._initialize_trainer_config_nb201">
+<span class="sig-name descname"><span class="pre">_initialize_trainer_config_nb201</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._initialize_trainer_config_nb201" title="Link to this definition"></a></dt>
+<dd><p>Initialize the configuration for the trainer based on the NB201 search space.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._initialize_trainer_config_tnb101">
+<span class="sig-name descname"><span class="pre">_initialize_trainer_config_tnb101</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._initialize_trainer_config_tnb101" title="Link to this definition"></a></dt>
+<dd><p>Initialize the configuration for the trainer based on the TransNasBench101             search space.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._set_dropout">
+<span class="sig-name descname"><span class="pre">_set_dropout</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dropout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._set_dropout" title="Link to this definition"></a></dt>
+<dd><p>Initializes the default configurations for dropout.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dropout</strong> (<em>float</em><em> | </em><em>None</em>) – Dropout operation rate for architectural                 parameters. Must be in the range [0, 1). Defaults to None.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._set_lora_configs">
+<span class="sig-name descname"><span class="pre">_set_lora_configs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lora_rank</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lora_warm_epochs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lora_dropout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lora_alpha</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lora_toggle_probability</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">merge_weights</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">toggle_epochs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._set_lora_configs" title="Link to this definition"></a></dt>
+<dd><p>Set the configuration for LoRA (Low-Rank Adaptation) layers.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>lora_rank</strong> (<em>int</em>) – Rank for LoRA configuration. Defaults to 0.</p></li>
+<li><p><strong>lora_warm_epochs</strong> (<em>int</em>) – Number of warm-up epochs before                 initializing LoRA _A_ and LoRA _B_. Defaults to 0.</p></li>
+<li><p><strong>lora_dropout</strong> (<em>float</em>) – Dropout rate for LoRA layers. Defaults to 0.</p></li>
+<li><p><strong>lora_alpha</strong> (<em>int</em>) – Scaling factor for LoRA layers. Defaults to 1.</p></li>
+<li><p><strong>lora_toggle_probability</strong> (<em>float</em><em> | </em><em>None</em>) – Probability to toggle                 LoRA and deactivate it. Defaults to None.</p></li>
+<li><p><strong>merge_weights</strong> (<em>bool</em>) – Flag to merge LoRA weights. Defaults to True.</p></li>
+<li><p><strong>toggle_epochs</strong> (<em>list</em><em>[</em><em>int</em><em>] </em><em>| </em><em>None</em>) – Specific epochs to toggle                 LoRA configuration. Defaults to None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._set_oles_configs">
+<span class="sig-name descname"><span class="pre">_set_oles_configs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">oles</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">calc_gm_score</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._set_oles_configs" title="Link to this definition"></a></dt>
+<dd><p>Set the configuration for OLES (Operation-Level Early Stopping).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>oles</strong> (<em>bool</em>) – Flag to enable OLES. Defaults to False.</p></li>
+<li><p><strong>calc_gm_score</strong> (<em>bool</em>) – Flag to calculate Gradient Matching                 score for OLES. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>UserWarning</strong> – If OLES is enabled but calc_gm_score is not                 set to True.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._set_partial_connector">
+<span class="sig-name descname"><span class="pre">_set_partial_connector</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">is_partial_connection</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._set_partial_connector" title="Link to this definition"></a></dt>
+<dd><p>Initializes the default configuration for the partial connector.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>is_partial_connection</strong> (<em>bool</em>) – Flag to enable partial connections in                 the supernet. Defaults to False.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._set_perturb">
+<span class="sig-name descname"><span class="pre">_set_perturb</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">perturb_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">perturbator_sample_frequency</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'epoch'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._set_perturb" title="Link to this definition"></a></dt>
+<dd><p>Set the configuration for perturbation of the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>perturb_type</strong> (<em>str</em><em> | </em><em>None</em>) – Type of perturbation to apply.                 Valid values are ‘adversarial’ and ‘random’.</p></li>
+<li><p><strong>perturbator_sample_frequency</strong> (<em>str</em>) – Sampling frequency for                 perturbator. Defaults to ‘epoch’.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>AssertionError</strong> – If perturbator_sample_frequency is not ‘epoch’ or ‘step’.</p></li>
+<li><p><strong>AssertionError</strong> – If perturb_type is neither the string values                 ‘adversarial’, ‘random’, ‘none’ or None.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._set_pruner_configs">
+<span class="sig-name descname"><span class="pre">_set_pruner_configs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prune_epochs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prune_fractions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._set_pruner_configs" title="Link to this definition"></a></dt>
+<dd><p>Set the configuration for the pruning of the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>prune_epochs</strong> (<em>list</em><em>[</em><em>int</em><em>] </em><em>| </em><em>None</em>) – List of epochs to apply pruning at.</p></li>
+<li><p><strong>prune_fractions</strong> (<em>list</em><em>[</em><em>float</em><em>] </em><em>| </em><em>None</em>) – List of fractions to prune in                 the specified epochs.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>AssertionError</strong> – If prune_epochs and prune_fractions are not of                 the same length.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile._set_pt_select_configs">
+<span class="sig-name descname"><span class="pre">_set_pt_select_configs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pt_select_architecture</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pt_projection_criteria</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'acc'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'loss'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'acc'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pt_projection_interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile._set_pt_select_configs" title="Link to this definition"></a></dt>
+<dd><p>Set the configuration for the projection-based selection of the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pt_select_architecture</strong> (<em>bool</em>) – Flag to enable projection-based                 selection of the supernet.</p></li>
+<li><p><strong>pt_projection_criteria</strong> (<em>str</em>) – Criteria for projection. Can be                 ‘acc’ or ‘loss’.</p></li>
+<li><p><strong>pt_projection_interval</strong> (<em>int</em>) – Interval for applying the projection                 while training.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile.configure_dropout">
+<span class="sig-name descname"><span class="pre">configure_dropout</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile.configure_dropout" title="Link to this definition"></a></dt>
+<dd><p>Configure the dropout module for the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**kwargs</strong> – <p>Arbitrary keyword arguments. Possible keys include:</p>
+<p>p (float): Dropout probability of the architecture parameters.</p>
+<p>p_min (float): Minimum dropout probability.</p>
+<p>anneal_frequency (str): Frequency of annealing. Can be ‘epoch’ or                     ‘step’.</p>
+<p>anneal_type (str): Type of annealing. Can be ‘linear’ or ‘cosine’.</p>
+<p>max_iter (int): Maximum iterations for annealing.</p>
+</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>AssertionError</strong> – If any of the provided configuration keys are not valid.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile.configure_early_stopper">
+<span class="sig-name descname"><span class="pre">configure_early_stopper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile.configure_early_stopper" title="Link to this definition"></a></dt>
+<dd><p>Configure the early stopping mechanism for the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**config</strong> – <p>Arbitrary keyword arguments. Possible keys include:</p>
+<p>max_skip_normal (int): Maximum number of skip connections in                     normal cells</p>
+<p>max_skip_reduce (int): Maximum number of skip connections in                     reduction cells</p>
+<p>min_epochs (int): Minimum number of epochs to wait before stopping</p>
+</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>AssertionError</strong> – If any of the provided configuration keys are not valid.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile.configure_extra">
+<span class="sig-name descname"><span class="pre">configure_extra</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">config</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile.configure_extra" title="Link to this definition"></a></dt>
+<dd><p>Configure any extra settings for the supernet.
+Could be useful for tracking Weights &amp; Biases metadata.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**config</strong> – Arbitrary keyword arguments.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile.configure_lora">
+<span class="sig-name descname"><span class="pre">configure_lora</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile.configure_lora" title="Link to this definition"></a></dt>
+<dd><p>Configure the LoRA (Low-Rank Adaptation) module for the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**kwargs</strong> – <p>Arbitrary keyword arguments. Possible keys include:</p>
+<p>r (int): Rank for LoRA configuration.</p>
+<p>lora_dropout (float): Dropout rate for LoRA layers.</p>
+<p>lora_alpha (int): Scaling factor for LoRA layers.</p>
+<p>merge_weights (bool): Flag to merge LoRA weights.</p>
+</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>AssertionError</strong> – If any of the provided configuration keys are not valid.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile.configure_oles">
+<span class="sig-name descname"><span class="pre">configure_oles</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile.configure_oles" title="Link to this definition"></a></dt>
+<dd><p>Configure the OLES (Operation-Level Early Stopping) module for the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**kwargs</strong> – <p>Arbitrary keyword arguments. Possible keys include:</p>
+<p>oles (bool): Flag to enable OLES. Defaults to False.</p>
+<p>calc_gm_score (bool): Flag to calculate GM score for OLES. Defaults to                     False.</p>
+<p>frequency (int): Accumalative value of GM score to check the threashold.</p>
+<p>threshold (float): Threshold of GM score to stop the training.                     Defaults to 0.4.</p>
+</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>AssertionError</strong> – If any of the provided configuration keys are not valid.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile.configure_partial_connector">
+<span class="sig-name descname"><span class="pre">configure_partial_connector</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile.configure_partial_connector" title="Link to this definition"></a></dt>
+<dd><p>Configure the partial connector component for the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**kwargs</strong> – <p>Arbitrary keyword arguments. Possible keys include:</p>
+<p>k (int): 1/(Number of connections to keep).</p>
+<p>num_warm_epoch (int): Number of warm-up epochs.</p>
+</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>AssertionError</strong> – If any of the provided configuration keys are not valid.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile.configure_perturbator">
+<span class="sig-name descname"><span class="pre">configure_perturbator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile.configure_perturbator" title="Link to this definition"></a></dt>
+<dd><p>Configures the perturbator used for training the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**kwargs</strong> – <p>Arbitrary keyword arguments. Possible keys include:</p>
+<p>Possible keys include:
+for perturbation type ‘adversarial’:</p>
+<p>epsilon (float): Perturbation strength.</p>
+<p>data (tuple): Tuple of input data and target labels.</p>
+<p>loss_criterion (torch.nn.Module): Loss function to use.</p>
+<p>steps (int): Number of steps for perturbation.</p>
+<p>random_start (bool): Flag to  start with a random perturbation.</p>
+<p>sample_frequency (str): Frequency of sampling. Can be ‘epoch’ or ‘step’.</p>
+<p>for perturbation type ‘random’:</p>
+<p>epsilon (float): Perturbation strength.</p>
+<p>sample_frequency (str): Frequency of sampling. Can be ‘epoch’ or ‘step’.</p>
+</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>AssertionError</strong> – If any of the provided configuration keys are not valid.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile.configure_pt_selection">
+<span class="sig-name descname"><span class="pre">configure_pt_selection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile.configure_pt_selection" title="Link to this definition"></a></dt>
+<dd><p>Configure the projection-based selection for the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**kwargs</strong> – <p>Arbitrary keyword arguments. Possible keys include:</p>
+<p>projection_interval (int): Interval for applying the projection while                     training.</p>
+<p>projection_criteria (str): Criteria for projection. Can be ‘acc’ or                     ‘loss’.</p>
+</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>AssertionError</strong> – If any of the provided configuration keys are not valid.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile.configure_regularization">
+<span class="sig-name descname"><span class="pre">configure_regularization</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile.configure_regularization" title="Link to this definition"></a></dt>
+<dd><p>Configure the regularization module for the supernet.</p>
+<dl class="simple">
+<dt>There are three different types of regularizations in Configurable Optimizer:</dt><dd><ul class="simple">
+<li><p>FairDarts: FairDARTSRegularizationTerm</p></li>
+<li><p>Flops: FLOPSRegularizationTerm</p></li>
+<li><p>Drnas: DrNASRegularizationTerm.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**kwargs</strong> – <p>Arbitrary keyword arguments. Possible keys include:</p>
+<p>reg_weights (list[float]): List of weights for each regularization term.
+loss_weight (float): Weight for the loss term.
+active_reg_terms (list[str]): List of types of regularization terms.</p>
+<dl class="simple">
+<dt>drnas_config (dict): Configuration for DRNAS regularization.</dt><dd><dl class="simple">
+<dt>This dictionary can contain the following keys:</dt><dd><p>reg_scale (float): Scale for the regularization term.
+reg_type (str): Type of regularization. Can be ‘l1’ or ‘kl’.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>flops_config (dict): Configuration for FLOPS regularization.
+fairdarts_config (dict): Configuration for FairDARTS regularization.</p>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile.configure_sampler">
+<span class="sig-name descname"><span class="pre">configure_sampler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile.configure_sampler" title="Link to this definition"></a></dt>
+<dd><p>Configures the sampler used for training the supernet based on attributes
+of the type of sampler.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>**kwargs</strong> – Keyword arguments for configuring the sampler. The keys should</p></li>
+<li><p><strong>parameters.</strong> (<em>match the expected configuration</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>AssertionError</strong> – If any of the provided configuration keys are not valid for</p></li>
+<li><p><strong>the sampler type.</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile.configure_searchspace">
+<span class="sig-name descname"><span class="pre">configure_searchspace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile.configure_searchspace" title="Link to this definition"></a></dt>
+<dd><p>Configure the search space for the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**config</strong> – Arbitrary keyword arguments. Possible depend on the                 the search space type. For more information please check the                 Parameters of the supernet of each search space.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile.configure_synthetic_dataset">
+<span class="sig-name descname"><span class="pre">configure_synthetic_dataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile.configure_synthetic_dataset" title="Link to this definition"></a></dt>
+<dd><p>Configure the synthetic dataset for the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**config</strong> – <p>Arbitrary keyword arguments. Possible keys include:</p>
+<p>signal_width (int): Width of the signal Patch.</p>
+<p>shortcut_width (int): Width of the shortcut Patch.</p>
+<p>shortcut_strength (int): Probability of shourcut single being the                     valid single.</p>
+</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>AssertionError</strong> – If any of the provided configuration keys are not valid.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile.configure_trainer">
+<span class="sig-name descname"><span class="pre">configure_trainer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile.configure_trainer" title="Link to this definition"></a></dt>
+<dd><p>Configure the trainer component of the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**kwargs</strong> – <p>Arbitrary keyword arguments. Possible keys include:</p>
+<p>lr (float): Learning rate of the optimizer.</p>
+<p>arch_lr (float): Learning rate of architecture parameters.</p>
+<p>epochs (int): Number of training epochs.</p>
+<p>optim (str): Optimizer type. Can be ‘sgd’, ‘adam’, etc.</p>
+<p>arch_optim (str): Optimizer type of architecture parameters.</p>
+<p>optim_config (dict): Additional configuration of the optimizer.</p>
+<blockquote>
+<div><p>momentum (float): Momentum for model’s optimizer.</p>
+<p>nesterov (bool): Flag to use Nesterov momentum for model’s                         optimizer.</p>
+<p>weight_decay (float): Weight decay for model’s optimizer.</p>
+</div></blockquote>
+<p>arch_optim_config (dict): Additional configuration of the architecture                     optimizer.</p>
+<blockquote>
+<div><p>weight_decay (float): Weight decay for architecture’s optimizer.</p>
+<p>beta (float): Beta for architecture’s optimizer.</p>
+</div></blockquote>
+<p>scheduler (str): Scheduler’s type.</p>
+<p>scheduler_config (dict): Additional configuration of the scheduler.</p>
+<p>criterion (str): Loss function type.</p>
+<p>batch_size (int): Batch size for training.</p>
+<p>learning_rate_min (float): Minimum learning rate.</p>
+<p>cutout (int): Enables cutout. If  cutout &gt; 0, cutout is applied.</p>
+<p>cutout_length (int): Cutout length.</p>
+<p>train_portion (float): Portion of the training data to use for                     training the model’s parameter.</p>
+<p>use_data_parallel (bool): Flag to use data parallelism.</p>
+<p>checkpointing_freq (int): Frequency of checkpointing.</p>
+<p>seed (int): Seed for random number generators.</p>
+</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>AssertionError</strong> – If any of the provided configuration keys are not valid.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile.get_config">
+<span class="sig-name descname"><span class="pre">get_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile.get_config" title="Link to this definition"></a></dt>
+<dd><p>This method returns a dictionary representation of the Profile class.         The configurations are used for training the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>dict</em> – A dictionary representation of the Profile class.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.BaseProfile.get_run_description">
+<span class="sig-name descname"><span class="pre">get_run_description</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#confopt.profile.BaseProfile.get_run_description" title="Link to this definition"></a></dt>
+<dd><p>This method returns a string description of the run configuration.
+The description is used for tracking purposes in Weights &amp; Biases.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>str</em> – A string describing the run configuration.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="profiles.html" class="btn btn-neutral float-left" title="Profiles" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="dartsprofile.html" class="btn btn-neutral float-right" title="DARTS Profile" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Arjun Krishnakumar, Shakiba Moradian, Abhash Kumar Jha.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+    <!-- Theme Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-XXXXXXX-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-XXXXXXX-1', {
+          'anonymize_ip': false,
+      });
+    </script> 
+
+</body>
+</html>

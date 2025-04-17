@@ -1,0 +1,405 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Experiment &mdash; ConfigurableOptimizer  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9a2dae69"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Discrete Profile" href="discreteprofile.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            ConfigurableOptimizer
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Important Links:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="benchsuite_doc.html">Benchsuite Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="profiles.html">Profiles</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Experiment</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#confopt.train.Experiment"><code class="docutils literal notranslate"><span class="pre">Experiment</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#confopt.train.Experiment.cleanup_ddp"><code class="docutils literal notranslate"><span class="pre">Experiment.cleanup_ddp()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#confopt.train.Experiment.get_discrete_model"><code class="docutils literal notranslate"><span class="pre">Experiment.get_discrete_model()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#confopt.train.Experiment.get_discrete_model_from_genotype_str"><code class="docutils literal notranslate"><span class="pre">Experiment.get_discrete_model_from_genotype_str()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#confopt.train.Experiment.get_discrete_model_from_supernet"><code class="docutils literal notranslate"><span class="pre">Experiment.get_discrete_model_from_supernet()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#confopt.train.Experiment.get_genotype_str_from_checkpoint"><code class="docutils literal notranslate"><span class="pre">Experiment.get_genotype_str_from_checkpoint()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#confopt.train.Experiment.init_ddp"><code class="docutils literal notranslate"><span class="pre">Experiment.init_ddp()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#confopt.train.Experiment.select_perturbation_based_arch"><code class="docutils literal notranslate"><span class="pre">Experiment.select_perturbation_based_arch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#confopt.train.Experiment.train_discrete_model"><code class="docutils literal notranslate"><span class="pre">Experiment.train_discrete_model()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#confopt.train.Experiment.train_supernet"><code class="docutils literal notranslate"><span class="pre">Experiment.train_supernet()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">ConfigurableOptimizer</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Experiment</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/experiment.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="experiment">
+<h1>Experiment<a class="headerlink" href="#experiment" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="confopt.train.Experiment">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">confopt.train.</span></span><span class="sig-name descname"><span class="pre">Experiment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">search_space</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SearchSpaceType</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DatasetType</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_with_wandb</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exp_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'test'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset_domain</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'datasets'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">api_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'api'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#confopt.train.Experiment" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>The Experiment class is responsible for managing the training and evaluation of
+the supernet and discrete models. It initializes the necessary components,
+manages the states to load, and handles the training process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>search_space</strong> (<em>SearchSpace</em>) – The search space type used for the experiment.</p></li>
+<li><p><strong>dataset</strong> (<em>DatasetType</em>) – The dataset type used for the experiment.</p></li>
+<li><p><strong>seed</strong> (<em>int</em>) – The random seed for reproducibility of the runs.</p></li>
+<li><p><strong>log_with_wandb</strong> (<em>bool</em>) – Flag to enable logging with Weights &amp; Biases.</p></li>
+<li><p><strong>debug_mode</strong> (<em>bool</em>) – Flag to enable debug mode, where we only do 5 steps for             each epoch.</p></li>
+<li><p><strong>exp_name</strong> (<em>str</em>) – The name of the experiment.</p></li>
+<li><p><strong>dataset_domain</strong> (<em>str</em><em> | </em><em>None</em>) – The domain of the dataset used for the Taskonomy             dataset. Valid values are ‘class_object’ and ‘class_scene’.</p></li>
+<li><p><strong>dataset_dir</strong> (<em>str</em>) – The directory where the dataset is stored.</p></li>
+<li><p><strong>api_dir</strong> (<em>str</em>) – The directory where the API is stored to used when we are using             the benchmarks.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.train.Experiment.cleanup_ddp">
+<span class="sig-name descname"><span class="pre">cleanup_ddp</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.train.Experiment.cleanup_ddp" title="Link to this definition"></a></dt>
+<dd><p>Kills the distributed data parallel (DDP) process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.train.Experiment.get_discrete_model">
+<span class="sig-name descname"><span class="pre">get_discrete_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">searchspace_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_to_load</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_supernet_checkpoint</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_expr_search_space</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">genotype_str</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">torch.nn.Module</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#confopt.train.Experiment.get_discrete_model" title="Link to this definition"></a></dt>
+<dd><p>Returns a discrete model based on the given parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>searchspace_config</strong> (<em>dict</em>) – Configuration for the search space.</p></li>
+<li><p><strong>model_to_load</strong> (<em>str</em><em> | </em><em>int</em><em> | </em><em>None</em>) – Specifies the training state to load. Can</p></li>
+<li><p><strong>&quot;last&quot;</strong> (<em>be</em>)</p></li>
+<li><p><strong>&quot;best&quot;</strong></p></li>
+<li><p><strong>epoch.</strong> (<em>or specific</em>)</p></li>
+<li><p><strong>use_supernet_checkpoint</strong> (<em>bool</em>) – If <cite>True</cite>, initializes the model’s weights</p></li>
+<li><p><strong>checkpoint.</strong> (<em>from a supernet</em>)</p></li>
+<li><p><strong>use_expr_search_space</strong> (<em>bool</em>) – If <cite>True</cite>, gets the discretized model from</p></li>
+<li><p><strong>self.search_space.</strong></p></li>
+<li><p><strong>genotype_str</strong> (<em>str</em><em> | </em><em>None</em>) – The genotype string to use for creating the</p></li>
+<li><p><strong>model.</strong> (<em>discrete</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>tuple[torch.nn.Module, str]</em> – A tuple containing the discrete model and its
+genotype string.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.train.Experiment.get_discrete_model_from_genotype_str">
+<span class="sig-name descname"><span class="pre">get_discrete_model_from_genotype_str</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">search_space_str</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">genotype_str</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">searchspace_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Module</span></span></span><a class="headerlink" href="#confopt.train.Experiment.get_discrete_model_from_genotype_str" title="Link to this definition"></a></dt>
+<dd><p>Returns a discrete model based on the given genotype string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>search_space_str</strong> (<em>str</em>) – The search space type.</p></li>
+<li><p><strong>genotype_str</strong> (<em>str</em>) – The genotype string to use for creating the discrete</p></li>
+<li><p><strong>model.</strong></p></li>
+<li><p><strong>searchspace_config</strong> (<em>dict</em>) – Configuration for the search space.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – If the search space type is not recognized or if the dataset</p></li>
+<li><p><strong>is not supported.</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>torch.nn.Module</em> – The discrete model.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.train.Experiment.get_discrete_model_from_supernet">
+<span class="sig-name descname"><span class="pre">get_discrete_model_from_supernet</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">SearchSpace</span></span></span><a class="headerlink" href="#confopt.train.Experiment.get_discrete_model_from_supernet" title="Link to this definition"></a></dt>
+<dd><p>Returns a discrete model from experiment’s supernet(search space).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>Exception</strong> – If the experiment does not have a search space or the</p></li>
+<li><p><strong>search space is not a supernet.</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>SearchSpace</em> – A discrete model.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.train.Experiment.get_genotype_str_from_checkpoint">
+<span class="sig-name descname"><span class="pre">get_genotype_str_from_checkpoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_to_load</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_supernet_checkpoint</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#confopt.train.Experiment.get_genotype_str_from_checkpoint" title="Link to this definition"></a></dt>
+<dd><p>Returns the genotype string from the checkpoint.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>model_to_load</strong> (<em>str</em><em> | </em><em>int</em><em> | </em><em>None</em>) – Specifies the training state to load.</p></li>
+<li><p><strong>&quot;last&quot;</strong> (<em>Can be</em>)</p></li>
+<li><p><strong>&quot;best&quot;</strong></p></li>
+<li><p><strong>epoch.</strong> (<em>or specific</em>)</p></li>
+<li><p><strong>use_supernet_checkpoint</strong> (<em>bool</em>) – If <cite>True</cite>, initializes the model’s weights</p></li>
+<li><p><strong>checkpoint.</strong> (<em>from a supernet</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If <cite>model_to_load</cite> is not given</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>str</em> – The genotype string.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.train.Experiment.init_ddp">
+<span class="sig-name descname"><span class="pre">init_ddp</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.train.Experiment.init_ddp" title="Link to this definition"></a></dt>
+<dd><p>Initializes the distributed data parallel (DDP) environment.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.train.Experiment.select_perturbation_based_arch">
+<span class="sig-name descname"><span class="pre">select_perturbation_based_arch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">profile</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="baseprofile.html#confopt.profile.BaseProfile" title="confopt.profile.BaseProfile"><span class="pre">BaseProfile</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_source</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'supernet'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'arch_selection'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'supernet'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_to_load</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exp_runtime_to_load</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_with_wandb</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">run_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'darts-pt'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">src_folder_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">PerturbationArchSelection</span></span></span><a class="headerlink" href="#confopt.train.Experiment.select_perturbation_based_arch" title="Link to this definition"></a></dt>
+<dd><p>Creates and returns an architecture based on perturbation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>profile</strong> (<a class="reference internal" href="baseprofile.html#confopt.profile.BaseProfile" title="confopt.profile.BaseProfile"><em>BaseProfile</em></a>) – The profile containing the configuration for the</p></li>
+<li><p><strong>experiment.</strong></p></li>
+<li><p><strong>model_source</strong> (<em>str</em>) – The source of the model to load. Can be “supernet”</p></li>
+<li><p><strong>object.</strong> (<em>or a PerturbationArchSelection</em>)</p></li>
+<li><p><strong>model_to_load</strong> (<em>str</em><em> | </em><em>int</em><em> | </em><em>None</em>) – The model to load. Can be “last”,</p></li>
+<li><p><strong>&quot;best&quot;</strong></p></li>
+<li><p><strong>epoch.</strong> (<em>or specific</em>)</p></li>
+<li><p><strong>exp_runtime_to_load</strong> (<em>str</em><em> | </em><em>None</em>) – The runtime to load the model from.</p></li>
+<li><p><strong>log_with_wandb</strong> (<em>bool</em>) – Flag to  log with wandb.</p></li>
+<li><p><strong>run_name</strong> (<em>str</em>) – The name of the run.</p></li>
+<li><p><strong>src_folder_path</strong> (<em>str</em><em> | </em><em>None</em>) – The source folder path of experiment’s run.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>AttributeError</strong> – If an illegal model source is provided.</p></li>
+<li><p><strong>AssertionError</strong> – If the model source is “arch_selection” and model_to_load</p></li>
+<li><p><strong>is &quot;best&quot;.</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>PerturbationArchSelection</em> – The architecture selection object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.train.Experiment.train_discrete_model">
+<span class="sig-name descname"><span class="pre">train_discrete_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">profile</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="discreteprofile.html#confopt.profile.DiscreteProfile" title="confopt.profile.DiscreteProfile"><span class="pre">DiscreteProfile</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_to_load</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exp_runtime_to_load</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_supernet_checkpoint</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_expr_search_space</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DiscreteTrainer</span></span></span><a class="headerlink" href="#confopt.train.Experiment.train_discrete_model" title="Link to this definition"></a></dt>
+<dd><p>Trains a discrete model using the given profile with options for loading
+specific training states.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>profile</strong> (<a class="reference internal" href="discreteprofile.html#confopt.profile.DiscreteProfile" title="confopt.profile.DiscreteProfile"><em>DiscreteProfile</em></a>) – Contains configurations for training the model,
+including hyperparameters and architecture details.The genotype could be
+set in the profile, or the default genotype will be used.</p></li>
+<li><p><strong>model_to_load</strong> (<em>str</em><em> | </em><em>int</em><em> | </em><em>None</em>) – Specifies the training state to load.
+Acceptable string values are “last” or “best”, representing the most
+recent or the best-performing model checkpoint, respectively.
+If an integer is provided, it represents the epoch number from which
+training should be continued.
+If <cite>None</cite>, behavior is determined by other parameters.</p></li>
+<li><p><strong>exp_runtime_to_load</strong> (<em>str</em><em> | </em><em>None</em>) – The experiment runtime to load the model
+from.
+If <cite>None</cite>, the model will be loaded from the most recent runtime.</p></li>
+<li><p><strong>use_supernet_checkpoint</strong> (<em>bool</em>) – If <cite>True</cite>, initializes the model’s weights
+from a supernet checkpoint.
+If <cite>False</cite>, the model will use checkpoints from the discrete network
+instead.</p></li>
+<li><p><strong>use_expr_search_space</strong> (<em>bool</em>) – If <cite>True</cite>, gets the discretized model from
+self.search_space</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>DiscreteTrainer</em> – The trained discrete model.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Behavior Notes:</dt><dd><ul class="simple">
+<li><p>If none of the parameters are provided the default profile genotype will
+be used.</p></li>
+<li><p>The default genotype in the profile refers to the best architecture found
+after 50 epochs using the DARTS optimizer on the CIFAR-10 dataset within
+the DARTS search space.</p></li>
+<li><p>Setting <cite>use_supernet_checkpoint</cite> to <cite>True</cite> allows loading from the
+supernet, while <cite>False</cite> defaults to using checkpoints from the discrete
+network.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">trainer</span> <span class="o">=</span> <span class="n">experiment</span><span class="o">.</span><span class="n">train_discrete_model</span><span class="p">(</span>
+<span class="go">        profile=profile,</span>
+<span class="go">        model_to_load=&quot;last&quot;,</span>
+<span class="go">        exp_runtime_to_load=None,</span>
+<span class="go">        use_supernet_checkpoint=True,</span>
+<span class="go">        use_expr_search_space=False,</span>
+<span class="go">    )</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.train.Experiment.train_supernet">
+<span class="sig-name descname"><span class="pre">train_supernet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">profile</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="baseprofile.html#confopt.profile.BaseProfile" title="confopt.profile.BaseProfile"><span class="pre">BaseProfile</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_to_load</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exp_runtime_to_load</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_benchmark</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ConfigurableTrainer</span></span></span><a class="headerlink" href="#confopt.train.Experiment.train_supernet" title="Link to this definition"></a></dt>
+<dd><p>Trains a supernet using the given profile with options for loading previous
+runs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>profile</strong> (<a class="reference internal" href="baseprofile.html#confopt.profile.BaseProfile" title="confopt.profile.BaseProfile"><em>BaseProfile</em></a>) – Contains configurations for training the supernet,</p></li>
+<li><p><strong>specifications.</strong> (<em>including component settings and architectural</em>)</p></li>
+<li><p><strong>model_to_load</strong> (<em>str</em><em> | </em><em>int</em><em> | </em><em>None</em>) – Specifies the training state to load the</p></li>
+<li><p><strong>&quot;best&quot;</strong> (<em>supernet from. Valid values are &quot;last&quot; or</em>)</p></li>
+<li><p><strong>most</strong> (<em>representing the</em>)</p></li>
+<li><p><strong>checkpoint</strong> (<em>recent</em><em> or </em><em>the best-performing model</em>)</p></li>
+<li><p><strong>respectively.</strong></p></li>
+<li><p><strong>provided</strong> (<em>If an integer is</em>)</p></li>
+<li><p><strong>which</strong> (<em>it represents the epoch number from</em>)</p></li>
+<li><p><strong>continued.</strong> (<em>training should be</em>)</p></li>
+<li><p><strong>None</strong> (<em>load the model from.If</em>)</p></li>
+<li><p><strong>scratch.</strong> (<em>then it starts training the model from</em>)</p></li>
+<li><p><strong>exp_runtime_to_load</strong> (<em>str</em><em> | </em><em>None</em>) – The particular experiment runtime to</p></li>
+<li><p><strong>None</strong></p></li>
+<li><p><strong>last</strong> (<em>the model will be loaded from the</em>)</p></li>
+<li><p><strong>runtime.</strong></p></li>
+<li><p><strong>use_benchmark</strong> (<em>bool</em>) – If <cite>True</cite>, uses a benchmark API for evaluation.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ConfigurableTrainer</em> – The trained supernet.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="discreteprofile.html" class="btn btn-neutral float-left" title="Discrete Profile" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Arjun Krishnakumar, Shakiba Moradian, Abhash Kumar Jha.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+    <!-- Theme Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-XXXXXXX-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-XXXXXXX-1', {
+          'anonymize_ip': false,
+      });
+    </script> 
+
+</body>
+</html>

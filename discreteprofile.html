@@ -1,0 +1,334 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Discrete Profile &mdash; ConfigurableOptimizer  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9a2dae69"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Experiment" href="experiment.html" />
+    <link rel="prev" title="DRNAS Profile" href="drnasprofile.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            ConfigurableOptimizer
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Important Links:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="benchsuite_doc.html">Benchsuite Documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="profiles.html">Profiles</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="baseprofile.html">BaseProfile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dartsprofile.html">DARTS Profile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gdasprofile.html">GDAS Profile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reinmaxprofile.html">Reinmax Profile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="snasprofile.html">SNAS Profile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="drnasprofile.html">DRNAS Profile</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Discrete Profile</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#confopt.profile.DiscreteProfile"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DiscreteProfile._initializa_genotype"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile._initializa_genotype()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DiscreteProfile._initialize_trainer_config"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile._initialize_trainer_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DiscreteProfile.configure_extra"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile.configure_extra()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DiscreteProfile.configure_searchspace"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile.configure_searchspace()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DiscreteProfile.configure_trainer"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile.configure_trainer()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DiscreteProfile.get_extra_config"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile.get_extra_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DiscreteProfile.get_genotype"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile.get_genotype()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DiscreteProfile.get_run_description"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile.get_run_description()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DiscreteProfile.get_searchspace_config"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile.get_searchspace_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DiscreteProfile.get_trainer_config"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile.get_trainer_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DiscreteProfile.set_search_space_config"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile.set_search_space_config()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="experiment.html">Experiment</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">ConfigurableOptimizer</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="profiles.html">Profiles</a></li>
+      <li class="breadcrumb-item active">Discrete Profile</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/discreteprofile.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="discrete-profile">
+<h1>Discrete Profile<a class="headerlink" href="#discrete-profile" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="confopt.profile.DiscreteProfile">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">confopt.profile.</span></span><span class="sig-name descname"><span class="pre">DiscreteProfile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">searchspace_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SearchSpaceType</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#confopt.profile.DiscreteProfile" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.DiscreteProfile._initializa_genotype">
+<span class="sig-name descname"><span class="pre">_initializa_genotype</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.DiscreteProfile._initializa_genotype" title="Link to this definition"></a></dt>
+<dd><p>Initializes the genotype for the discrete profile.
+This method sets the genotype of the best DARTS supernet found
+after 50 epochs of running the DARTS optimizer. Thus it is only
+a valid genotype if the search space is of type DARTS.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.DiscreteProfile._initialize_trainer_config">
+<span class="sig-name descname"><span class="pre">_initialize_trainer_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.DiscreteProfile._initialize_trainer_config" title="Link to this definition"></a></dt>
+<dd><p>Initializes the trainer configuration for the discrete profile.
+This method sets the default training configuration parameters for the
+discrete model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.DiscreteProfile.configure_extra">
+<span class="sig-name descname"><span class="pre">configure_extra</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.DiscreteProfile.configure_extra" title="Link to this definition"></a></dt>
+<dd><p>Configure any extra settings for the supernet.
+Could be useful for tracking Weights &amp; Biases metadata.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**config</strong> – Arbitrary keyword arguments.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.DiscreteProfile.configure_searchspace">
+<span class="sig-name descname"><span class="pre">configure_searchspace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.DiscreteProfile.configure_searchspace" title="Link to this definition"></a></dt>
+<dd><p>Configure the search space for the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**config</strong> – Arbitrary keyword arguments. Possible depend on the                 the search space type. For more information please check the                 Parameters of the supernet of each search space.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.DiscreteProfile.configure_trainer">
+<span class="sig-name descname"><span class="pre">configure_trainer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.DiscreteProfile.configure_trainer" title="Link to this definition"></a></dt>
+<dd><p>Configure the trainer component for the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**kwargs</strong> – <p>Arbitrary keyword arguments. Possible keys include:</p>
+<p>lr (float): Learning rate for the optimizer.</p>
+<p>epochs (int): Number of training epochs.</p>
+<p>optim (str): Optimizer type. Can be ‘sgd’, ‘adam’, etc.</p>
+<p>optim_config (dict): Additional configuration for the optimizer.</p>
+<p>…</p>
+</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>AssertionError</strong> – If any of the provided configuration keys are not valid.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.DiscreteProfile.get_extra_config">
+<span class="sig-name descname"><span class="pre">get_extra_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#confopt.profile.DiscreteProfile.get_extra_config" title="Link to this definition"></a></dt>
+<dd><p>This method returns the extra configuration parameters for the
+discrete profile for example could be used for Weights &amp; Biases metadata.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>dict</em> – A dictionary containing extra configuration parameters.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.DiscreteProfile.get_genotype">
+<span class="sig-name descname"><span class="pre">get_genotype</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#confopt.profile.DiscreteProfile.get_genotype" title="Link to this definition"></a></dt>
+<dd><p>Returns the genotype of the discrete profile.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>str</em> – The genotype of the discrete profile.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.DiscreteProfile.get_run_description">
+<span class="sig-name descname"><span class="pre">get_run_description</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#confopt.profile.DiscreteProfile.get_run_description" title="Link to this definition"></a></dt>
+<dd><p>This method returns a string description of the run configuration.
+The description is used for tracking purposes in Weights &amp; Biases.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>str</em> – A string describing the run configuration.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.DiscreteProfile.get_searchspace_config">
+<span class="sig-name descname"><span class="pre">get_searchspace_config</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset_str</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#confopt.profile.DiscreteProfile.get_searchspace_config" title="Link to this definition"></a></dt>
+<dd><p>Returns the search space configuration based on the search space type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dataset_str</strong> (<em>str</em>) – The dataset string.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – If the search space is not any of the valid values of</p></li>
+<li><p><strong>NasBench201</strong><strong>, </strong><strong>DARTS</strong><strong>, </strong><strong>NasBench1Shot1</strong><strong> or </strong><strong>TransNasBench101.</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>dict</em> – A dictionary containing the search space configuration which
+would be passed to as the arguments for creating the new discrete
+model object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.DiscreteProfile.get_trainer_config">
+<span class="sig-name descname"><span class="pre">get_trainer_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#confopt.profile.DiscreteProfile.get_trainer_config" title="Link to this definition"></a></dt>
+<dd><p>Returns the trainer configuration for the discrete profile.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>dict</em> – A dictionary containing the trainer configuration.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.DiscreteProfile.set_search_space_config">
+<span class="sig-name descname"><span class="pre">set_search_space_config</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.DiscreteProfile.set_search_space_config" title="Link to this definition"></a></dt>
+<dd><p>Sets the search space configuration for the discrete profile.
+This method allows the user to set custom configuration parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>config</strong> (<em>dict</em>) – A dictionary containing the search space configuration.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="drnasprofile.html" class="btn btn-neutral float-left" title="DRNAS Profile" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="experiment.html" class="btn btn-neutral float-right" title="Experiment" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Arjun Krishnakumar, Shakiba Moradian, Abhash Kumar Jha.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+    <!-- Theme Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-XXXXXXX-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-XXXXXXX-1', {
+          'anonymize_ip': false,
+      });
+    </script> 
+
+</body>
+</html>

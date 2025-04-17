@@ -1,0 +1,177 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Configurable Optimizer &mdash; ConfigurableOptimizer  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9a2dae69"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            ConfigurableOptimizer
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Important Links:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="benchsuite_doc.html">Benchsuite Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="profiles.html">Profiles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="experiment.html">Experiment</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">ConfigurableOptimizer</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Configurable Optimizer</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/README.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="configurable-optimizer">
+<h1>Configurable Optimizer<a class="headerlink" href="#configurable-optimizer" title="Link to this heading"></a></h1>
+<p><a class="reference external" href="https://postimg.cc/7G2kGzZZ"><img alt="confopt" src="https://i.postimg.cc/xCsTZyrM/diagram-20250403.png" /></a></p>
+<p>Break down one-shot optimizers into their core ideas, modularize them, and then search the space of optimizers for the best one.</p>
+<section id="installation-and-development">
+<h2>Installation and Development<a class="headerlink" href="#installation-and-development" title="Link to this heading"></a></h2>
+<p>First, install the dependencies required for development and testing in your environment. You can skip running the last line as it might take long.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">create</span> <span class="o">-</span><span class="n">n</span> <span class="n">confopt</span> <span class="n">python</span><span class="o">=</span><span class="mf">3.9</span>
+<span class="n">conda</span> <span class="n">activate</span> <span class="n">confopt</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">e</span> <span class="s2">&quot;.[dev, test]&quot;</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">e</span> <span class="s2">&quot;.[benchmark]&quot;</span>
+</pre></div>
+</div>
+<p>Install the precommit hooks</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pre</span><span class="o">-</span><span class="n">commit</span> <span class="n">install</span>
+</pre></div>
+</div>
+<p>Run the tests</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pytest</span> <span class="n">tests</span>
+</pre></div>
+</div>
+<p>Run with the slow benchmark tests</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pytest</span> <span class="o">--</span><span class="n">benchmark</span> <span class="n">tests</span>
+</pre></div>
+</div>
+<p>Try running an example</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">examples</span><span class="o">/</span><span class="n">demo_light</span><span class="o">.</span><span class="n">py</span>
+</pre></div>
+</div>
+<p>This project uses <code class="docutils literal notranslate"><span class="pre">mypy</span></code> for type checking, <code class="docutils literal notranslate"><span class="pre">ruff</span></code> for linting, and <code class="docutils literal notranslate"><span class="pre">black</span></code> for formatting. VSCode extensions can be found for each of these tools. The pre-commit hooks check for <code class="docutils literal notranslate"><span class="pre">mypy</span></code>/<code class="docutils literal notranslate"><span class="pre">ruff</span></code>/<code class="docutils literal notranslate"><span class="pre">black</span></code> errors and won’t let you commit until you fix the issues. The pre-commit hooks also checks for proper commit message format.</p>
+<p>The easiest way to ensure that the commits are well formatted is to commit using <code class="docutils literal notranslate"><span class="pre">cz</span> <span class="pre">commit</span></code> instead of <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">commit</span></code>.</p>
+</section>
+<section id="getting-started">
+<h2>Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading"></a></h2>
+<p>We define modular, differentiable NAS components within our library.</p>
+<section id="explore-the-demo-notebook">
+<h3>Explore the Demo Notebook<a class="headerlink" href="#explore-the-demo-notebook" title="Link to this heading"></a></h3>
+<p>We recommend exploring the <a class="reference download internal" download="" href="_downloads/6579a98fbd2b85d7822d3f0476da1c37/demo_notebook.ipynb"><span class="xref download myst">demo-notebook</span></a> for a hands-on experience with the library.</p>
+</section>
+<section id="run-your-first-experiment-vanilla-darts">
+<h3>Run Your First Experiment (Vanilla DARTS)<a class="headerlink" href="#run-your-first-experiment-vanilla-darts" title="Link to this heading"></a></h3>
+<p>Below is a snippet that demonstrates how we run a vanilla-DARTS experiment.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">confopt.profile</span><span class="w"> </span><span class="kn">import</span> <span class="n">DARTSProfile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">confopt.train</span><span class="w"> </span><span class="kn">import</span> <span class="n">Experiment</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">confopt.enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">SearchSpaceType</span><span class="p">,</span> <span class="n">DatasetType</span>
+
+<span class="n">profile</span> <span class="o">=</span> <span class="n">DARTSProfile</span><span class="p">(</span>
+        <span class="n">searchspace_type</span><span class="o">=</span><span class="n">SearchSpaceType</span><span class="o">.</span><span class="n">DARTS</span><span class="p">,</span>
+        <span class="n">epochs</span><span class="o">=</span><span class="mi">3</span>
+<span class="p">)</span>
+
+<span class="n">experiment</span> <span class="o">=</span> <span class="n">Experiment</span><span class="p">(</span>
+    <span class="n">search_space</span><span class="o">=</span><span class="n">SearchSpaceType</span><span class="o">.</span><span class="n">DARTS</span><span class="p">,</span>
+    <span class="n">dataset</span><span class="o">=</span><span class="n">DatasetType</span><span class="o">.</span><span class="n">CIFAR10</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">experiment</span><span class="o">.</span><span class="n">train_supernet</span><span class="p">(</span><span class="n">profile</span><span class="p">)</span>
+
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Arjun Krishnakumar, Shakiba Moradian, Abhash Kumar Jha.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+    <!-- Theme Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-XXXXXXX-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-XXXXXXX-1', {
+          'anonymize_ip': false,
+      });
+    </script> 
+
+</body>
+</html>

@@ -1,0 +1,201 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reproducing Results &mdash; ConfigurableOptimizer  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9a2dae69"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Profiles" href="profiles.html" />
+    <link rel="prev" title="Quick Start" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            ConfigurableOptimizer
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Important Links:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Benchsuite Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#architecture-search-on-the-benchsuite">Architecture Search on the Benchsuite</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#darts">DARTS →</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#drnas">DrNAS →</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gdas">GDAS →</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#oles">OLES →</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pc-darts">PC-DARTS →</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#smoothdarts">SmoothDARTS →</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#fairdarts">FairDARTS →</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#retraining-the-architecture">Retraining the architecture</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="profiles.html">Profiles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="experiment.html">Experiment</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">ConfigurableOptimizer</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content style-external-links">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Reproducing Results</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/benchsuite_doc.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="reproducing-results">
+<h1>Reproducing Results<a class="headerlink" href="#reproducing-results" title="Link to this heading"></a></h1>
+<p>Scripts accompanying the paper <em><strong><code class="docutils literal notranslate"><span class="pre">confopt</span></code></strong> : A Library for Implementation and Evaluation of Gradient-based One-Shot NAS Methods</em></p>
+<section id="architecture-search-on-the-benchsuite">
+<h2>Architecture Search on the Benchsuite<a class="headerlink" href="#architecture-search-on-the-benchsuite" title="Link to this heading"></a></h2>
+<p>There are 3 subspaces in benchsuite (<code class="docutils literal notranslate"><span class="pre">WIDE</span></code>, <code class="docutils literal notranslate"><span class="pre">DEEP</span></code> and <code class="docutils literal notranslate"><span class="pre">SINGLE_CELL</span></code>) and 3 operation sets we utilize (<code class="docutils literal notranslate"><span class="pre">REGULAR</span></code>, <code class="docutils literal notranslate"><span class="pre">NO_SKIP</span></code> and <code class="docutils literal notranslate"><span class="pre">ALL_SKIP</span></code>).</p>
+<p>For example, to run the experiments for subspace <code class="docutils literal notranslate"><span class="pre">WIDE</span></code> with opset <code class="docutils literal notranslate"><span class="pre">REGULAR</span></code>,</p>
+<section id="darts">
+<h3>DARTS →<a class="headerlink" href="#darts" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>scripts/benchsuite_experiments/supernet_search.py<span class="w"> </span>--optimizer<span class="w"> </span><span class="s2">&quot;darts&quot;</span><span class="w"> </span>--subspace<span class="w"> </span><span class="s2">&quot;wide&quot;</span><span class="w"> </span>--ops<span class="w"> </span><span class="s2">&quot;regular&quot;</span><span class="w"> </span>--dataset<span class="w"> </span><span class="s2">&quot;cifar10_supernet&quot;</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">0</span><span class="w"> </span>--tag<span class="w"> </span>wide-regular-darts
+</pre></div>
+</div>
+</section>
+<section id="drnas">
+<h3>DrNAS →<a class="headerlink" href="#drnas" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>scripts/benchsuite_experiments/supernet_search.py<span class="w"> </span>--optimizer<span class="w"> </span><span class="s2">&quot;drnas&quot;</span><span class="w"> </span>--subspace<span class="w"> </span><span class="s2">&quot;wide&quot;</span><span class="w"> </span>--ops<span class="w"> </span><span class="s2">&quot;regular&quot;</span><span class="w"> </span>--dataset<span class="w"> </span><span class="s2">&quot;cifar10_supernet&quot;</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">0</span><span class="w"> </span>--tag<span class="w"> </span><span class="s2">&quot;wide-regular-drnas&quot;</span><span class="w"> </span>
+</pre></div>
+</div>
+</section>
+<section id="gdas">
+<h3>GDAS →<a class="headerlink" href="#gdas" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>scripts/benchsuite_experiments/supernet_search.py<span class="w"> </span>--optimizer<span class="w"> </span><span class="s2">&quot;gdas&quot;</span><span class="w"> </span>--subspace<span class="w"> </span><span class="s2">&quot;wide&quot;</span><span class="w"> </span>--ops<span class="w"> </span><span class="s2">&quot;regular&quot;</span><span class="w"> </span>--dataset<span class="w"> </span><span class="s2">&quot;cifar10_supernet&quot;</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">0</span><span class="w"> </span>--tag<span class="w"> </span><span class="s2">&quot;wide-regular-gdas&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="oles">
+<h3>OLES →<a class="headerlink" href="#oles" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>scripts/benchsuite_experiments/supernet_search.py<span class="w"> </span>--optimizer<span class="w"> </span><span class="s2">&quot;darts&quot;</span><span class="w"> </span>--subspace<span class="w"> </span><span class="s2">&quot;wide&quot;</span><span class="w"> </span>--ops<span class="w"> </span><span class="s2">&quot;regular&quot;</span><span class="w"> </span>--dataset<span class="w"> </span><span class="s2">&quot;cifar10_supernet&quot;</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">0</span><span class="w"> </span>--tag<span class="w"> </span><span class="s2">&quot;wide-regular-oles&quot;</span><span class="w"> </span>--oles<span class="w"> </span><span class="nb">true</span>
+</pre></div>
+</div>
+</section>
+<section id="pc-darts">
+<h3>PC-DARTS →<a class="headerlink" href="#pc-darts" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>scripts/benchsuite_experiments/supernet_search.py<span class="w"> </span>--optimizer<span class="w"> </span><span class="s2">&quot;darts&quot;</span><span class="w"> </span>--subspace<span class="w"> </span><span class="s2">&quot;wide&quot;</span><span class="w"> </span>--ops<span class="w"> </span><span class="s2">&quot;regular&quot;</span><span class="w"> </span>--dataset<span class="w"> </span><span class="s2">&quot;cifar10_supernet&quot;</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">0</span><span class="w"> </span>--tag<span class="w"> </span><span class="s2">&quot;wide-regular-pcdarts&quot;</span><span class="w"> </span>--pcdarts<span class="w"> </span><span class="nb">true</span>
+</pre></div>
+</div>
+</section>
+<section id="smoothdarts">
+<h3>SmoothDARTS →<a class="headerlink" href="#smoothdarts" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>scripts/benchsuite_experiments/supernet_search.py<span class="w"> </span>--optimizer<span class="w"> </span><span class="s2">&quot;darts&quot;</span><span class="w"> </span>--subspace<span class="w"> </span><span class="s2">&quot;wide&quot;</span><span class="w"> </span>--ops<span class="w"> </span><span class="s2">&quot;regular&quot;</span><span class="w"> </span>--dataset<span class="w"> </span><span class="s2">&quot;cifar10_supernet&quot;</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">0</span><span class="w"> </span>--tag<span class="w"> </span><span class="s2">&quot;wide-regular-sdarts&quot;</span><span class="w"> </span>--sdarts<span class="w"> </span><span class="s2">&quot;random&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="fairdarts">
+<h3>FairDARTS →<a class="headerlink" href="#fairdarts" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>scripts/benchsuite_experiments/supernet_search.py<span class="w"> </span>--optimizer<span class="w"> </span><span class="s2">&quot;darts&quot;</span><span class="w"> </span>--subspace<span class="w"> </span><span class="s2">&quot;wide&quot;</span><span class="w"> </span>--ops<span class="w"> </span><span class="s2">&quot;regular&quot;</span><span class="w"> </span>--dataset<span class="w"> </span><span class="s2">&quot;cifar10_supernet&quot;</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">0</span><span class="w"> </span>--tag<span class="w"> </span><span class="s2">&quot;wide-regular-fairdarts&quot;</span><span class="w"> </span>--fairdarts<span class="w"> </span><span class="nb">true</span>
+</pre></div>
+</div>
+<p>For other benchmarks, one can provide options <strong><code class="docutils literal notranslate"><span class="pre">deep</span></code></strong> and <strong><code class="docutils literal notranslate"><span class="pre">single_cell</span></code></strong> for <code class="docutils literal notranslate"><span class="pre">--subspace</span></code>, &amp;  <strong><code class="docutils literal notranslate"><span class="pre">no_skip</span></code></strong> and <strong><code class="docutils literal notranslate"><span class="pre">all_skip</span></code></strong> for <code class="docutils literal notranslate"><span class="pre">--ops</span></code>. If you want to log your run on <strong>WandB</strong>, simply provide <code class="docutils literal notranslate"><span class="pre">--log_with_wandb</span> <span class="pre">true</span></code> argument with the scripts above.</p>
+</section>
+</section>
+<section id="retraining-the-architecture">
+<h2>Retraining the architecture<a class="headerlink" href="#retraining-the-architecture" title="Link to this heading"></a></h2>
+<p>Once you obtain searched genotypes, you can train them on the 9 Hyperparameter sets defined in the paper. You can also take a look at the found genotypes in this <a class="reference external" href="https://drive.google.com/drive/u/1/folders/1sJrWQcQTfdmsYmm4bLwfSqv_AuCSGwhv">link</a>.</p>
+<p>For example, if one wants to test the genotype obtained from running <strong><code class="docutils literal notranslate"><span class="pre">GDAS</span></code></strong> with <strong><code class="docutils literal notranslate"><span class="pre">DEEP</span></code></strong> subspace and <strong><code class="docutils literal notranslate"><span class="pre">NO_SKIP</span></code></strong> opset on the Hyperparameter set (HP) <strong>1</strong>,</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>scripts/benchsuite_experiments/train_genotype.py<span class="w"> </span>--dataset<span class="w"> </span><span class="s2">&quot;cifar10_model&quot;</span><span class="w"> </span>--optimizer<span class="w"> </span><span class="s2">&quot;gdas&quot;</span><span class="w"> </span>--other<span class="w"> </span><span class="s2">&quot;baseline&quot;</span><span class="w"> </span>--subspace<span class="w"> </span><span class="s2">&quot;deep&quot;</span><span class="w"> </span>--opset<span class="w"> </span><span class="s2">&quot;no_skip&quot;</span><span class="w"> </span>--epochs<span class="w"> </span><span class="m">300</span><span class="w"> </span>--seed<span class="w"> </span><span class="m">0</span><span class="w"> </span>--hpset<span class="w"> </span><span class="m">1</span><span class="w"> </span>--genotypes_folder<span class="w"> </span><span class="s2">&quot;genotypes&quot;</span><span class="w"> </span>--tag<span class="w"> </span><span class="s2">&quot;retrain_arch&quot;</span>
+</pre></div>
+</div>
+<p>Please use <strong><code class="docutils literal notranslate"><span class="pre">--hpset</span></code></strong> (vary from 1-9) for training with the respective hyperparameter set.</p>
+<blockquote>
+<div><p>Note:</p>
+<ul class="simple">
+<li><p>For Fair-DARTS, SmoothDARTS, OLES, and PC-DARTS, one has to change the <strong><code class="docutils literal notranslate"><span class="pre">--other</span></code></strong> option to <strong><code class="docutils literal notranslate"><span class="pre">fairdarts</span></code></strong>, <strong><code class="docutils literal notranslate"><span class="pre">sdarts</span></code></strong>, <strong><code class="docutils literal notranslate"><span class="pre">oles</span></code></strong> and <strong><code class="docutils literal notranslate"><span class="pre">pcdarts</span></code></strong> respectively, with <strong><code class="docutils literal notranslate"><span class="pre">--optimizer</span> <span class="pre">darts</span></code></strong>.</p></li>
+<li><p>Make sure that <strong><code class="docutils literal notranslate"><span class="pre">genotypes</span></code></strong> folder exist in the path.</p></li>
+<li><p>If you want to log your run on <strong>WandB</strong>, simply provide <code class="docutils literal notranslate"><span class="pre">--log_with_wandb</span> <span class="pre">true</span></code> argument with the scripts above.</p></li>
+</ul>
+</div></blockquote>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Quick Start" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="profiles.html" class="btn btn-neutral float-right" title="Profiles" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Arjun Krishnakumar, Shakiba Moradian, Abhash Kumar Jha.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+    <!-- Theme Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-XXXXXXX-1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-XXXXXXX-1', {
+          'anonymize_ip': false,
+      });
+    </script> 
+
+</body>
+</html>
