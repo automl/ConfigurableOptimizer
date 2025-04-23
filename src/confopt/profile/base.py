@@ -102,9 +102,15 @@ class BaseProfile:
         extra_config (dict, optional): Any additional configurations that may be \
             needed for example could be used for Weights & Biases metadata.
 
+        use_dynamic_exploration (bool): Flag to use dynamic exploration \
+            connections in the supernet's edges(OperationBlock). Defaults to False.
+
+        dynamic_exploration_config (dict, optional): Configuration for dynamic \
+            exploration if dynamic exploration is enabled.
+
     """
 
-    def __init__(  # noqa: PLR0912 PLR0915
+    def __init__(  # noqa: C901, PLR0912, PLR0915
         self,
         sampler_type: str | SamplerType,
         searchspace_type: str | SearchSpaceType,
@@ -138,6 +144,8 @@ class BaseProfile:
         early_stopper_config: dict | None = None,
         synthetic_dataset_config: dict | None = None,
         extra_config: dict | None = None,
+        use_dynamic_exploration: bool = False,
+        dynamic_exploration_config: dict | None = None,
     ) -> None:
         """Initialize a BaseProfile instance with configurations for training the
         supernet.
@@ -171,10 +179,7 @@ class BaseProfile:
             assert (
                 searchspace_domain is None
             ), "searchspace_domain is not required for this searchspace"
-        if (
-            searchspace_type == "nb1shot1"
-            or searchspace_type == SearchSpaceType.NB1SHOT1
-        ):
+        if searchspace_type in ("nb1shot1", SearchSpaceType.NB1SHOT1):
             assert searchspace_subspace in [
                 "S1",
                 "S2",
@@ -241,6 +246,34 @@ class BaseProfile:
             self.extra_config = extra_config
         else:
             self.extra_config = None  # type: ignore
+
+        self.use_dynamic_exploration = use_dynamic_exploration
+        if self.use_dynamic_exploration:
+            dynamic_exploration_config = (
+                dynamic_exploration_config if dynamic_exploration_config else {}
+            )
+            self._set_dynamic_exploration_configs(**dynamic_exploration_config)
+
+    def _set_dynamic_exploration_configs(
+        self, attention_weight: float = 1, min_attention_weight: float = 1e-4
+    ) -> None:
+        """Set the configuration for the dynamic exploration oneshot \
+            module (DynamicAttentionExplorer).
+
+        Args:
+            attention_weight (float): Initial attention weight for the DAN module.\
+                Defaults to 1.
+            min_attention_weight (float): Minimum attention weight possible\
+                at the last schedule step. Defaults to 1e-4.
+
+        Returns:
+            None
+        """
+        self.dynamic_exploration_config = {
+            "total_epochs": self.epochs,
+            "attention_weight": attention_weight,
+            "min_attention_weight": min_attention_weight,
+        }
 
     def _set_pt_select_configs(
         self,
@@ -474,6 +507,10 @@ class BaseProfile:
 
         if hasattr(self, "extra_config") and self.extra_config is not None:
             config.update(self.extra_config)
+
+        if hasattr(self, "dynamic_exploration_config"):
+            config.update({"dynamic_exploration": self.dynamic_exploration_config})
+
         return config
 
     def _initialize_sampler_config(self) -> None:
@@ -551,9 +588,9 @@ class BaseProfile:
         """
         if self.searchspace_type == SearchSpaceType.NB201:
             self._initialize_trainer_config_nb201()
-        elif (
-            self.searchspace_type == SearchSpaceType.BABYDARTS
-            or self.searchspace_type == SearchSpaceType.DARTS
+        elif self.searchspace_type in (
+            SearchSpaceType.BABYDARTS,
+            SearchSpaceType.DARTS,
         ):
             self._initialize_trainer_config_darts()
         elif self.searchspace_type == SearchSpaceType.NB1SHOT1:
@@ -984,6 +1021,31 @@ class BaseProfile:
             self.synthetic_dataset_config = config
         else:
             self.synthetic_dataset_config.update(config)
+
+    def configure_dynamic_explorer(self, **kwargs) -> None:  # type: ignore
+        """Configure the synthetic dataset for the supernet.
+
+        Args:
+            **kwargs: Arbitrary keyword arguments. Possible keys include:
+
+                attention_weight (float): Initial attention weight for DAN.
+
+                minimum_attention_weight (float): Minimum attention weight possible\
+                    at the last schedule step.
+
+        Raises:
+            AssertionError: If any of the provided configuration keys are not valid.
+
+        Returns:
+            None
+
+        """
+        for config_key in kwargs:
+            assert config_key in self.dynamic_exploration_config, (
+                f"{config_key} not a valid configuration for the"
+                + "dynamic exploration config"
+            )
+            self.dynamic_exploration_config[config_key] = kwargs[config_key]
 
     def get_run_description(self) -> str:
         """This method returns a string description of the run configuration.
