@@ -56,6 +56,13 @@ class TestDynamicAttentionExploration(unittest.TestCase):
             if param.requires_grad is True and "dan" in name:
                 params_after_step.append(param.detach().clone())
 
+        assert (
+            len(params_before_step) > 0
+        ), "DAN parameters are not present in the searchspace"
+        assert (
+            len(params_after_step) > 0
+        ), "DAN parameters are not present in the searchspace"
+        assert len(params_before_step) == len(params_after_step)
         for param_before, param_after in zip(params_before_step, params_after_step):
             assert not torch.allclose(param_before, param_after)
 
