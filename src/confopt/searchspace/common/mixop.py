@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+import warnings
 
 from thop import profile as flop_profile
 import torch
@@ -43,12 +44,18 @@ class OperationChoices(nn.Module):
                         C = in_op.in_channels
                         break
                 break
-
-        self.dan = DynamicAttentionNetwork(
-            C=C,  # type: ignore
-            num_ops=len(self.ops),
-            attention_weight=1,
-        )
+        self.dan: DynamicAttentionNetwork | None = None
+        if C is not None:
+            self.dan = DynamicAttentionNetwork(
+                C=C,  # type: ignore
+                num_ops=len(self.ops),
+                attention_weight=1,
+            )
+        else:
+            warnings.warn(
+                "Unable to find a parameter-based operation for initializing DAN",
+                stacklevel=1,
+            )
 
     def _init_aux_skip_connection(self) -> None:
         stride = 1
