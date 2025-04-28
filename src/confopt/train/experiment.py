@@ -40,6 +40,7 @@ from confopt.oneshot import (
 )
 from confopt.oneshot.archsampler import (
     BaseSampler,
+    CompositeSampler,
     DARTSSampler,
     DRNASSampler,
     GDASSampler,
@@ -374,17 +375,36 @@ class Experiment:
         config: dict,
     ) -> None:
         arch_params = self.search_space.arch_parameters
-        self.sampler: BaseSampler | None = None
-        if sampler == SamplerType.DARTS:
-            self.sampler = DARTSSampler(**config, arch_parameters=arch_params)
-        elif sampler == SamplerType.DRNAS:
-            self.sampler = DRNASSampler(**config, arch_parameters=arch_params)
-        elif sampler == SamplerType.GDAS:
-            self.sampler = GDASSampler(**config, arch_parameters=arch_params)
-        elif sampler == SamplerType.SNAS:
-            self.sampler = SNASSampler(**config, arch_parameters=arch_params)
-        elif sampler == SamplerType.REINMAX:
-            self.sampler = ReinMaxSampler(**config, arch_parameters=arch_params)
+        self.sampler: BaseSampler | CompositeSampler | None = None
+
+        def _get_sampler_class(sampler: SamplerType) -> Callable:
+            if sampler == SamplerType.DARTS:
+                return DARTSSampler
+            if sampler == SamplerType.DRNAS:
+                return DRNASSampler
+            if sampler == SamplerType.GDAS:
+                return GDASSampler
+            if sampler == SamplerType.SNAS:
+                return SNASSampler
+            if sampler == SamplerType.REINMAX:
+                return ReinMaxSampler
+
+            raise ValueError(f"Illegal sampler {sampler} provided")
+
+        if sampler == SamplerType.COMPOSITE:
+            sub_samplers: list[BaseSampler] = []
+            for _, sampler_config in config.items():
+                sampler_type = sampler_config["sampler_type"]
+                del sampler_config["sampler_type"]
+                sampler_component = _get_sampler_class(sampler_type)(
+                    **sampler_config, arch_parameters=arch_params
+                )
+                sub_samplers.append(sampler_component)
+            self.sampler = CompositeSampler(sub_samplers, arch_parameters=arch_params)
+        else:
+            self.sampler = _get_sampler_class(sampler)(
+                **config, arch_parameters=arch_params
+            )
 
     def _set_perturbator(
         self,

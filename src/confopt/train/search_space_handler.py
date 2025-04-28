@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import torch
 
-from confopt.oneshot.archsampler import BaseSampler, DARTSSampler, GDASSampler
+from confopt.oneshot.archsampler import (
+    BaseSampler,
+    CompositeSampler,
+    DARTSSampler,
+    GDASSampler,
+)
 from confopt.oneshot.dropout import Dropout
 from confopt.oneshot.lora_toggler import LoRAToggler
 from confopt.oneshot.partial_connector import PartialConnector
@@ -23,7 +28,7 @@ from confopt.searchspace.common.base_search import ArchAttentionSupport
 class SearchSpaceHandler:
     def __init__(
         self,
-        sampler: BaseSampler,
+        sampler: BaseSampler | CompositeSampler,
         edge_normalization: bool = False,
         partial_connector: PartialConnector | None = None,
         perturbation: BasePerturbator | None = None,

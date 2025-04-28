@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import ABC
 from typing import Any
 
+from typing_extensions import override
+
 from confopt.enums import SamplerType, SearchSpaceType
 from confopt.searchspace.darts.core.genotypes import DARTSGenotype
 from confopt.utils import get_num_classes
@@ -400,6 +402,147 @@ class DRNASProfile(BaseProfile, ABC):
             None
         """
         super().configure_sampler(**kwargs)
+
+
+class CompositeProfile(BaseProfile, ABC):
+    SAMPLER_TYPE = SamplerType.COMPOSITE
+
+    def __init__(
+        self,
+        searchspace_type: str | SearchSpaceType,
+        samplers: list[str | SamplerType],
+        epochs: int,
+        # GDAS configs
+        tau_min: float = 0.1,
+        tau_max: float = 10,
+        # SNAS configs
+        temp_init: float = 1.0,
+        temp_min: float = 0.03,
+        temp_annealing: bool = True,
+        **kwargs: Any,
+    ) -> None:
+        self.samplers = []
+        for sampler in samplers:
+            if isinstance(sampler, str):
+                sampler = SamplerType(sampler)
+            self.samplers.append(sampler)
+
+        self.tau_min = tau_min
+        self.tau_max = tau_max
+
+        self.temp_init = temp_init
+        self.temp_min = temp_min
+        self.temp_annealing = temp_annealing
+
+        super().__init__(  # type: ignore
+            self.SAMPLER_TYPE,
+            searchspace_type,
+            epochs,
+            **kwargs,
+        )
+
+    def _initialize_sampler_config(self) -> None:
+        """Initializes the sampler configuration for Composite samplers.
+
+        The sampler configuration includes the sample frequency and the architecture
+        combine function.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        self.sampler_config: dict[int, dict] = {}  # type: ignore
+        for i, sampler in enumerate(self.samplers):
+            if sampler in [SamplerType.DARTS, SamplerType.DRNAS]:
+                config = {
+                    "sampler_type": sampler,
+                    "sample_frequency": self.sampler_sample_frequency,
+                    "arch_combine_fn": self.sampler_arch_combine_fn,
+                }
+            elif sampler in [SamplerType.GDAS, SamplerType.REINMAX]:
+                config = {
+                    "sampler_type": sampler,
+                    "sample_frequency": self.sampler_sample_frequency,
+                    "arch_combine_fn": self.sampler_arch_combine_fn,
+                    "tau_min": self.tau_min,
+                    "tau_max": self.tau_max,
+                }
+            elif sampler == SamplerType.SNAS:
+                config = {
+                    "sampler_type": sampler,
+                    "sample_frequency": self.sampler_sample_frequency,
+                    "arch_combine_fn": self.sampler_arch_combine_fn,
+                    "temp_init": self.temp_init,
+                    "temp_min": self.temp_min,
+                    "temp_annealing": self.temp_annealing,
+                    "total_epochs": self.epochs,
+                }
+            else:
+                raise AttributeError(f"Illegal sampler type {sampler} provided!")
+
+            self.sampler_config[i] = config
+
+    @override
+    def configure_sampler(  # type: ignore[override]
+        self, sampler_config_map: dict[int, dict]
+    ) -> None:
+        """Configures the sampler settings based on the provided configurations.
+
+        Args:
+            sampler_config_map (dict[int, dict]): A dictionary where each key is an \
+                integer representing the order of the sampler (zero-indexed), and \
+                each value is a dictionary containing the configuration parameters \
+                for that sampler.
+
+            The inner configuration dictionary can contain different sets of keys
+            depending on the type of sampler being configured. The available keys
+            include:
+
+                Generic Configurations:
+                    - sample_frequency (str): The rate at which samples should be taken.
+                    - arch_combine_fn (str): Function to combine architectures.
+                      For FairDARTS, set this to 'sigmoid'. Default is 'default'.
+
+                GDAS-specific Configurations:
+                    - tau_min (float): Minimum temperature for sampling.
+                    - tau_max (float): Maximum temperature for sampling.
+
+                SNAS-specific Configurations:
+                    - temp_init (float): Initial temperature for sampling.
+                    - temp_min (float): Minimum temperature for sampling.
+                    - temp_annealing (bool): Whether to apply temperature annealing.
+                    - total_epochs (int): Total number of training epochs.
+
+        The specific keys required in the dictionary depend on the type of
+        sampler being used.
+        Please make sure that the sample frequency of all the configurations are same.
+        Each configuration is validated, and an error is raised if unknown keys are
+        provided.
+
+        Raises:
+            ValueError: If an unrecognized configuration key is detected.
+
+        Returns:
+            None
+        """
+        assert self.sampler_config is not None
+
+        for idx in sampler_config_map:
+            for config_key in sampler_config_map[idx]:
+                assert idx in self.sampler_config
+                exists = False
+                sampler_type = self.sampler_config[idx]["sampler_type"]
+                if config_key in self.sampler_config[idx]:
+                    exists = True
+                    self.sampler_config[idx][config_key] = sampler_config_map[idx][
+                        config_key
+                    ]
+                assert exists, (
+                    f"{config_key} is not a valid configuration for {sampler_type}",
+                    "sampler inside composite sampler",
+                )
 
 
 class DiscreteProfile:

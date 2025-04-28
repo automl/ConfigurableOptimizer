@@ -21,6 +21,7 @@ class SamplerType(Enum):
     GDAS = "gdas"
     SNAS = "snas"
     REINMAX = "reinmax"
+    COMPOSITE = "composite"
 
     def __str__(self) -> str:
         return self.value
