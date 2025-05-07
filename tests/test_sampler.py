@@ -8,6 +8,7 @@ from confopt.oneshot.archsampler import (
     DRNASSampler,
     GDASSampler,
     ReinMaxSampler,
+    CompositeSampler,
 )
 
 
@@ -109,6 +110,60 @@ class TestReinmaxSampler(unittest.TestCase):
         # wouldn't really make a difference, considering that only one operation
         # is chosen per edge
         _test_arch_combine_fn_default(sampler, alphas)
+
+
+class TestCompositeSampler(unittest.TestCase):
+    def test_post_sample_fn_default(self) -> None:
+        alphas = [torch.randn(14, 8), torch.randn(14, 8)]
+        inner_samplers = [
+            DRNASSampler(alphas, sample_frequency="epoch", arch_combine_fn="default"),
+            GDASSampler(alphas, sample_frequency="epoch", arch_combine_fn="default"),
+            DARTSSampler(alphas, sample_frequency="epoch", arch_combine_fn="default"),
+        ]
+        sampler = CompositeSampler(inner_samplers, alphas)
+        _test_arch_combine_fn_default(sampler, alphas)
+
+    def test_post_sample_fn_sigmoid(self) -> None:
+        alphas = [torch.randn(14, 8), torch.randn(14, 8)]
+        inner_samplers = [
+            DRNASSampler(alphas, sample_frequency="epoch", arch_combine_fn="sigmoid"),
+            GDASSampler(alphas, sample_frequency="epoch", arch_combine_fn="sigmoid"),
+            DARTSSampler(alphas, sample_frequency="epoch", arch_combine_fn="sigmoid"),
+        ]
+        sampler = CompositeSampler(inner_samplers, alphas)
+        _test_arch_combine_fn_sigmoid(sampler, alphas)
+
+    def test_post_sample_fn_mixed(self) -> None:
+        alphas = [torch.randn(14, 8), torch.randn(14, 8)]
+
+        # Case 1
+        inner_samplers = [
+            DRNASSampler(alphas, sample_frequency="epoch", arch_combine_fn="default"),
+            GDASSampler(alphas, sample_frequency="epoch", arch_combine_fn="sigmoid"),
+            DARTSSampler(alphas, sample_frequency="epoch", arch_combine_fn="default"),
+        ]
+        sampler = CompositeSampler(inner_samplers, alphas)
+        # The last sampler's combine function matters,
+        # and if its GDAS/Reinmax, it would get ignored
+        _test_arch_combine_fn_default(sampler, alphas)
+
+        # Case 2
+        inner_samplers = [
+            DRNASSampler(alphas, sample_frequency="epoch", arch_combine_fn="default"),
+            DARTSSampler(alphas, sample_frequency="epoch", arch_combine_fn="sigmoid"),
+            GDASSampler(alphas, sample_frequency="epoch", arch_combine_fn="sigmoid"),
+        ]
+        sampler = CompositeSampler(inner_samplers, alphas)
+        _test_arch_combine_fn_default(sampler, alphas)
+
+        # Case 3
+        inner_samplers = [
+            DRNASSampler(alphas, sample_frequency="epoch", arch_combine_fn="default"),
+            GDASSampler(alphas, sample_frequency="epoch", arch_combine_fn="sigmoid"),
+            DARTSSampler(alphas, sample_frequency="epoch", arch_combine_fn="sigmoid"),
+        ]
+        sampler = CompositeSampler(inner_samplers, alphas)
+        _test_arch_combine_fn_sigmoid(sampler, alphas)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 from .base import BaseProfile
 from .profiles import (
+    CompositeProfile,
     DARTSProfile,
     DiscreteProfile,
     DRNASProfile,
@@ -16,4 +17,5 @@ __all__ = [
     "SNASProfile",
     "DiscreteProfile",
     "ReinMaxProfile",
+    "CompositeProfile",
 ]
