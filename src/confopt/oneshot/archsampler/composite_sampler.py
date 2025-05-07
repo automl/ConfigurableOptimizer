@@ -21,7 +21,7 @@ class CompositeSampler(OneShotComponent):
         for sampler in arch_samplers:
             assert (
                 self.sample_frequency == sampler.sample_frequency
-            ), "All the sampler must have the same sample frequency"
+            ), "All samplers must have the same sample frequency"
 
     def sample(self, alpha: torch.Tensor) -> torch.Tensor:
         sampled_alphas = alpha
