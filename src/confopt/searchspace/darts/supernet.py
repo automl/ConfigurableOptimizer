@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import Literal
+from typing import Any, Literal
 
 import torch
 from torch import nn
@@ -64,7 +64,7 @@ class DARTSSearchSpace(
             steps (int): Number of steps in the search space cell.
             multiplier (int): Multiplier for channels in the cells.
             stem_multiplier (int): Stem multiplier for channels.
-            edge_normalization (bool): Whether to use edge normalization.
+            edge_normalization (bool): Flag to  use edge normalization.
 
         Methods:
             - arch_parameters: Get architectural parameters.
@@ -118,14 +118,27 @@ class DARTSSearchSpace(
         """
         assert len(arch_parameters) == len(self.arch_parameters)
         assert arch_parameters[0].shape == self.arch_parameters[0].shape
-        (
-            self.model.alphas_normal.data,
-            self.model.alphas_reduce.data,
-        ) = arch_parameters
-        self.model._arch_parameters = [
-            self.model.alphas_normal,
-            self.model.alphas_reduce,
-        ]
+
+        len_params = len(arch_parameters)
+
+        if len(self.model.cells) == 1:
+            assert (
+                len_params == 1
+            ), f"Invalid number of arch parameters. Expected 1, got {len_params}."
+            self.model.alphas_reduce.data = arch_parameters[0].data
+            self.model._arch_parameters = [self.model.alphas_reduce]
+        else:
+            assert (
+                len_params == 2
+            ), f"Invalid number of arch parameters. Expected 2, got {len_params}."
+            (
+                self.model.alphas_normal.data,
+                self.model.alphas_reduce.data,
+            ) = arch_parameters
+            self.model._arch_parameters = [
+                self.model.alphas_normal,
+                self.model.alphas_reduce,
+            ]
 
     def get_cell_types(self) -> list[str]:
         return ["normal", "reduce"]
@@ -161,17 +174,28 @@ class DARTSSearchSpace(
         return self.model.get_mean_layer_alignment_score(only_first_and_last=True)
 
     def get_num_skip_ops(self) -> dict[str, int]:
-        alphas_normal, alphas_reduce = self.model.arch_parameters()
-        count_skip = lambda alphas: sum(alphas[:, 1:].argmax(dim=1) == 2)
+        genotype = self.get_genotype()
+        count = lambda edges, op: sum(1 for edge in edges if edge[0] == op)
 
-        stats = {
-            "skip_connections/normal": count_skip(alphas_normal),
-            "skip_connections/reduce": count_skip(alphas_reduce),
+        stats_normal = {
+            f"op_counts/normal/{primitive}": count(genotype.normal, primitive)
+            for primitive in self.model.primitives
         }
+        stats_reduce = {
+            f"op_counts/reduce/{primitive}": count(genotype.reduce, primitive)
+            for primitive in self.model.primitives
+        }
+
+        stats = {}
+        stats.update(stats_normal)
+        stats.update(stats_reduce)
 
         return stats
 
     def get_drnas_anchors(self) -> list[torch.Tensor]:
+        if len(self.model.cells) == 1:
+            return [self.model.anchor_reduce]
+
         return [self.model.anchor_normal, self.model.anchor_reduce]
 
     def get_weighted_flops(self) -> torch.Tensor:
@@ -254,3 +278,39 @@ class DARTSSearchSpace(
             self.model.get_projected_weights("reduce"),
         ]
         return projected_arch_params
+
+
+class DARTSSearchSpaceWide(DARTSSearchSpace):
+    """DARTS search space with a shallow and wide architecture
+    Number of cells: 4
+    Inital Channels: 18
+    1057132 parameters
+    Normal cell -> Reduction cell -> Normal cell -> Reduction cell.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs, C=18, layers=4)
+
+
+class DARTSSearchSpaceDeep(DARTSSearchSpace):
+    """DARTS search space with a shallow and wide architecture
+    Number of cells: 16
+    Inital Channels: 8
+    1080382 parameters
+    Reduction cells at the 5th and 11th position (index starting from 0).
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs, C=7, layers=18)
+
+
+class DARTSSearchSpaceSingleCell(DARTSSearchSpace):
+    """DARTS search space with a single cell
+    Inital Channels: 26
+    1048968 parameters
+    Number of steps: 8
+    Number of edges in the cell: 44.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs, C=26, layers=1, steps=8)

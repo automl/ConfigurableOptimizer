@@ -15,6 +15,7 @@ from confopt.searchspace import (
 from confopt.searchspace.common.base_search import SearchSpace
 from confopt.searchspace.common.lora_layers import LoRALayer
 from confopt.searchspace.darts.core.model_search import Cell as DARTSSearchCell
+from confopt.searchspace.baby_darts.core.model_search import Cell as BabyDARTSSearchCell
 from confopt.searchspace.darts.core.operations import (
     FactorizedReduce,
     Identity,
@@ -108,7 +109,10 @@ def _test_toggle_lora(search_space: SearchSpace) -> None:  # noqa: C901
             assert not hasattr(module, "_original_r")
             assert module.conv.weight.requires_grad is False
 
-def _test_gradient_stats_support_without_gradients(search_space: SearchSpace, n_extra: int) -> None:
+
+def _test_gradient_stats_support_without_gradients(
+    search_space: SearchSpace, n_extra: int
+) -> None:
     x = torch.randn(2, 3, 32, 32).to(DEVICE)
     out = search_space(x)
 
@@ -119,7 +123,8 @@ def _test_gradient_stats_support_without_gradients(search_space: SearchSpace, n_
     assert all(v == 0 for v in values)
     assert len(values) == (len(search_space.model.cells) + n_extra)
 
-def _test_gradient_stats_support(search_space: SearchSpace,  n_extra: int) -> None:
+
+def _test_gradient_stats_support(search_space: SearchSpace, n_extra: int) -> None:
     x = torch.randn(2, 3, 32, 32).to(DEVICE)
     _, out = search_space(x)
     out.mean().backward()
@@ -153,16 +158,8 @@ class TestBabyDARTS(unittest.TestCase):
     def test_arch_parameters(self) -> None:
         search_space = BabyDARTSSearchSpace()
         arch_params = search_space.arch_parameters
-        assert len(arch_params) == 2
+        assert len(arch_params) == 1
         assert isinstance(arch_params[0], nn.Parameter)
-        assert isinstance(arch_params[1], nn.Parameter)
-
-    def test_beta_parameters(self) -> None:
-        search_space = BabyDARTSSearchSpace(edge_normalization=True)
-        beta_params = search_space.beta_parameters
-        assert len(beta_params) == 2
-        assert isinstance(beta_params[0], nn.Parameter)
-        assert isinstance(beta_params[1], nn.Parameter)
 
     def test_forward_pass(self) -> None:
         search_space = BabyDARTSSearchSpace()
@@ -174,20 +171,7 @@ class TestBabyDARTS(unittest.TestCase):
         assert len(out) == 2
         assert isinstance(out[0], torch.Tensor)
         assert isinstance(out[1], torch.Tensor)
-        assert out[0].shape == torch.Size([2, 32])
-        assert out[1].shape == torch.Size([2, 10])
-
-    def test_forward_pass_with_edge_normalization(self) -> None:
-        search_space = BabyDARTSSearchSpace(edge_normalization=True)
-        x = torch.randn(2, 3, 64, 64).to(DEVICE)
-
-        out = search_space(x)
-
-        assert isinstance(out, tuple)
-        assert len(out) == 2
-        assert isinstance(out[0], torch.Tensor)
-        assert isinstance(out[1], torch.Tensor)
-        assert out[0].shape == torch.Size([2, 32])
+        assert out[0].shape == torch.Size([2, 16])
         assert out[1].shape == torch.Size([2, 10])
 
     def test_supernet_init(self) -> None:
@@ -195,11 +179,11 @@ class TestBabyDARTS(unittest.TestCase):
         num_classes = 11
         search_space = BabyDARTSSearchSpace(C=C, num_classes=num_classes)
 
-        search_cells = get_modules_of_type(search_space.model, DARTSSearchCell)
+        search_cells = get_modules_of_type(search_space.model, BabyDARTSSearchCell)
         assert len(search_cells) == 1
 
         reduction_cells = [cell for cell in search_cells if cell.reduction is True]
-        assert len(reduction_cells) == 1
+        assert len(reduction_cells) == 0
 
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
         out, logits = search_space(x)
@@ -207,7 +191,7 @@ class TestBabyDARTS(unittest.TestCase):
         assert logits.shape == torch.Size([2, num_classes])
 
     def test_prune(self) -> None:
-        search_space = BabyDARTSSearchSpace(edge_normalization=True)
+        search_space = BabyDARTSSearchSpace()
         x = torch.randn(2, 3, 64, 64).to(DEVICE)
         search_space.prune(prune_fraction=0.4)
         masks = search_space.model.mask
@@ -217,7 +201,6 @@ class TestBabyDARTS(unittest.TestCase):
         search_space.prune(prune_fraction=0)
         masks = search_space.model.mask
         assert masks[0].sum() == masks[0].numel()
-        assert masks[1].sum() == masks[1].numel()
 
         out = search_space(x)
 
@@ -225,15 +208,14 @@ class TestBabyDARTS(unittest.TestCase):
         assert len(out) == 2
         assert isinstance(out[0], torch.Tensor)
         assert isinstance(out[1], torch.Tensor)
-        assert out[0].shape == torch.Size([2, 32])
+        assert out[0].shape == torch.Size([2, 16])
         assert out[1].shape == torch.Size([2, 10])
 
     def test_discretize_supernet(self) -> None:
         C = 32
         num_classes = 10
         search_space = BabyDARTSSearchSpace(
-            C=C, num_classes=num_classes, edge_normalization=True
-        )
+            C=C, num_classes=num_classes)
 
         new_model = search_space.discretize()
 
@@ -243,7 +225,7 @@ class TestBabyDARTS(unittest.TestCase):
         assert logits.shape == torch.Size([2, num_classes])
 
     def test_optim_forward_pass(self) -> None:
-        search_space = BabyDARTSSearchSpace(edge_normalization=True)
+        search_space = BabyDARTSSearchSpace()
         loss_fn = torch.nn.CrossEntropyLoss().to(DEVICE)
         x = torch.randn(2, 3, 32, 32).to(DEVICE)
         y = torch.randint(low=0, high=9, size=(2,)).to(DEVICE)
@@ -254,15 +236,11 @@ class TestBabyDARTS(unittest.TestCase):
         out = search_space(x)
         loss = loss_fn(out[1], y)
         loss.backward()
-        alphas_before = copy.deepcopy(search_space.arch_parameters[1])
-        betas_before = copy.deepcopy(search_space.beta_parameters[1])
+        alphas_before = copy.deepcopy(search_space.arch_parameters[0])
         arch_optim.step()
-        alphas_after = search_space.arch_parameters[1]
-        betas_after = search_space.beta_parameters[1]
+        alphas_after = search_space.arch_parameters[0]
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
             assert not torch.allclose(arch_param_before, arch_param_after)
-        for beta_param_before, beta_param_after in zip(betas_before, betas_after):
-            assert not torch.allclose(beta_param_before, beta_param_after)
 
 
 class TestNASBench201SearchSpace(unittest.TestCase):
@@ -442,12 +420,14 @@ class TestNASBench201SearchSpace(unittest.TestCase):
 
         # n_extra = 7.
         # 1 for each row of the arch parameters
-        # and 1 for the full arch parameters matrix 
+        # and 1 for the full arch parameters matrix
         _test_gradient_stats_support_without_gradients(search_space, n_extra=7)
 
     def test_gradient_stats_support(self) -> None:
         search_space = NASBench201SearchSpace()
         _test_gradient_stats_support(search_space, n_extra=7)
+
+
 class TestDARTSSearchSpace(unittest.TestCase):
     def test_arch_parameters(self) -> None:
         search_space = DARTSSearchSpace()
@@ -621,6 +601,104 @@ class TestDARTSSearchSpace(unittest.TestCase):
     def test_gradient_stats_support(self) -> None:
         search_space = DARTSSearchSpace()
         _test_gradient_stats_support(search_space, n_extra=30)
+
+    def test_skip_count(self) -> None:
+        # Case: Skip and None present in operations
+        primitives = [
+            "max_pool_3x3",
+            "none",
+            "avg_pool_3x3",
+            "skip_connect",
+            "sep_conv_5x5",
+        ]
+        skip_index = primitives.index("skip_connect")
+        none_index = primitives.index("none")
+        search_space = DARTSSearchSpace(primitives=primitives)
+
+        # Case: Skip connections have highest weight
+        normal_alphas = torch.zeros(14, 5)
+        reduce_alphas = torch.zeros(14, 5)
+        normal_alphas[:, skip_index] = 1
+        reduce_alphas[:, skip_index] = 1
+        search_space.set_arch_parameters([normal_alphas, reduce_alphas])
+        skip_counts = search_space.get_num_skip_ops()
+        assert skip_counts["op_counts/normal/skip_connect"] == 8
+        assert skip_counts["op_counts/normal/skip_connect"] == 8
+
+        # Case: Skip connections have the lowest weight
+        normal_alphas = torch.zeros(14, 5)
+        reduce_alphas = torch.zeros(14, 5)
+        normal_alphas[:, none_index] = 1
+        normal_alphas[:, skip_index + 1] = 0.9
+        reduce_alphas[:, none_index] = 1
+        reduce_alphas[:, skip_index + 1] = 0.9
+        search_space.set_arch_parameters([normal_alphas, reduce_alphas])
+        skip_counts = search_space.get_num_skip_ops()
+        assert skip_counts["op_counts/normal/skip_connect"] == 0
+        assert skip_counts["op_counts/normal/skip_connect"] == 0
+
+        # Case: Skip connections are the second highest weight after None
+        normal_alphas = torch.zeros(14, 5)
+        reduce_alphas = torch.zeros(14, 5)
+        normal_alphas[:, none_index] = 1
+        normal_alphas[:, skip_index] = 0.9
+        reduce_alphas[:, none_index] = 1
+        reduce_alphas[:, skip_index] = 0.9
+        search_space.set_arch_parameters([normal_alphas, reduce_alphas])
+        skip_counts = search_space.get_num_skip_ops()
+
+        assert skip_counts["op_counts/normal/skip_connect"] == 8
+        assert skip_counts["op_counts/normal/skip_connect"] == 8
+
+        # Case: No None operation. Skip connections have the highest weights
+        primitives = [
+            "max_pool_3x3",
+            "avg_pool_3x3",
+            "skip_connect",
+            "sep_conv_5x5",
+        ]
+        skip_index = primitives.index("skip_connect")
+        search_space = DARTSSearchSpace(primitives=primitives)
+
+        normal_alphas = torch.zeros(14, 4)
+        reduce_alphas = torch.zeros(14, 4)
+        normal_alphas[:, skip_index] = 1
+        reduce_alphas[:, skip_index] = 1
+        search_space.set_arch_parameters([normal_alphas, reduce_alphas])
+        skip_counts = search_space.get_num_skip_ops()
+
+        assert skip_counts["op_counts/normal/skip_connect"] == 8
+        assert skip_counts["op_counts/normal/skip_connect"] == 8
+
+        # Case: No None operation. Skip connections have the lowest weights
+        primitives = [
+            "max_pool_3x3",
+            "avg_pool_3x3",
+            "skip_connect",
+            "sep_conv_5x5",
+        ]
+        skip_index = primitives.index("skip_connect")
+        search_space = DARTSSearchSpace(primitives=primitives)
+
+        normal_alphas = torch.zeros(14, 4)
+        reduce_alphas = torch.zeros(14, 4)
+        normal_alphas[:, skip_index + 1] = 1
+        reduce_alphas[:, skip_index + 1] = 1
+        search_space.set_arch_parameters([normal_alphas, reduce_alphas])
+        skip_counts = search_space.get_num_skip_ops()
+        assert skip_counts["op_counts/normal/skip_connect"] == 0
+        assert skip_counts["op_counts/normal/skip_connect"] == 0
+
+        # Case: No Skip connections or None operations in the set
+        primitives = [
+            "max_pool_3x3",
+            "avg_pool_3x3",
+            "sep_conv_5x5",
+        ]
+        search_space = DARTSSearchSpace(primitives=primitives)
+        skip_counts = search_space.get_num_skip_ops()
+        assert "op_counts/normal/skip_connect" not in skip_counts
+        assert "op_counts/reduce/skip_connect" not in skip_counts
 
 
 class TestNASBench1Shot1SearchSpace(unittest.TestCase):

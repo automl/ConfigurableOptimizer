@@ -69,7 +69,6 @@ class DiscreteTrainer(ConfigurableTrainer):
             [metrics.loss, metrics.acc_top1, metrics.acc_top5]
         ).cuda()
 
-        print(f"ALL: reducing tensor from rank {rank}")
         dist.reduce(metrics_tensor, dst=0, op=dist.ReduceOp.SUM)
 
         if rank == 0:
@@ -195,12 +194,11 @@ class DiscreteTrainer(ConfigurableTrainer):
                 dist_utils.get_world_size(),
             )
             dist_utils.print_on_master_only(rank == 0)
-            print("ALL: local_rank, rank, world_size", local_rank, rank, world_size)
             network, criterion = self._load_onto_distributed_data_parallel(
                 self.model, self.criterion
             )
         else:
-            local_rank, rank, world_size = 0, 0, 1
+            local_rank, rank, world_size = 0, 0, 1  # noqa: F841
             network: nn.Module = self.model  # type: ignore
             criterion = self.criterion
 
@@ -239,7 +237,6 @@ class DiscreteTrainer(ConfigurableTrainer):
         end = time.time()
 
         for _step, (base_inputs, base_targets) in enumerate(train_loader):
-            print("ALL: Step", _step)
             # FIXME: What was the point of this? and is it safe to remove?
             # scheduler.update(None, 1.0 * step / len(xloader))
 
@@ -280,6 +277,7 @@ class DiscreteTrainer(ConfigurableTrainer):
             end = time.time()
 
             if self.debug_mode and _step > DEBUG_STEPS:
+                self.logger.log(f"DEBUG MODE: Breaking after {DEBUG_STEPS}")
                 break
 
             if _step % print_freq == 0 or _step + 1 == len(train_loader):
@@ -297,15 +295,12 @@ class DiscreteTrainer(ConfigurableTrainer):
         )
         self.logger.reset_wandb_logs()
         if self.use_ddp is True:
-            local_rank, rank, world_size = (
+            local_rank, rank, world_size = (  # noqa: F841
                 dist_utils.get_local_rank(),
                 dist_utils.get_rank(),
                 dist_utils.get_world_size(),
             )
             dist_utils.print_on_master_only(rank == 0)
-            print(
-                "ALL: test:: local_rank, rank, world_size", local_rank, rank, world_size
-            )
             network, criterion = self._load_onto_distributed_data_parallel(
                 self.model, self.criterion
             )
@@ -337,6 +332,7 @@ class DiscreteTrainer(ConfigurableTrainer):
                 test_top5.update(test_prec5.item(), test_inputs.size(0))
 
                 if self.debug_mode and _step > DEBUG_STEPS:
+                    self.logger.log(f"DEBUG MODE: Breaking after {DEBUG_STEPS}")
                     break
 
         test_metrics = TrainingMetrics(test_losses.avg, test_top1.avg, test_top5.avg)

@@ -281,7 +281,7 @@ class PerturbationArchSelection:
             )
             genotype = unwrapped_network.get_genotype().tostr()  # type: ignore
             self.trainer.logger.save_genotype(
-                genotype, epoch, self.trainer.checkpointing_freq
+                genotype, epoch  # log genotype in every epoch
             )
 
         unwrapped_network.set_projection_mode(False)

@@ -54,27 +54,6 @@ class TestArchSamplers(unittest.TestCase):
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
             assert not torch.allclose(arch_param_before, arch_param_after)
 
-    def _test_darts_sampler_new_step_epoch(self, sample_frequency: str) -> None:
-        searchspace = NASBench201SearchSpace(N=1)
-        sampler = DARTSSampler(
-            arch_parameters=searchspace.arch_parameters,
-            sample_frequency=sample_frequency,
-        )
-
-        alphas_before = searchspace.arch_parameters
-        self._sampler_new_step_or_epoch(sampler, sample_frequency)
-        alphas_after = sampler.sampled_alphas
-
-        # assert that the tensors are close
-        for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
-            assert not torch.allclose(arch_param_before, arch_param_after)
-
-    def test_darts_sampler_new_step(self) -> None:
-        self._test_darts_sampler_new_step_epoch(sample_frequency="step")
-
-    def test_darts_sampler_new_epoch(self) -> None:
-        self._test_darts_sampler_new_step_epoch(sample_frequency="epoch")
-
     def test_gdas_sampler(self) -> None:
         searchspace = NASBench201SearchSpace(N=1)
         sampler = GDASSampler(arch_parameters=searchspace.arch_parameters)
@@ -86,27 +65,6 @@ class TestArchSamplers(unittest.TestCase):
             assert not torch.allclose(arch_param_before, arch_param_after)
             self.assert_rows_one_hot(arch_param_after)
 
-    def _test_gdas_sampler_new_step_epoch(self, sample_frequency: str) -> None:
-        searchspace = NASBench201SearchSpace(N=1)
-        sampler = GDASSampler(
-            arch_parameters=searchspace.arch_parameters,
-            sample_frequency=sample_frequency,
-        )
-
-        alphas_before = searchspace.arch_parameters
-        self._sampler_new_step_or_epoch(sampler, sample_frequency)
-        alphas_after = sampler.sampled_alphas
-
-        for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
-            assert not torch.allclose(arch_param_before, arch_param_after)
-            self.assert_rows_one_hot(arch_param_after)
-
-    def test_gdas_sampler_new_step(self) -> None:
-        self._test_gdas_sampler_new_step_epoch(sample_frequency="step")
-
-    def test_gdas_sampler_new_epoch(self) -> None:
-        self._test_gdas_sampler_new_step_epoch(sample_frequency="epoch")
-
     def test_reinmax_sampler(self) -> None:
         searchspace = NASBench201SearchSpace(N=1)
         sampler = ReinMaxSampler(arch_parameters=searchspace.arch_parameters)
@@ -117,27 +75,6 @@ class TestArchSamplers(unittest.TestCase):
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
             assert not torch.allclose(arch_param_before, arch_param_after)
             self.assert_rows_one_hot(arch_param_after)
-
-    def _test_reinmax_sampler_new_step_epoch(self, sample_frequency: str) -> None:
-        searchspace = NASBench201SearchSpace(N=1)
-        sampler = ReinMaxSampler(
-            arch_parameters=searchspace.arch_parameters,
-            sample_frequency=sample_frequency,
-        )
-
-        alphas_before = searchspace.arch_parameters
-        self._sampler_new_step_or_epoch(sampler, sample_frequency)
-        alphas_after = sampler.sampled_alphas
-
-        for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
-            assert not torch.allclose(arch_param_before, arch_param_after)
-            self.assert_rows_one_hot(arch_param_after)
-
-    def test_reinmax_sampler_new_step(self) -> None:
-        self._test_reinmax_sampler_new_step_epoch(sample_frequency="step")
-
-    def test_reinmax_sampler_new_epoch(self) -> None:
-        self._test_reinmax_sampler_new_step_epoch(sample_frequency="epoch")
 
     def test_drnas_sampler(self) -> None:
         searchspace = NASBench201SearchSpace(N=1)
@@ -152,29 +89,6 @@ class TestArchSamplers(unittest.TestCase):
             for row in arch_param_after:
                 assert torch.allclose(torch.sum(row), torch.Tensor([1.0]).to(DEVICE))
 
-    def _test_drnas_sampler_new_step_epoch(self, sample_frequency: str) -> None:
-        searchspace = NASBench201SearchSpace(N=1)
-        sampler = DRNASSampler(
-            arch_parameters=searchspace.arch_parameters,
-            sample_frequency=sample_frequency,
-        )
-
-        alphas_before = searchspace.arch_parameters
-        self._sampler_new_step_or_epoch(sampler, sample_frequency)
-        alphas_after = sampler.sampled_alphas
-
-        for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
-            assert not torch.allclose(arch_param_before, arch_param_after)
-
-            for row in arch_param_after:
-                assert torch.allclose(torch.sum(row), torch.Tensor([1.0]).to(DEVICE))
-
-    def test_drnas_sampler_new_step(self) -> None:
-        self._test_drnas_sampler_new_step_epoch(sample_frequency="step")
-
-    def test_drnas_sampler_new_epoch(self) -> None:
-        self._test_drnas_sampler_new_step_epoch(sample_frequency="epoch")
-
     def test_snas_sampler(self) -> None:
         searchspace = NASBench201SearchSpace(N=1)
         sampler = SNASSampler(arch_parameters=searchspace.arch_parameters)
@@ -184,26 +98,6 @@ class TestArchSamplers(unittest.TestCase):
 
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
             assert not torch.allclose(arch_param_before, arch_param_after)
-
-    def _test_snas_sampler_new_step_epoch(self, sample_frequency: str) -> None:
-        searchspace = NASBench201SearchSpace(N=1)
-        sampler = SNASSampler(
-            arch_parameters=searchspace.arch_parameters,
-            sample_frequency=sample_frequency,
-        )
-
-        alphas_before = searchspace.arch_parameters
-        self._sampler_new_step_or_epoch(sampler, sample_frequency)
-        alphas_after = sampler.sampled_alphas
-
-        for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
-            assert not torch.allclose(arch_param_before, arch_param_after)
-
-    def test_snas_sampler_new_step(self) -> None:
-        self._test_snas_sampler_new_step_epoch(sample_frequency="step")
-
-    def test_snas_sampler_new_epoch(self) -> None:
-        self._test_snas_sampler_new_step_epoch(sample_frequency="epoch")
 
     def _test_snas_illegal_temperatures(
         self, temp_init: float, temp_min: float
@@ -246,11 +140,11 @@ class TestArchSamplers(unittest.TestCase):
         for arch_param_before, arch_param_after in zip(alphas_before, alphas_after):
             assert not torch.allclose(arch_param_before, arch_param_after)
 
-        # Adverserial Attack
+        # Adversarial Attack
         # Changes the model's alpha as well, but if the loss does not decrease, it does
         # not change alpha
         # TODO Improve this test
-        perturbator.attack_type = "adverserial"
+        perturbator.attack_type = "adversarial"
         alphas_before = [
             arch_param.clone() for arch_param in searchspace.arch_parameters
         ]
@@ -260,27 +154,27 @@ class TestArchSamplers(unittest.TestCase):
     def test_illegal_sample_frequency(self) -> None:
         arch_parameters = [torch.randn(5, 5)]
         with self.assertRaises(AssertionError):
-            DARTSSampler(arch_parameters=arch_parameters, sample_frequency="illegal")
+            DARTSSampler(arch_parameters=arch_parameters, sample_frequency="illegal") # type: ignore
 
         with self.assertRaises(AssertionError):
-            GDASSampler(arch_parameters=arch_parameters, sample_frequency="illegal")
+            GDASSampler(arch_parameters=arch_parameters, sample_frequency="illegal") # type: ignore
 
         with self.assertRaises(AssertionError):
-            ReinMaxSampler(arch_parameters=arch_parameters, sample_frequency="illegal")
+            ReinMaxSampler(arch_parameters=arch_parameters, sample_frequency="illegal") # type: ignore
 
         with self.assertRaises(AssertionError):
-            DRNASSampler(arch_parameters=arch_parameters, sample_frequency="illegal")
+            DRNASSampler(arch_parameters=arch_parameters, sample_frequency="illegal") # type: ignore
 
         with self.assertRaises(AssertionError):
             SNASSampler(
                 arch_parameters=arch_parameters,
-                sample_frequency="illegal",
+                sample_frequency="illegal", # type: ignore
             )
 
         with self.assertRaises(AssertionError):
             SDARTSPerturbator(
                 arch_parameters=arch_parameters,
-                sample_frequency="illegal",
+                sample_frequency="illegal", # type: ignore
                 epsilon=0.03,
             )
 
@@ -310,7 +204,7 @@ class TestDropout(unittest.TestCase):
 
     def test_illegal_anneal_frequency(self) -> None:
         with self.assertRaises(AssertionError):
-            Dropout(p=0.5, anneal_frequency="illegal")
+            Dropout(p=0.5, anneal_frequency="illegal") # type: ignore
 
     def test_illegal_anneal_type_and_frequency(self) -> None:
         with self.assertRaises(AssertionError):

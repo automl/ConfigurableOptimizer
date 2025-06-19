@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from confopt.profile import DARTSProfile
+from confopt.profile import GDASProfile
 from confopt.train import Experiment
 from confopt.enums import SearchSpaceType, DatasetType
 
 if __name__ == "__main__":
-    profile = DARTSProfile(
-        searchspace=SearchSpaceType.DARTS, epochs=3, use_lambda_regularizer=True
+    profile = GDASProfile(
+        searchspace_type=SearchSpaceType.DARTS,
+        epochs=3,
     )
-    profile.configure_searchspace(C=1)
+
     experiment = Experiment(
         search_space=SearchSpaceType.DARTS,
         dataset=DatasetType.CIFAR10,

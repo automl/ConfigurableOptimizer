@@ -5,6 +5,7 @@ from typing import Callable
 import torch
 from torch import nn
 
+from confopt.searchspace.common.mixop import AuxiliarySkipConnection
 from confopt.utils.channel_shuffle import channel_shuffle
 
 
@@ -27,6 +28,7 @@ class PartialConnector(nn.Module):
         alphas: list[torch.Tensor],
         ops: list[nn.Module],
         forward_method: Callable,
+        auxiliary_skip_module: AuxiliarySkipConnection | None = None,
     ) -> torch.Tensor:
         assert len(alphas) == len(
             ops
@@ -37,6 +39,10 @@ class PartialConnector(nn.Module):
         xtemp2 = x[:, dim_2 // self.k :, :, :]
 
         temp1 = forward_method(xtemp, ops, alphas)
+
+        if auxiliary_skip_module is not None:
+            aux_out = auxiliary_skip_module(xtemp)
+            temp1 += aux_out
 
         if (
             hasattr(ops[-1], "C_in")

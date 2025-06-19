@@ -26,6 +26,7 @@ from confopt.enums import (
 from confopt.oneshot import (
     DrNASRegularizationTerm,
     Dropout,
+    EarlyStopper,
     FairDARTSRegularizationTerm,
     FLOPSRegularizationTerm,
     LoRAToggler,
@@ -34,16 +35,19 @@ from confopt.oneshot import (
     RegularizationTerm,
     Regularizer,
     SDARTSPerturbator,
+    SkipConnectionEarlyStopper,
     WeightEntangler,
 )
 from confopt.oneshot.archsampler import (
     BaseSampler,
+    CompositeSampler,
     DARTSSampler,
     DRNASSampler,
     GDASSampler,
     ReinMaxSampler,
     SNASSampler,
 )
+from confopt.oneshot.dynamic_exploration import DynamicAttentionExplorer
 from confopt.profile import (
     BaseProfile,
     DiscreteProfile,
@@ -75,6 +79,25 @@ DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 
 
 class Experiment:
+    """The Experiment class is responsible for managing the training and evaluation of
+    the supernet and discrete models. It initializes the necessary components,
+    manages the states to load, and handles the training process.
+
+    Parameters:
+        search_space (SearchSpace): The search space type used for the experiment.
+        dataset (DatasetType): The dataset type used for the experiment.
+        seed (int): The random seed for reproducibility of the runs.
+        log_with_wandb (bool): Flag to enable logging with Weights & Biases.
+        debug_mode (bool): Flag to enable debug mode, where we only do 5 steps for \
+            each epoch.
+        exp_name (str): The name of the experiment.
+        dataset_domain (str | None): The domain of the dataset used for the Taskonomy \
+            dataset. Valid values are 'class_object' and 'class_scene'.
+        dataset_dir (str): The directory where the dataset is stored.
+        api_dir (str): The directory where the API is stored to used when we are using \
+            the benchmarks.
+    """
+
     def __init__(
         self,
         search_space: SearchSpaceType,
@@ -106,9 +129,25 @@ class Experiment:
         torch.cuda.manual_seed(rand_seed)
 
     def init_ddp(self) -> None:
+        """Initializes the distributed data parallel (DDP) environment.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         dist_utils.init_distributed()
 
     def cleanup_ddp(self) -> None:
+        """Kills the distributed data parallel (DDP) process.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         dist_utils.cleanup()
 
     def train_supernet(
@@ -118,6 +157,29 @@ class Experiment:
         exp_runtime_to_load: str | None = None,
         use_benchmark: bool = False,
     ) -> ConfigurableTrainer:
+        """Trains a supernet using the given profile with options for loading previous
+        runs.
+
+        Args:
+            profile (BaseProfile): Contains configurations for training the supernet,
+            including component settings and architectural specifications.
+
+            model_to_load (str | int | None): Specifies the training state to load the
+            supernet from. Valid values are "last" or "best", representing the most
+            recent or the best-performing model checkpoint, respectively.
+            If an integer is provided, it represents the epoch number from which
+            training should be continued.
+            If `None`, then it starts training the model from scratch.
+
+            exp_runtime_to_load (str | None): The particular experiment runtime to
+            load the model from.If `None`, the model will be loaded from the last
+            runtime.
+
+            use_benchmark (bool): If `True`, uses a benchmark API for evaluation.
+
+        Returns:
+            ConfigurableTrainer: The trained supernet.
+        """
         config = profile.get_config()
         run_name = profile.get_run_description()
         config["dataset"] = self.dataset.value
@@ -219,6 +281,9 @@ class Experiment:
             oles_threshold=oles_threshold,
         )
 
+        if self.log_with_wandb:
+            wandb.finish()  # type: ignore
+
         return trainer
 
     def _init_components(
@@ -259,7 +324,11 @@ class Experiment:
         self._set_weight_entangler()
         self._set_regularizer(config.get("regularization", {}))
         self._set_lambda_regularizer(config.get("lambda_regularizer", {}))
+        self._set_dynamic_explorer(config.get("dynamic_exploration", {}))
         self._set_profile(config)
+        self._set_early_stopper(
+            config["early_stopper"], config.get("early_stopper_config", {})
+        )
 
     def _set_search_space(
         self,
@@ -310,17 +379,36 @@ class Experiment:
         config: dict,
     ) -> None:
         arch_params = self.search_space.arch_parameters
-        self.sampler: BaseSampler | None = None
-        if sampler == SamplerType.DARTS:
-            self.sampler = DARTSSampler(**config, arch_parameters=arch_params)
-        elif sampler == SamplerType.DRNAS:
-            self.sampler = DRNASSampler(**config, arch_parameters=arch_params)
-        elif sampler == SamplerType.GDAS:
-            self.sampler = GDASSampler(**config, arch_parameters=arch_params)
-        elif sampler == SamplerType.SNAS:
-            self.sampler = SNASSampler(**config, arch_parameters=arch_params)
-        elif sampler == SamplerType.REINMAX:
-            self.sampler = ReinMaxSampler(**config, arch_parameters=arch_params)
+        self.sampler: BaseSampler | CompositeSampler | None = None
+
+        def _get_sampler_class(sampler: SamplerType) -> Callable:
+            if sampler == SamplerType.DARTS:
+                return DARTSSampler
+            if sampler == SamplerType.DRNAS:
+                return DRNASSampler
+            if sampler == SamplerType.GDAS:
+                return GDASSampler
+            if sampler == SamplerType.SNAS:
+                return SNASSampler
+            if sampler == SamplerType.REINMAX:
+                return ReinMaxSampler
+
+            raise ValueError(f"Illegal sampler {sampler} provided")
+
+        if sampler == SamplerType.COMPOSITE:
+            sub_samplers: list[BaseSampler] = []
+            for _, sampler_config in config.items():
+                sampler_type = sampler_config["sampler_type"]
+                del sampler_config["sampler_type"]
+                sampler_component = _get_sampler_class(sampler_type)(
+                    **sampler_config, arch_parameters=arch_params
+                )
+                sub_samplers.append(sampler_component)
+            self.sampler = CompositeSampler(sub_samplers, arch_parameters=arch_params)
+        else:
+            self.sampler = _get_sampler_class(sampler)(
+                **config, arch_parameters=arch_params
+            )
 
     def _set_perturbator(
         self,
@@ -402,6 +490,16 @@ class Experiment:
     def _set_lambda_regularizer(self, config: dict) -> None:
         self.lambda_regularizer = None if len(config) == 0 else LambdaReg(**config)
 
+    def _set_dynamic_explorer(self, config: dict) -> None:
+        self.dynamic_explorer: DynamicAttentionExplorer | None = None
+        if config:
+            self.dynamic_explorer = DynamicAttentionExplorer(
+                self.search_space,
+                total_epochs=config.get("total_epochs"),  # type: ignore
+                attention_weight=config.get("attention_weight", 1),
+                min_attention_weight=config.get("min_attention_weight", 1e-4),
+            )
+
     def _set_profile(self, config: dict) -> None:
         assert self.sampler is not None
 
@@ -421,6 +519,7 @@ class Experiment:
             use_auxiliary_skip_connection=config.get(
                 "use_auxiliary_skip_connection", False
             ),
+            dynamic_explorer=self.dynamic_explorer,
         )
 
     def _get_criterion(self, criterion_str: str) -> torch.nn.Module:
@@ -466,24 +565,92 @@ class Experiment:
             )
         return None
 
+    def _set_early_stopper(
+        self, early_stopper: str | None, config: dict | None
+    ) -> None:
+        self.early_stopper: None | EarlyStopper = None
+
+        if early_stopper is not None:
+            assert config is not None, (
+                "The configurations for the EarlyStopper is empty. "
+                + "Use profile.configure_early_stopper() to fix it."
+            )
+            if early_stopper == "skip_connection":
+                self.early_stopper = SkipConnectionEarlyStopper(**config)
+            else:
+                raise ValueError(f"Earlyt stopping method {early_stopper} not known!")
+
     def train_discrete_model(
         self,
         profile: DiscreteProfile,
         model_to_load: str | int | None = None,
         exp_runtime_to_load: str | None = None,
         use_supernet_checkpoint: bool = False,
+        use_expr_search_space: bool = False,
     ) -> DiscreteTrainer:
+        """Trains a discrete model using the given profile with options for loading
+        specific training states.
+
+        Args:
+            profile (DiscreteProfile): Contains configurations for training the model,
+                including hyperparameters and architecture details.The genotype could be
+                set in the profile, or the default genotype will be used.
+
+            model_to_load (str | int | None): Specifies the training state to load.
+                Acceptable string values are "last" or "best", representing the most
+                recent or the best-performing model checkpoint, respectively.
+                If an integer is provided, it represents the epoch number from which
+                training should be continued.
+                If `None`, behavior is determined by other parameters.
+
+            exp_runtime_to_load (str | None): The experiment runtime to load the model
+                from.
+                If `None`, the model will be loaded from the most recent runtime.
+
+            use_supernet_checkpoint (bool): If `True`, initializes the model's weights
+                from a supernet checkpoint.
+                If `False`, the model will use checkpoints from the discrete network
+                instead.
+
+            use_expr_search_space (bool): If `True`, gets the discretized model from
+                self.search_space
+
+        Returns:
+            DiscreteTrainer: The trained discrete model.
+
+        Behavior Notes:
+            - If none of the parameters are provided the default profile genotype will
+              be used.
+            - The default genotype in the profile refers to the best architecture found
+              after 50 epochs using the DARTS optimizer on the CIFAR-10 dataset within
+              the DARTS search space.
+            - Setting `use_supernet_checkpoint` to `True` allows loading from the
+              supernet, while `False` defaults to using checkpoints from the discrete
+              network.
+
+        Example:
+            >>> trainer = experiment.train_discrete_model(
+                    profile=profile,
+                    model_to_load="last",
+                    exp_runtime_to_load=None,
+                    use_supernet_checkpoint=True,
+                    use_expr_search_space=False,
+                )
+        """
         train_config = profile.get_trainer_config()
         searchspace_config = profile.get_searchspace_config(self.dataset.value)
         genotype_str = profile.get_genotype()
         run_name = profile.get_run_description()
+        extra_config = profile.get_extra_config()
 
         return self._train_discrete_model(
             searchspace_config=searchspace_config,
+            extra_config=extra_config,
             train_config=train_config,
             model_to_load=model_to_load,
             exp_runtime_to_load=exp_runtime_to_load,
             use_supernet_checkpoint=use_supernet_checkpoint,
+            use_expr_search_space=use_expr_search_space,
             genotype_str=genotype_str,
             run_name=run_name,
         )
@@ -494,14 +661,35 @@ class Experiment:
         genotype_str: str,
         searchspace_config: dict,
     ) -> torch.nn.Module:
+        """Returns a discrete model based on the given genotype string.
+
+        Args:
+            search_space_str (str): The search space type.
+            genotype_str (str): The genotype string to use for creating the discrete
+            model.
+            searchspace_config (dict): Configuration for the search space.
+
+        Raises:
+            ValueError: If the search space type is not recognized or if the dataset
+            is not supported.
+
+        Returns:
+            torch.nn.Module: The discrete model.
+        """
         if search_space_str == SearchSpaceType.NB201.value:
             searchspace_config["genotype"] = NAS201Genotype.str2structure(genotype_str)
             discrete_model = NASBench201Model(**searchspace_config)
         elif search_space_str == SearchSpaceType.DARTS.value:
             searchspace_config["genotype"] = eval(genotype_str)
-            if self.dataset.value in ("cifar10", "cifar100"):
+            if self.dataset in (
+                DatasetType.CIFAR10,
+                DatasetType.CIFAR10_MODEL,
+                DatasetType.CIFAR10_SUPERNET,
+                DatasetType.CIFAR100,
+                DatasetType.AIRCRAFT,
+            ):
                 discrete_model = DARTSModel(**searchspace_config)
-            elif self.dataset.value in ("imgnet16", "imgnet16_120"):
+            elif self.dataset in (DatasetType.IMGNET16, DatasetType.IMGNET16_120):
                 discrete_model = DARTSImageNetModel(**searchspace_config)
             else:
                 raise ValueError("undefined discrete model for this dataset.")
@@ -513,6 +701,18 @@ class Experiment:
     def get_discrete_model_from_supernet(
         self,
     ) -> SearchSpace:
+        """Returns a discrete model from experiment's supernet(search space).
+
+        Args:
+            None
+
+        Raises:
+            Exception: If the experiment does not have a search space or the
+            search space is not a supernet.
+
+        Returns:
+            SearchSpace: A discrete model.
+        """
         # A) Use the experiment's self.search_space of the experiment.
         if hasattr(self, "search_space"):
             if self.search_space.arch_parameters:
@@ -527,6 +727,20 @@ class Experiment:
         model_to_load: str | int | None = None,
         use_supernet_checkpoint: bool = False,
     ) -> str:
+        """Returns the genotype string from the checkpoint.
+
+        Args:
+            model_to_load (str | int | None): Specifies the training state to load.
+            Can be "last", "best", or specific epoch.
+            use_supernet_checkpoint (bool): If `True`, initializes the model's weights
+            from a supernet checkpoint.
+
+        Raises:
+            ValueError: If `model_to_load` is not given
+
+        Returns:
+            str: The genotype string.
+        """
         if model_to_load is not None:
             genotype_str = self.logger.load_genotype(
                 model_to_load=model_to_load,
@@ -544,23 +758,39 @@ class Experiment:
         use_expr_search_space: bool = False,
         genotype_str: str | None = None,
     ) -> tuple[torch.nn.Module, str]:
+        """Returns a discrete model based on the given parameters.
+
+        Args:
+            searchspace_config (dict): Configuration for the search space.
+            model_to_load (str | int | None): Specifies the training state to load. Can
+            be "last", "best", or specific epoch.
+            use_supernet_checkpoint (bool): If `True`, initializes the model's weights
+            from a supernet checkpoint.
+            use_expr_search_space (bool): If `True`, gets the discretized model from
+            self.search_space.
+            genotype_str (str | None): The genotype string to use for creating the
+            discrete model.
+
+        Returns:
+            tuple[torch.nn.Module, str]: A tuple containing the discrete model and its
+            genotype string.
+        """
         # A) Use the experiment's self.search_space of the experiment.
         if use_expr_search_space:
             model = self.get_discrete_model_from_supernet()
-            return model, model.get_genotype()  # type: ignore
+            return model, self.search_space.get_genotype()  # type: ignore
+        # B, C) Use a checkpoint (discrete net or supernet) to load the model.
         if model_to_load is not None:
             genotype_str = self.get_genotype_str_from_checkpoint(
                 model_to_load=model_to_load,
                 use_supernet_checkpoint=use_supernet_checkpoint,
             )
-        elif sum(
-            [
-                (model_to_load is not None),
-                use_supernet_checkpoint,
-            ],
-        ) == 0 and hasattr(self, "search_space"):
-            genotype_str = self.search_space.get_genotype().tostr()  # type: ignore
-
+        # E) Use the default genotype which is set in the discrete_profile.
+        # if you don't set the genotype in the profile the genotype
+        # is the best model found by darts
+        # elif genotype_str is None:
+        # genotype_str = searchspace_config.get("genotype")
+        # assert the according genotype_str is the one for the search space.
         elif genotype_str is None:
             raise ValueError("genotype cannot be empty")
 
@@ -576,8 +806,7 @@ class Experiment:
         cutout: int,
         cutout_length: int,
         train_portion: float,
-        *args: Any,  # noqa: ARG002
-        **kwargs: Any,  # noqa: ARG002
+        **kwargs: Any,
     ) -> AbstractData:
         return get_dataset(
             dataset=self.dataset,
@@ -586,12 +815,14 @@ class Experiment:
             cutout=cutout,  # type: ignore
             cutout_length=cutout_length,  # type: ignore
             train_portion=train_portion,  # type: ignore
+            dataset_kwargs=kwargs,
         )
 
     # refactor the name to train
     def _train_discrete_model(
         self,
         searchspace_config: dict,
+        extra_config: dict,
         train_config: dict,
         model_to_load: str | int | None = None,
         exp_runtime_to_load: str | None = None,
@@ -643,6 +874,7 @@ class Experiment:
             self.logger.set_up_new_run()
 
         self.logger.save_genotype(genotype_str)
+        train_config["genotype"] = genotype_str
 
         if train_config.get("use_ddp", False) is True:
             assert torch.distributed.is_initialized(), "DDP is not initialized!"
@@ -697,7 +929,10 @@ class Experiment:
             debug_mode=self.debug_mode,
         )
         if self.log_with_wandb:
-            self._init_wandb(run_name, config=train_config)
+            config = {k: v for k, v in train_config.items()}
+            config.update(extra_config)
+
+            self._init_wandb(run_name, config=config)
 
         trainer.train(
             epochs=trainer_arguments.epochs,  # type: ignore
@@ -705,6 +940,9 @@ class Experiment:
         )
 
         trainer.test(log_with_wandb=self.log_with_wandb)
+
+        if self.log_with_wandb:
+            wandb.finish()  # type: ignore
 
         return trainer
 
@@ -722,10 +960,16 @@ class Experiment:
             criterion_str=trainer_arguments.criterion  # type: ignore
         )
 
+        dataset_kwargs = (
+            config.get("synthetic_dataset_config")
+            if config.get("synthetic_dataset_config") is not None
+            else {}
+        )
         data = self._get_dataset(
             cutout=trainer_arguments.cutout,  # type: ignore
             cutout_length=trainer_arguments.cutout_length,  # type: ignore
             train_portion=trainer_arguments.train_portion,  # type: ignore
+            **dataset_kwargs,
         )
 
         model = self.search_space
@@ -777,6 +1021,7 @@ class Experiment:
             debug_mode=self.debug_mode,
             query_dataset=self.dataset.value,
             benchmark_api=self.benchmark_api,
+            early_stopper=self.early_stopper,
         )
 
         return trainer
@@ -791,6 +1036,28 @@ class Experiment:
         run_name: str = "darts-pt",
         src_folder_path: str | None = None,
     ) -> PerturbationArchSelection:
+        """Creates and returns an architecture based on perturbation.
+
+        Args:
+            profile (BaseProfile): The profile containing the configuration for the
+            experiment.
+            model_source (str): The source of the model to load. Can be "supernet"
+            or a PerturbationArchSelection object.
+            model_to_load (str | int | None): The model to load. Can be "last",
+            "best", or specific epoch.
+            exp_runtime_to_load (str | None): The runtime to load the model from.
+            log_with_wandb (bool): Flag to  log with wandb.
+            run_name (str): The name of the run.
+            src_folder_path (str | None): The source folder path of experiment's run.
+
+        Raises:
+            AttributeError: If an illegal model source is provided.
+            AssertionError: If the model source is "arch_selection" and model_to_load
+            is "best".
+
+        Returns:
+            PerturbationArchSelection: The architecture selection object.
+        """
         # find pt_configs in the profile
         if model_to_load is not None:
             # self.searchspace is not trained
@@ -855,7 +1122,11 @@ class Experiment:
         # Load from supernet
         if model_source == "supernet":
             trainer._init_experiment_state(
-                search_space_handler=search_space_handler, setup_new_run=False
+                search_space_handler=search_space_handler,
+                setup_new_run=False,
+                warm_epochs=config["trainer"].get(  # type: ignore
+                    "lora_warm_epochs", 0
+                ),
             )
 
             # reroute logger
@@ -908,7 +1179,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--perturbator",
         default="none",
-        help="Type of perturbation in (none, random, adverserial)",
+        help="Type of perturbation in (none, random, adversarial)",
         type=str,
     )
     parser.add_argument(
@@ -970,7 +1241,7 @@ if __name__ == "__main__":
     args.epochs = 3
 
     profile = GDASProfile(
-        searchspace=searchspace.value,
+        searchspace_type=searchspace.value,
         epochs=args.epochs,
         is_partial_connection=args.is_partial_connector,
         perturbation=args.perturbator,

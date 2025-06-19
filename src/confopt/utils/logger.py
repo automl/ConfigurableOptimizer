@@ -221,7 +221,7 @@ class Logger:
             file_path = self.path(mode="best_genotype")
         elif type(model_to_load) == int:
             file_path = self.path("genotypes")
-            file_path = "{}/{}_{:07d}.txt".format(file_path, "genotype", model_to_load)
+            file_path = "{}/{}_{:04d}.txt".format(file_path, "genotype", model_to_load)
         elif model_to_load == "last":
             file_path = self.path("genotypes")
             last_file_path = "{}/{}".format(file_path, "last_genotype.txt")
@@ -239,29 +239,35 @@ class Logger:
         genotype: str,
         epoch: int = 0,
         checkpointing_freq: int = 1,
-        save_best_model: bool = False,
+        is_best_model: bool = False,
     ) -> None:
         if epoch % checkpointing_freq != 0:
             return
-        if save_best_model:
-            file_path = Path(self.path(mode="best_genotype"))
-            last_file_path = Path(self.path(mode=None)) / "last_genotype.txt"
-            last_file_info = "best_genotype.txt"
-        elif not self.use_supernet_checkpoint:
-            file_path = Path(self.path(mode="genotypes"))
-            last_file_info = None
-        else:
-            file_path = Path(self.path(mode="genotypes"))
-            last_file_path = file_path / "last_genotype.txt"
-            file_path = Path("{}/{}_{:07d}.txt".format(file_path, "genotype", epoch))
-            last_file_info = "{}_{:07d}.txt".format("genotype", epoch)
 
-        with open(file_path, "w") as f:
+        genotype_filename = f"genotype_{epoch:04d}.txt"
+
+        # Log the last genotype if using supernet checkpoint
+        if self.use_supernet_checkpoint:
+            genotypes_dir = Path(self.path(mode="genotypes"))
+            genotype_filename = f"genotype_{epoch:04d}.txt"
+            genotype_filepath = genotypes_dir / genotype_filename
+
+            last_genotype_filepath = genotypes_dir / "last_genotype.txt"
+
+            with open(last_genotype_filepath, "w") as f:
+                f.write(genotype_filename)
+        else:
+            # When training the discrete model, the genotype is fixed
+            genotype_filepath = Path(self.path(mode="genotypes"))
+
+        # Log the (current/fixed) genotype
+        with open(genotype_filepath, "w") as f:
             f.write(genotype)
 
-        if last_file_info:
-            with open(last_file_path, "w") as f:
-                f.write(last_file_info)
+        if is_best_model:
+            best_genotype_filepath = Path(self.path(mode="best_genotype"))
+            with open(best_genotype_filepath, "w") as f:
+                f.write(genotype_filename)
 
     def log_metrics(
         self,

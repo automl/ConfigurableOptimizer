@@ -1,4 +1,5 @@
 from confopt.oneshot.dropout import Dropout
+from confopt.oneshot.early_stopper import EarlyStopper, SkipConnectionEarlyStopper
 from confopt.oneshot.lora_toggler import LoRAToggler
 from confopt.oneshot.partial_connector import PartialConnector
 from confopt.oneshot.perturbator import SDARTSPerturbator
@@ -14,6 +15,7 @@ from confopt.oneshot.weightentangler import WeightEntangler
 
 __all__ = [
     "Dropout",
+    "EarlyStopper",
     "LoRAToggler",
     "PartialConnector",
     "Pruner",
@@ -24,4 +26,5 @@ __all__ = [
     "RegularizationTerm",
     "Regularizer",
     "WeightEntangler",
+    "SkipConnectionEarlyStopper",
 ]

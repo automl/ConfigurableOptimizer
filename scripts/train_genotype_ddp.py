@@ -3,7 +3,7 @@ from confopt.train import Experiment
 from confopt.train.experiment import DatasetType, SearchSpaceType
 
 if __name__ == "__main__":
-    profile = DiscreteProfile()
+    profile = DiscreteProfile(searchspace_type=SearchSpaceType.DARTS)
     config = profile.get_trainer_config()
     profile.configure_trainer(use_ddp=True)
     config.update({"genotype": profile.get_genotype()})
@@ -14,11 +14,9 @@ if __name__ == "__main__":
         seed=9001,
         log_with_wandb=False,
         exp_name="Debug Experiment",
-        runtime="now",
     )
 
     profile.train_config["epochs"] = 1
-
 
     experiment.init_ddp()
     trainer = experiment.train_discrete_model(

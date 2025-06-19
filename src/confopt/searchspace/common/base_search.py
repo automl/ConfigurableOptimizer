@@ -440,11 +440,11 @@ class PerturbationArchSelectionSupport(ModelWrapper):
     @abstractmethod
     def is_topology_supported(self) -> bool:
         """Returns:
-        bool: Whether topology search is supported or not for the SearchSpace.
+        bool: Flag showing topology search is supported or not for the SearchSpace.
         """
 
     def set_topology(self, value: bool) -> None:
-        """Set whether toplogy search is active for model or not."""
+        """Set flag showing toplogy search is active for model or not."""
         self.topology = value
 
     @abstractmethod

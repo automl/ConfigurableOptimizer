@@ -29,20 +29,3 @@ class BaseSampler(OneShotComponent):
     @abstractmethod
     def sample(self, alpha: torch.Tensor) -> torch.Tensor:
         pass
-
-    def _sample_and_update_alphas(self) -> None:  # type: ignore
-        sampled_alphas = []
-        for arch_param in self.arch_parameters:
-            sampled_alphas.append(self.sample(arch_param))
-
-        self.sampled_alphas = sampled_alphas
-
-    def new_epoch(self) -> None:
-        super().new_epoch()
-        if self.sample_frequency == "epoch":
-            self._sample_and_update_alphas()
-
-    def new_step(self) -> None:  # type: ignore
-        super().new_step()
-        if self.sample_frequency == "step":
-            self._sample_and_update_alphas()

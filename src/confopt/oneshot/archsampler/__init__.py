@@ -1,4 +1,5 @@
 from .base_sampler import BaseSampler
+from .composite_sampler import CompositeSampler
 from .darts.sampler import DARTSSampler
 from .drnas.sampler import DRNASSampler
 from .gdas.sampler import GDASSampler
@@ -12,4 +13,5 @@ __all__ = [
     "GDASSampler",
     "SNASSampler",
     "ReinMaxSampler",
+    "CompositeSampler",
 ]

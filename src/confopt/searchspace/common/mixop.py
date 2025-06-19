@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+import warnings
+
 from thop import profile as flop_profile
 import torch
 from torch import nn
+import torch.nn.functional as F  # noqa: N812
 
-from confopt.oneshot.dropout import Dropout
-from confopt.oneshot.partial_connector import PartialConnector
-from confopt.oneshot.weightentangler import WeightEntangler
+if TYPE_CHECKING:
+    from confopt.oneshot.dropout import Dropout
+    from confopt.oneshot.partial_connector import PartialConnector
+    from confopt.oneshot.weightentangler import WeightEntangler
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 __all__ = ["OperationChoices"]
@@ -27,16 +32,46 @@ class OperationChoices(nn.Module):
         self.flops: list[float] | None = None
         self.use_aux_skip = use_aux_skip
         self._init_aux_skip_connection()
+        self._init_dan()
+
+    def _init_dan(self) -> None:
+        C = None
+        for op in self.ops:
+            # targeting the SepConv Block
+            if hasattr(op, "stride") and hasattr(op, "op"):
+                for in_op in op.op:
+                    if hasattr(in_op, "in_channels"):
+                        C = in_op.in_channels
+                        break
+                break
+        self.dan: DynamicAttentionNetwork | None = None
+        if C is not None:
+            self.dan = DynamicAttentionNetwork(
+                C=C,  # type: ignore
+                num_ops=len(self.ops),
+                attention_weight=1,
+            )
+        else:
+            warnings.warn(
+                "Unable to find a parameter-based operation for initializing DAN",
+                stacklevel=1,
+            )
 
     def _init_aux_skip_connection(self) -> None:
         stride = 1
         C = None
-        affine = True
+        affine = False
         if self.is_reduction_cell:
             for op in self.ops:
-                if type(op).__name__ == "FactorizedReduce":
-                    C = op.C_in
-                    stride = 2
+                # targeting the SepConv Block
+                if hasattr(op, "stride"):
+                    stride = op.stride
+                    if hasattr(op, "op"):
+                        for in_op in op.op:
+                            if hasattr(in_op, "in_channels"):
+                                C = in_op.in_channels
+                                break
+                        break
 
         self.aux_skip = AuxiliarySkipConnection(
             stride=stride,
@@ -118,6 +153,7 @@ class OperationBlock(nn.Module):
         device: torch.device = DEVICE,
         is_argmax_sampler: bool = False,
         aux_skip: nn.Module | None = None,
+        dan: nn.Module | None = None,
     ) -> None:
         super().__init__()
         self.device = device
@@ -131,6 +167,7 @@ class OperationBlock(nn.Module):
         self.flops: list[float] | None = None
         self.use_aux_skip = aux_skip is not None
         self.aux_skip = aux_skip
+        self.dan = dan
 
     def forward_method(
         self, x: torch.Tensor, ops: list[nn.Module], alphas: list[torch.Tensor]
@@ -168,16 +205,20 @@ class OperationBlock(nn.Module):
         if self.flops is None:
             self._calculate_flops(x)
 
+        if self.dan:
+            alphas = alphas + self.dan(x)
+
         if self.dropout:
             alphas = self.dropout.apply_mask(alphas)
 
         if self.partial_connector:
-            if self.use_aux_skip:
-                return self.aux_skip(x) + self.partial_connector(  # type: ignore
-                    x, alphas, self.ops, self.forward_method
-                )
-
-            return self.partial_connector(x, alphas, self.ops, self.forward_method)
+            return self.partial_connector(
+                x,
+                alphas,
+                self.ops,
+                self.forward_method,
+                auxiliary_skip_module=self.aux_skip,
+            )
 
         return self.forward_method(x, self.ops, alphas)
 
@@ -248,7 +289,7 @@ class AuxiliarySkipConnection(nn.Module):
             stride (int): stride to apply
             C_in (int): Number of input channels.
             C_out (int): Number of output channels.
-            affine (bool): Whether to apply affine transformations in BatchNorm.
+            affine (bool): Flag to  apply affine transformations in BatchNorm.
             device (torch.device): torch device to use
         """
         super().__init__()
@@ -293,3 +334,24 @@ class AuxiliarySkipConnection(nn.Module):
         out = torch.cat([self.conv_1(x), self.conv_2(x[:, :, 1:, 1:])], dim=1)
         out = self.bn(out)
         return out
+
+
+class DynamicAttentionNetwork(nn.Module):
+    def __init__(self, C: int, num_ops: int, attention_weight: float) -> None:
+        super().__init__()
+        self.fc1 = nn.Linear(C, C // 4)
+        self.fc2 = nn.Linear(C // 4, num_ops)
+        self._attention_weight = attention_weight
+
+    def update_attention_weight(self, attention_weight: float) -> None:
+        self._attention_weight = attention_weight
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = F.adaptive_avg_pool2d(x, output_size=(1, 1))
+        out = out.view(x.size(0), -1)  # shape (N, C)
+
+        out = F.relu(self.fc1(out))
+        out = F.relu(self.fc2(out))
+
+        out = out.mean(dim=0)
+        return self._attention_weight * F.softmax(out, dim=-1)

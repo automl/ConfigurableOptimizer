@@ -8,7 +8,7 @@ if __name__ == "__main__":
     search_space = SearchSpaceType.DARTS
 
     profile = GDASProfile(
-        searchspace=search_space,
+        searchspace_type=search_space,
         epochs=10,
         perturbation="random",
         entangle_op_weights=True,

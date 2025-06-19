@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import torch
+from torch import nn
 from torch.distributions import Dirichlet, kl_divergence
 import torch.nn.functional as F  # noqa: N812
 
@@ -27,10 +28,6 @@ class Regularizer(OneShotComponent):
     ) -> None:
         super().__init__()
 
-        assert (
-            sum([loss_weight, *reg_weights]) == 1.0
-        ), f"Sum of loss_weight ({loss_weight}) and reg_weights \
-        ({reg_weights}) must be 1.0"
         assert len(reg_weights) == len(
             reg_terms
         ), "Length of reg_weights must match reg_terms"
@@ -54,9 +51,10 @@ class RegularizationTerm(ABC):
 
 
 class DrNASRegularizationTerm(RegularizationTerm):
-    def __init__(self, reg_scale: float, **kwargs: Any) -> None:
+    def __init__(self, reg_scale: float, reg_type: str, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.reg_scale = reg_scale
+        self.reg_type = reg_type
 
     def loss(self, model: SearchSpace) -> torch.Tensor:
         assert isinstance(
@@ -71,6 +69,24 @@ class DrNASRegularizationTerm(RegularizationTerm):
             + " as the number of arch parameters in the model"
         )
 
+        if self.reg_type == "kl":
+            loss = self.loss_kl(anchors, arch_parameters)
+        elif self.reg_type == "l2":
+            loss = self.loss_l2(arch_parameters)
+        else:
+            raise ValueError(f"Unknown regularization type: {self.reg_type}")
+        return loss
+
+    def loss_l2(self, arch_parameters: list[nn.Parameter]) -> torch.Tensor:
+        l2_reg_terms = []
+        for alphas in arch_parameters:
+            l2_reg_terms.append(alphas.norm())
+
+        return self.reg_scale * sum(l2_reg_terms)
+
+    def loss_kl(
+        self, anchors: torch.Tensor, arch_parameters: list[nn.Parameter]
+    ) -> torch.Tensor:
         kl_reg_terms = []
         for anchor, alphas in zip(anchors, arch_parameters):
             cons = F.elu(alphas) + 1

@@ -2,6 +2,7 @@ import unittest
 
 import torch
 from torch import nn
+import pytest
 
 from confopt.searchspace import DARTSSearchSpace
 from confopt.searchspace.common.mixop import OperationChoices
@@ -174,6 +175,7 @@ class TestDARTSSearchSpace(unittest.TestCase):
             return True
         return False
 
+    @pytest.mark.experimental()  # type: ignore
     def test_create_new_cell(self) -> None:
         for i in range(2, 15):
             search_space = DARTSSearchSpace(layers=i, C=16)
@@ -182,6 +184,7 @@ class TestDARTSSearchSpace(unittest.TestCase):
             search_space_2 = DARTSSearchSpace(layers=i + 1, C=16)
             assert self._compare_cells(new_cell, search_space_2.model.cells[pos])
 
+    @pytest.mark.experimental() # type: ignore
     def test_insert_new_cells(self) -> None:
         for i in range(2, 10):
             search_space = DARTSSearchSpace(layers=i, C=16)

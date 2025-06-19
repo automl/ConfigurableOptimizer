@@ -14,7 +14,6 @@ from confopt.searchspace.common.mixop import OperationBlock, OperationChoices
 from confopt.utils import (
     calc_layer_alignment_score,
     get_pos_new_cell_darts,
-    get_pos_reductions_darts,
     preserve_gradients_in_module,
     prune,
     set_ops_to_prune,
@@ -22,7 +21,6 @@ from confopt.utils import (
 from confopt.utils.normalize_params import normalize_params
 
 from .genotypes import (
-    BABY_PRIMITIVES,
     PRIMITIVES,
     DARTSGenotype,
     get_skip_connection_index,
@@ -270,7 +268,7 @@ class Network(nn.Module):
         stem_multiplier: int = 3,
         edge_normalization: bool = False,
         discretized: bool = False,
-        is_baby_darts: bool = False,
+        primitives: list[str] = PRIMITIVES,
         k: int = 1,
     ) -> None:
         """Implementation of DARTS search space's network model.
@@ -283,10 +281,10 @@ class Network(nn.Module):
             steps (int): Number of steps in the search space cell. Defaults to 4.
             multiplier (int): Multiplier for channels in the cells. Defaults to 4.
             stem_multiplier (int): Stem multiplier for channels. Defaults to 3.
-            edge_normalization (bool): Whether to use edge normalization. Defaults to False.
+            edge_normalization (bool): Flag to  use edge normalization. Defaults to False.
             discretized (bool): Whether supernet is discretized to only have one operation on
             each edge or not.
-            is_baby_darts (bool): Controls which primitive list to use
+            primitives (list): The list of primitives to use for generating cell.
             k (int): how much of the channel width should be used in the forward pass. Defaults to 1 which mean the whole channel width.
 
         Attributes:
@@ -317,23 +315,20 @@ class Network(nn.Module):
         self.discretized = discretized
         self.mask: list[torch.Tensor] | None = None
         self.last_mask: list[torch.Tensor] = []
+        self.stem_multiplier = stem_multiplier
+        self.k = k
         C_curr = stem_multiplier * C
         self.stem = nn.Sequential(
             nn.Conv2d(3, C_curr, 3, padding=1, bias=False),
             nn.BatchNorm2d(C_curr),
         )
-
-        self.is_baby_darts = is_baby_darts
-        if is_baby_darts:
-            self.primitives = BABY_PRIMITIVES
-        else:
-            self.primitives = PRIMITIVES
+        self.primitives = primitives
 
         C_prev_prev, C_prev, C_curr = C_curr, C_curr, C
         self.cells = nn.ModuleList()
         reduction_prev = False
         for i in range(layers):
-            if i in get_pos_reductions_darts(layers=layers):
+            if i in [layers // 3, 2 * layers // 3]:
                 C_curr *= 2
                 reduction = True
             else:
@@ -389,7 +384,17 @@ class Network(nn.Module):
             Network: A torch module with same arch and beta parameters as this model.
         """
         model_new = Network(
-            self._C, self._num_classes, self._layers, self._criterion
+            C=self._C,
+            num_classes=self._num_classes,
+            layers=self._layers,
+            criterion=self._criterion,
+            steps=self._steps,
+            multiplier=self._multiplier,
+            stem_multiplier=self.stem_multiplier,
+            edge_normalization=self.edge_normalization,
+            discretized=self.discretized,
+            primitives=self.primitives,
+            k=self.k,
         ).to(DEVICE)
         for x, y in zip(model_new.arch_parameters(), self.arch_parameters()):
             x.data.copy_(y.data)
@@ -568,10 +573,14 @@ class Network(nn.Module):
         self.alphas_reduce = nn.Parameter(
             1e-3 * torch.randn(k, self.num_ops).to(DEVICE)
         )
-        self._arch_parameters = [
-            self.alphas_normal,
-            self.alphas_reduce,
-        ]
+
+        if len(self.cells) == 1:
+            self._arch_parameters = [self.alphas_reduce]
+        else:
+            self._arch_parameters = [
+                self.alphas_normal,
+                self.alphas_reduce,
+            ]
 
         self.betas_normal = nn.Parameter(1e-3 * torch.randn(k).to(DEVICE))
         self.betas_reduce = nn.Parameter(1e-3 * torch.randn(k).to(DEVICE))
@@ -615,6 +624,11 @@ class Network(nn.Module):
             gene = []
             n = 2
             start = 0
+
+            none_idx = (
+                self.primitives.index("none") if "none" in self.primitives else -1
+            )
+
             for i in range(self._steps):
                 end = start + n
                 W = weights[start:end].copy()
@@ -623,15 +637,13 @@ class Network(nn.Module):
                     key=lambda x: -max(
                         W[x][k]
                         for k in range(len(W[x]))  # type: ignore
-                        if k != self.primitives.index("none")
+                        if k != none_idx
                     ),
                 )[:2]
                 for j in edges:
                     k_best = None
                     for k in range(len(W[j])):
-                        if k != self.primitives.index("none") and (
-                            k_best is None or W[j][k] > W[j][k_best]
-                        ):
+                        if k != none_idx and (k_best is None or W[j][k] > W[j][k_best]):
                             k_best = k
                     gene.append((self.primitives[k_best], j))  # type: ignore
                 start = end
@@ -677,7 +689,11 @@ class Network(nn.Module):
         self, only_first_and_last: bool = False
     ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
         def get_grads(alphas_grads_list: list[torch.Tensor]) -> list[torch.Tensor]:
+            if len(alphas_grads_list) < 2:
+                return []
+
             grads = []
+
             if only_first_and_last:
                 grads.append(alphas_grads_list[0].reshape(-1))
                 grads.append(alphas_grads_list[-1].reshape(-1))

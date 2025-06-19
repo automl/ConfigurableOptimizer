@@ -14,9 +14,14 @@ dependencies = [
     "thop",
     "seaborn",
     "scikit-image",
+    "gdown",
 ]
 requires-python = ">=3.8"
-authors = [{ name = "Arjun Krishnakumar", email = "arjun.krishnakumar.mec@gmail.com" }]
+authors = [
+    { name = "Abhash Kumar Jha", email = "jhaa@cs.uni-freiburg.de" },
+    { name = "Shakiba Moradian", email = "moradias@cs.uni-freiburg.de" },
+    { name = "Arjun Krishnakumar", email = "krishnan@cs.uni-freiburg.de" },
+]
 readme = "README.md"
 description = "Breaks down one-shot optimizers into their core ideas and modularizes them."
 classifiers = [
@@ -98,6 +103,9 @@ doc = [
   "mike",
   "pillow",
   "cairosvg",
+  "myst-parser",
+  "sphinx_rtd_theme",
+  "sphinx-panels",
 ]
 
 [project.urls]

@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     # Sampler and Perturbator have different sample_frequency
     profile = DRNASProfile(
-        searchspace=searchspace,
+        searchspace_type=searchspace,
         is_partial_connection=args.searchspace == "darts",
         epochs=args.search_epochs,
         sampler_sample_frequency="step",
@@ -94,7 +94,9 @@ if __name__ == "__main__":
         "learning_rate_min": 0.001,
     }
     profile.configure_trainer(**train_config)
-    discrete_profile = DiscreteProfile(searchspace=searchspace, epochs=args.eval_epochs, train_portion=0.9)
+    discrete_profile = DiscreteProfile(
+        searchspace_type=searchspace, epochs=args.eval_epochs, train_portion=0.9
+    )
     discrete_profile.configure_trainer(batch_size=64)
 
     discrete_config = discrete_profile.get_trainer_config()
