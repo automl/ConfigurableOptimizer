@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from confopt.enums import DatasetType, SearchSpaceType
+from confopt.enums import DatasetType, SearchSpaceType, TrainerPresetType
 from confopt.profile import BaseProfile, DARTSProfile, DiscreteProfile
 from confopt.searchspace.darts.core.genotypes import PRIMITIVES
 from confopt.train import Experiment
@@ -180,7 +180,7 @@ def configure_discrete_profile_with_hp_set(
 
 if __name__ == "__main__":
     profile = DARTSProfile(
-        searchspace_type=SearchSpaceType.DARTS,
+        trainer_preset=TrainerPresetType.DARTS,
         epochs=10,
     )
 

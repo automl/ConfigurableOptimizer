@@ -12,7 +12,7 @@ if __name__ == "__main__":
     seed = 100
 
     profile = DARTSProfile(
-        searchspace_type=searchspace,
+        trainer_preset="darts",
         is_partial_connection=True,
         perturbation="random",
         sampler_sample_frequency="step",

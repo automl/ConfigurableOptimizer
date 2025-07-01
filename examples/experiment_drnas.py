@@ -7,7 +7,7 @@ import wandb
 
 from confopt.profile import DiscreteProfile, DRNASProfile
 from confopt.train import Experiment
-from confopt.enums import DatasetType, SearchSpaceType
+from confopt.enums import DatasetType, SearchSpaceType, TrainerPresetType
 
 dataset_size = {
     "cifar10": 10,
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     # Sampler and Perturbator have different sample_frequency
     profile = DRNASProfile(
-        searchspace_type=searchspace,
+        trainer_preset=TrainerPresetType(args.searchspace),
         is_partial_connection=args.searchspace == "darts",
         epochs=args.search_epochs,
         sampler_sample_frequency="step",
@@ -95,7 +95,7 @@ if __name__ == "__main__":
     }
     profile.configure_trainer(**train_config)
     discrete_profile = DiscreteProfile(
-        searchspace_type=searchspace, epochs=args.eval_epochs, train_portion=0.9
+        trainer_preset=args.searchspace, epochs=args.eval_epochs, train_portion=0.9
     )
     discrete_profile.configure_trainer(batch_size=64)
 
