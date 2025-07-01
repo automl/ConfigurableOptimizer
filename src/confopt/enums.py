@@ -15,6 +15,18 @@ class SearchSpaceType(Enum):
         return self.value
 
 
+class TrainerPresetType(Enum):
+    DARTS = "darts"
+    NB201 = "nb201"
+    NB1SHOT1 = "nb1shot1"
+    TNB101 = "tnb101"
+    BABYDARTS = "baby_darts"
+    RobustDARTS = "robust_darts"
+
+    def __str__(self) -> str:
+        return self.value
+
+
 class SamplerType(Enum):
     DARTS = "darts"
     DRNAS = "drnas"
