@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from confopt.profile import GDASProfile
 from confopt.train import Experiment
-from confopt.enums import DatasetType, SearchSpaceType
+from confopt.enums import DatasetType, SearchSpaceType, TrainerPresetType
 
 if __name__ == "__main__":
     searchspace = SearchSpaceType("nb201")
@@ -11,7 +11,7 @@ if __name__ == "__main__":
 
     # Sampler and Perturbator have different sample_frequency
     profile = GDASProfile(
-        searchspace_type=searchspace,
+        trainer_preset=TrainerPresetType("nb201"),
         is_partial_connection=True,
         perturbation="random",
         sampler_sample_frequency="step",

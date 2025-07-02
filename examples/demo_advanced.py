@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from confopt.profile import GDASProfile
 from confopt.train import Experiment
-from confopt.enums import DatasetType, SearchSpaceType
+from confopt.enums import DatasetType, TrainerPresetType, SearchSpaceType
 
 if __name__ == "__main__":
     search_space = SearchSpaceType.DARTS
 
     profile = GDASProfile(
-        searchspace_type=search_space,
+        trainer_preset=TrainerPresetType.DARTS,
         epochs=10,
         perturbation="random",
         entangle_op_weights=True,

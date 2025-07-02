@@ -78,7 +78,7 @@ if __name__ == "__main__":
     searchspace = SearchSpaceType.BABYDARTS
     dataset = DatasetType.SYNTHETIC
 
-    profile = get_profile(args)(searchspace_type=searchspace, epochs=args.search_epochs)
+    profile = get_profile(args)(trainer_preset=searchspace.value, epochs=args.search_epochs)
 
     profile.configure_synthetic_dataset(
         signal_width=args.signal_width,

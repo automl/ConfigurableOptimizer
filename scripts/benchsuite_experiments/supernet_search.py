@@ -207,7 +207,7 @@ if __name__ == "__main__":
 
     epochs = 3 if args.dryrun is True else epochs_profiles[args.optimizer]
     profile = profile_classes[args.optimizer](
-        searchspace_type=SEARCHSPACE,
+        trainer_preset=SEARCHSPACE.value,
         epochs=epochs,
         is_partial_connection=args.pcdarts,
         perturbation=args.sdarts,

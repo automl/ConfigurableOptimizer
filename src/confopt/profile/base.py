@@ -5,7 +5,7 @@ import warnings
 
 import torch
 
-from confopt.enums import SamplerType, SearchSpaceType
+from confopt.enums import SamplerType, TrainerPresetType
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 # TODO Change this to real data
@@ -113,7 +113,7 @@ class BaseProfile:
     def __init__(  # noqa: C901, PLR0912, PLR0915
         self,
         sampler_type: str | SamplerType,
-        searchspace_type: str | SearchSpaceType,
+        trainer_preset: str | TrainerPresetType,
         epochs: int = 50,
         *,
         sampler_sample_frequency: str = "step",
@@ -154,23 +154,23 @@ class BaseProfile:
             AssertionError: If any of the provided configurations are invalid or \
                 inconsistent.
         """
-        self.searchspace_type = (
-            SearchSpaceType(searchspace_type)
-            if isinstance(searchspace_type, str)
-            else searchspace_type
+        self.trainer_preset = (
+            TrainerPresetType(trainer_preset)
+            if isinstance(trainer_preset, str)
+            else trainer_preset
         )
         self.sampler_type = (
             SamplerType(sampler_type) if isinstance(sampler_type, str) else sampler_type
         )
 
         assert isinstance(
-            self.searchspace_type, SearchSpaceType
-        ), f"Illegal value {self.searchspace_type} for searchspace_type"
+            self.trainer_preset, TrainerPresetType
+        ), f"Illegal value {self.trainer_preset} for trainer_preset"
         assert isinstance(
             self.sampler_type, SamplerType
         ), f"Illegal value {self.sampler_type} for sampler_type"
 
-        if self.searchspace_type == SearchSpaceType.TNB101:
+        if self.trainer_preset == TrainerPresetType.TNB101:
             assert searchspace_domain in [
                 "class_object",
                 "class_scene",
@@ -179,7 +179,7 @@ class BaseProfile:
             assert (
                 searchspace_domain is None
             ), "searchspace_domain is not required for this searchspace"
-        if searchspace_type in ("nb1shot1", SearchSpaceType.NB1SHOT1):
+        if trainer_preset in ("nb1shot1", TrainerPresetType.NB1SHOT1):
             assert searchspace_subspace in [
                 "S1",
                 "S2",
@@ -486,7 +486,7 @@ class BaseProfile:
                 "toggle_probability": self.lora_toggle_probability,
             },
             "sampler_type": self.sampler_type,
-            "searchspace": self.searchspace_type.value,
+            "searchspace": self.trainer_preset.value,
             "searchspace_domain": self.searchspace_domain,
             "weight_type": weight_type,
             "oles": self.oles_config,
@@ -578,7 +578,7 @@ class BaseProfile:
 
     def _initialize_trainer_config(self) -> None:
         """Initialize the configuration for the trainer based on the
-        searchspace_type.
+        trainer_preset.
 
         Args:
             None
@@ -586,16 +586,17 @@ class BaseProfile:
         Returns:
             None
         """
-        if self.searchspace_type == SearchSpaceType.NB201:
+        if self.trainer_preset == TrainerPresetType.NB201:
             self._initialize_trainer_config_nb201()
-        elif self.searchspace_type in (
-            SearchSpaceType.BABYDARTS,
-            SearchSpaceType.DARTS,
+        elif self.trainer_preset in (
+            TrainerPresetType.BABYDARTS,
+            TrainerPresetType.DARTS,
+            TrainerPresetType.RobustDARTS,
         ):
             self._initialize_trainer_config_darts()
-        elif self.searchspace_type == SearchSpaceType.NB1SHOT1:
+        elif self.trainer_preset == TrainerPresetType.NB1SHOT1:
             self._initialize_trainer_config_1shot1()
-        elif self.searchspace_type == SearchSpaceType.TNB101:
+        elif self.trainer_preset == TrainerPresetType.TNB101:
             self._initialize_trainer_config_tnb101()
 
     def _initialize_dropout_config(self) -> None:
@@ -946,7 +947,7 @@ class BaseProfile:
 
         Args:
             **config: Arbitrary keyword arguments. Possible depend on the \
-                the search space type. For more information please check the \
+                the trainer preset type. For more information please check the \
                 Parameters of the supernet of each search space.
 
 
@@ -1058,7 +1059,7 @@ class BaseProfile:
             str: A string describing the run configuration.
         """
         run_configs = []
-        run_configs.append(f"ss_{self.searchspace_type}")
+        run_configs.append(f"ss_{self.trainer_preset}")
         if self.entangle_op_weights:
             run_configs.append("type_we")
         else:
