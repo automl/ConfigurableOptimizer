@@ -54,7 +54,7 @@
 <li class="toctree-l2"><a class="reference internal" href="drnasprofile.html">DRNAS Profile</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Discrete Profile</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#confopt.profile.DiscreteProfile"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DiscreteProfile._initializa_genotype"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile._initializa_genotype()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DiscreteProfile._initialize_genotype"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile._initialize_genotype()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DiscreteProfile._initialize_trainer_config"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile._initialize_trainer_config()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DiscreteProfile.configure_extra"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile.configure_extra()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DiscreteProfile.configure_searchspace"><code class="docutils literal notranslate"><span class="pre">DiscreteProfile.configure_searchspace()</span></code></a></li>
@@ -103,11 +103,11 @@
 <h1>Discrete Profile<a class="headerlink" href="#discrete-profile" title="Link to this heading"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="confopt.profile.DiscreteProfile">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">confopt.profile.</span></span><span class="sig-name descname"><span class="pre">DiscreteProfile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">searchspace_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SearchSpaceType</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#confopt.profile.DiscreteProfile" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">confopt.profile.</span></span><span class="sig-name descname"><span class="pre">DiscreteProfile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">trainer_preset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">TrainerPresetType</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#confopt.profile.DiscreteProfile" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <dl class="py method">
-<dt class="sig sig-object py" id="confopt.profile.DiscreteProfile._initializa_genotype">
-<span class="sig-name descname"><span class="pre">_initializa_genotype</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.DiscreteProfile._initializa_genotype" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="confopt.profile.DiscreteProfile._initialize_genotype">
+<span class="sig-name descname"><span class="pre">_initialize_genotype</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.DiscreteProfile._initialize_genotype" title="Link to this definition"></a></dt>
 <dd><p>Initializes the genotype for the discrete profile.
 This method sets the genotype of the best DARTS supernet found
 after 50 epochs of running the DARTS optimizer. Thus it is only
@@ -159,7 +159,7 @@ Could be useful for tracking Weights &amp; Biases metadata.</p>
 <dd><p>Configure the search space for the supernet.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>**config</strong> – Arbitrary keyword arguments. Possible depend on the                 the search space type. For more information please check the                 Parameters of the supernet of each search space.</p>
+<dd class="field-odd"><p><strong>**config</strong> – Arbitrary keyword arguments. Possible depend on the                 the trainer preset type. For more information please check the                 Parameters of the supernet of each search space.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>None</p>
@@ -237,7 +237,7 @@ The description is used for tracking purposes in Weights &amp; Biases.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="confopt.profile.DiscreteProfile.get_searchspace_config">
 <span class="sig-name descname"><span class="pre">get_searchspace_config</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset_str</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#confopt.profile.DiscreteProfile.get_searchspace_config" title="Link to this definition"></a></dt>
-<dd><p>Returns the search space configuration based on the search space type.</p>
+<dd><p>Returns the search space configuration based on the trainer preset type.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>dataset_str</strong> (<em>str</em>) – The dataset string.</p>

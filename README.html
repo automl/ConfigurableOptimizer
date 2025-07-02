@@ -115,10 +115,10 @@
 <p>Below is a snippet that demonstrates how we run a vanilla-DARTS experiment.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">confopt.profile</span><span class="w"> </span><span class="kn">import</span> <span class="n">DARTSProfile</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">confopt.train</span><span class="w"> </span><span class="kn">import</span> <span class="n">Experiment</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">confopt.enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">SearchSpaceType</span><span class="p">,</span> <span class="n">DatasetType</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">confopt.enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrainerPresetType</span><span class="p">,</span> <span class="n">SearchSpaceType</span><span class="p">,</span> <span class="n">DatasetType</span>
 
 <span class="n">profile</span> <span class="o">=</span> <span class="n">DARTSProfile</span><span class="p">(</span>
-        <span class="n">searchspace_type</span><span class="o">=</span><span class="n">SearchSpaceType</span><span class="o">.</span><span class="n">DARTS</span><span class="p">,</span>
+        <span class="n">trainer_preset</span><span class="o">=</span><span class="n">TrainerPresetType</span><span class="o">.</span><span class="n">DARTS</span><span class="p">,</span>
         <span class="n">epochs</span><span class="o">=</span><span class="mi">3</span>
 <span class="p">)</span>
 
