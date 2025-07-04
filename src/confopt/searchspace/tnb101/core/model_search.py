@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 import math
-from typing import Callable
 
 import torch
 from torch import nn
@@ -112,8 +111,7 @@ class TNB101SearchModel(nn.Module):
         )
         self._beta_parameters = nn.Parameter(1e-3 * torch.randn(self.num_edge))
 
-        self.weights_grad: list[torch.Tensor] = []
-        self.grad_hook_handlers: list[torch.utils.hooks.RemovableHandle] = []
+        self.saved_weights: list[torch.Tensor] = []
 
         # Multi-head attention for architectural parameters
         self.is_arch_attention_enabled = False  # disabled by default
@@ -161,15 +159,12 @@ class TNB101SearchModel(nn.Module):
         return weights
 
     def forward(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        self.reset_hooks()
-
         if self._arch_parameters is None:
             return self.discrete_model_forward(inputs)
 
+        self.saved_weights = []
         if self.edge_normalization:
             return self.edge_normalization_forward(inputs)
-
-        self.weights_grad = []
 
         # alphas = self.sample(self._arch_parameters)
         alphas = self.sample_weights()
@@ -183,7 +178,7 @@ class TNB101SearchModel(nn.Module):
 
         for _i, cell in enumerate(self.cells):
             weights = alphas.clone()
-            self.save_weight_grads(weights)
+            self.save_weights(weights)
 
             if self.lambda_perturbations is not None:
                 weights = weights - self.lambda_perturbations[_i]
@@ -217,8 +212,6 @@ class TNB101SearchModel(nn.Module):
         inputs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         # alphas = self.sample(self._arch_parameters)
-        self.weights_grad = []
-
         alphas = self.sample_weights()
 
         if self.mask is not None:
@@ -239,7 +232,7 @@ class TNB101SearchModel(nn.Module):
                 )
                 betas = torch.cat([betas, beta_node_v], dim=0)
             weights = alphas.clone()
-            self.save_weight_grads(weights)
+            self.save_weights(weights)
             feature = cell(feature, alphas, betas)
 
         out = self.decoder(feature)
@@ -384,37 +377,25 @@ class TNB101SearchModel(nn.Module):
         return flops / len(self.cells)
 
     ### Layer alignment score support  methods ###
-    def reset_hooks(self) -> None:
-        for hook in self.grad_hook_handlers:
-            hook.remove()
-
-        self.grad_hook_handlers = []
-
-    def save_gradient(self) -> Callable:
-        def hook(grad: torch.Tensor) -> None:
-            self.weights_grad.append(grad)
-
-        return hook
-
-    def save_weight_grads(
+    def save_weights(
         self,
         weights: torch.Tensor,
     ) -> None:
         if not self.training:
             return
-        grad_hook = weights.register_hook(self.save_gradient())
-        self.grad_hook_handlers.append(grad_hook)
+        weights.retain_grad()
+        self.saved_weights.append(weights)
 
     def get_arch_grads(
         self, only_first_and_last: bool = False
     ) -> tuple[list[torch.Tensor], list[torch.Tensor] | None]:
         grads = []
         if only_first_and_last:
-            grads.append(self.weights_grad[0].reshape(-1))
-            grads.append(self.weights_grad[-1].reshape(-1))
+            grads.append(self.saved_weights[0].grad.data.clone().detach().reshape(-1))
+            grads.append(self.saved_weights[-1].grad.data.clone().detach().reshape(-1))
         else:
-            for alphas in self.weights_grad:
-                grads.append(alphas.reshape(-1))
+            for alphas in self.saved_weights:
+                grads.append(alphas.grad.data.clone().detach().reshape(-1))
 
         return grads, None
 

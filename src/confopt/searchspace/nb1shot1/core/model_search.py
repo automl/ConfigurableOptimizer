@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 import math
-from typing import Any, Callable
+from typing import Any
 import warnings
 
 import numpy as np
@@ -238,8 +238,7 @@ class Network(nn.Module):
         self._initialize_alphas()
         self.mask = None
 
-        self.weights_grad: list[torch.Tensor] = []
-        self.grad_hook_handlers: list[torch.utils.hooks.RemovableHandle] = []
+        self.saved_weights: list[torch.Tensor] = []
 
         # Multi-head attention for architectural parameters
         self.is_arch_attention_enabled = False  # disabled by default
@@ -288,7 +287,6 @@ class Network(nn.Module):
         return mixed_op_weights, output_weights, input_weights
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        self.reset_hooks()
         # NASBench only has one input to each cell
         mixed_op_weights, output_weights, input_weights = self.sample_weights()
         s0 = self.stem(x)
@@ -308,7 +306,7 @@ class Network(nn.Module):
 
             # Sample the input weights for the nodes in the cell
             input_weights_cell = [weight.clone() for weight in input_weights]
-            self.save_weight_grads(mixed_op_weights_cell)
+            self.save_weights(mixed_op_weights_cell)
             s0 = cell(
                 s0, mixed_op_weights_cell, output_weights_cell, input_weights_cell
             )
@@ -636,37 +634,25 @@ class Network(nn.Module):
             cell.prune_ops(self.mask)
 
     ### Layer Alignment START ###
-    def reset_hooks(self) -> None:
-        for hook in self.grad_hook_handlers:
-            hook.remove()
-
-        self.grad_hook_handlers = []
-
-    def save_gradient(self) -> Callable:
-        def hook(grad: torch.Tensor) -> None:
-            self.weights_grad.append(grad)
-
-        return hook
-
-    def save_weight_grads(
+    def save_weights(
         self,
         weights: torch.Tensor,
     ) -> None:
         if not self.training:
             return
-        grad_hook = weights.register_hook(self.save_gradient())
-        self.grad_hook_handlers.append(grad_hook)
+        weights.retain_grad()
+        self.saved_weights.append(weights)
 
     def get_arch_grads(
         self, only_first_and_last: bool = False
     ) -> tuple[list[torch.Tensor], list[torch.Tensor] | None]:
         grads = []
         if only_first_and_last:
-            grads.append(self.weights_grad[0].reshape(-1))
-            grads.append(self.weights_grad[-1].reshape(-1))
+            grads.append(self.saved_weights[0].grad.data.clone().detach().reshape(-1))
+            grads.append(self.saved_weights[-1].grad.data.clone().detach().reshape(-1))
         else:
-            for alphas in self.weights_grad:
-                grads.append(alphas.reshape(-1))
+            for alphas in self.saved_weights:
+                grads.append(alphas.grad.data.clone().detach().reshape(-1))
 
         return grads, None
 

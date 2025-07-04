@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 import math
-from typing import Callable, Literal
+from typing import Literal
 import warnings
 
 import torch
@@ -350,8 +350,9 @@ class Network(nn.Module):
 
         self.global_pooling = nn.AdaptiveAvgPool2d(1)
         self.classifier = nn.Linear(C_prev, num_classes)
-        self.weights_grad: dict[str, list[torch.Tensor]] = {}
-        self.grad_hook_handlers: list[torch.utils.hooks.RemovableHandle] = []
+
+        # layer-alignment
+        self.saved_weights: dict[str, list[torch.Tensor]] = {}
 
         # Multi-head attention for architectural parameters
         self.is_arch_attention_enabled = False  # disabled by default
@@ -406,25 +407,13 @@ class Network(nn.Module):
         # Replace this function on the fly to change the sampling method
         return F.softmax(alphas, dim=-1)
 
-    def reset_hooks(self) -> None:
-        for hook in self.grad_hook_handlers:
-            hook.remove()
-        self.grad_hook_handlers = []
-
-    def save_gradient(self, cell_type: Literal["normal", "reduce"]) -> Callable:
-        def hook(grad: torch.Tensor) -> None:
-            self.weights_grad[cell_type].append(grad)
-
-        return hook
-
-    def save_weight_grads(
+    def save_weights(
         self, weights: torch.Tensor, cell_type: Literal["reduce", "normal"]
     ) -> None:
-        assert cell_type in ["reduce", "normal"]
         if not self.training:
             return
-        grad_hook = weights.register_hook(self.save_gradient(cell_type=cell_type))
-        self.grad_hook_handlers.append(grad_hook)
+        weights.retain_grad()
+        self.saved_weights[cell_type].append(weights)
 
     def sample_weights(self) -> tuple[torch.Tensor, torch.Tensor]:
         if self.projection_mode:
@@ -467,13 +456,12 @@ class Network(nn.Module):
             - The output tensor after the forward pass.
             - The logits tensor produced by the model.
         """
-        self.reset_hooks()
+        self.saved_weights["normal"] = []
+        self.saved_weights["reduce"] = []
         if self.edge_normalization:
             return self.edge_normalization_forward(x)
 
         s0 = s1 = self.stem(x)
-        self.weights_grad["normal"] = []
-        self.weights_grad["reduce"] = []
 
         weights_normal, weights_reduce = self.sample_weights()
         self.sampled_weights = [weights_normal, weights_reduce]
@@ -481,10 +469,10 @@ class Network(nn.Module):
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
                 weights = weights_reduce.clone()
-                self.save_weight_grads(weights, cell_type="reduce")
+                self.save_weights(weights, cell_type="reduce")
             else:
                 weights = weights_normal.clone()
-                self.save_weight_grads(weights, cell_type="normal")
+                self.save_weights(weights, cell_type="normal")
 
             if self.lambda_perturbations is not None:
                 weights = weights - self.lambda_perturbations[_i]
@@ -504,8 +492,6 @@ class Network(nn.Module):
         # TODO: normalization of alphas
 
         s0 = s1 = self.stem(inputs)
-        self.weights_grad["normal"] = []
-        self.weights_grad["reduce"] = []
 
         weights_normal, weights_reduce = self.sample_weights()
         self.sampled_weights = [weights_normal, weights_reduce]
@@ -513,7 +499,7 @@ class Network(nn.Module):
         for _i, cell in enumerate(self.cells):
             if cell.reduction:
                 weights = weights_reduce.clone()
-                self.save_weight_grads(weights, cell_type="reduce")
+                self.save_weights(weights, cell_type="reduce")
                 n = 3
                 start = 2
                 weights2 = F.softmax(self.betas_reduce[0:2], dim=-1)
@@ -525,7 +511,7 @@ class Network(nn.Module):
                     weights2 = torch.cat([weights2, tw2], dim=0)
             else:
                 weights = weights_normal.clone()
-                self.save_weight_grads(weights, cell_type="normal")
+                self.save_weights(weights, cell_type="normal")
                 n = 3
                 start = 2
                 weights2 = F.softmax(self.betas_normal[0:2], dim=-1)
@@ -688,23 +674,24 @@ class Network(nn.Module):
     def get_arch_grads(
         self, only_first_and_last: bool = False
     ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
-        def get_grads(alphas_grads_list: list[torch.Tensor]) -> list[torch.Tensor]:
-            if len(alphas_grads_list) < 2:
+        def get_grads(weights: list[torch.Tensor]) -> list[torch.Tensor]:
+            if len(weights) < 2:
                 return []
 
             grads = []
 
             if only_first_and_last:
-                grads.append(alphas_grads_list[0].reshape(-1))
-                grads.append(alphas_grads_list[-1].reshape(-1))
+                grads.append(weights[0].grad.data.clone().detach().reshape(-1))
+                grads.append(weights[-1].grad.data.clone().detach().reshape(-1))
             else:
-                for alphas_grad in alphas_grads_list:
-                    grads.append(alphas_grad.reshape(-1))
+                for alphas in weights:
+                    grads.append(alphas.grad.data.clone().detach().reshape(-1))
 
             return grads
 
-        grads_normal = get_grads(self.weights_grad["normal"])
-        grads_reduce = get_grads(self.weights_grad["reduce"])
+        grads_normal = get_grads(self.saved_weights["normal"])
+        grads_reduce = get_grads(self.saved_weights["reduce"])
+
         return grads_normal, grads_reduce
 
     def get_mean_layer_alignment_score(

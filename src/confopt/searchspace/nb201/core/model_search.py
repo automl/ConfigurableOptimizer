@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 import math
-from typing import Callable
 
 import torch
 from torch import nn
@@ -136,8 +135,7 @@ class NB201SearchModel(nn.Module):
         self.beta_parameters = nn.Parameter(
             1e-3 * torch.randn(num_edge)  # type: ignore
         )
-        self.weights_grad: list[torch.Tensor] = []
-        self.grad_hook_handlers: list[torch.utils.hooks.RemovableHandle] = []
+        self.saved_weights: list[torch.Tensor] = []
 
         self.num_edges = num_edge
         self.num_nodes = max_nodes - 1
@@ -298,26 +296,14 @@ class NB201SearchModel(nn.Module):
 
         return weights
 
-    def reset_hooks(self) -> None:
-        for hook in self.grad_hook_handlers:
-            hook.remove()
-
-        self.grad_hook_handlers = []
-
-    def save_gradient(self) -> Callable:
-        def hook(grad: torch.Tensor) -> None:
-            self.weights_grad.append(grad)
-
-        return hook
-
-    def save_weight_grads(
+    def save_weights(
         self,
         weights: torch.Tensor,
     ) -> None:
         if not self.training:
             return
-        grad_hook = weights.register_hook(self.save_gradient())
-        self.grad_hook_handlers.append(grad_hook)
+        weights.retain_grad()
+        self.saved_weights.append(weights)
 
     def forward(self, inputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass of the model.
@@ -330,11 +316,9 @@ class NB201SearchModel(nn.Module):
             - The output tensor after the forward pass.
             - The logits tensor produced by the model.
         """
-        self.reset_hooks()
+        self.saved_weights = []
         if self.edge_normalization:
             return self.edge_normalization_forward(inputs)
-
-        self.weights_grad = []
 
         weights = self.sample_weights()
         self.sampled_weights = [weights]
@@ -344,7 +328,7 @@ class NB201SearchModel(nn.Module):
         for cell in self.cells:
             if isinstance(cell, SearchCell):
                 alphas = weights.clone()
-                self.save_weight_grads(alphas)
+                self.save_weights(alphas)
 
                 if self.lambda_perturbations is not None:
                     weights = weights - self.lambda_perturbations[_i]
@@ -367,8 +351,6 @@ class NB201SearchModel(nn.Module):
         self,
         inputs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        self.weights_grad = []
-
         weights = self.sample_weights()
         self.sampled_weights = [weights]
 
@@ -376,7 +358,7 @@ class NB201SearchModel(nn.Module):
         for _i, cell in enumerate(self.cells):
             if isinstance(cell, SearchCell):
                 alphas = weights.clone()
-                self.save_weight_grads(alphas)
+                self.save_weights(alphas)
                 betas = torch.empty((0,)).to(alphas[0].device)  # type: ignore
                 for v in range(1, self.max_nodes):
                     idx_nodes = []
@@ -404,11 +386,11 @@ class NB201SearchModel(nn.Module):
     ) -> tuple[list[torch.Tensor], list[torch.Tensor] | None]:
         grads = []
         if only_first_and_last:
-            grads.append(self.weights_grad[0].reshape(-1))
-            grads.append(self.weights_grad[-1].reshape(-1))
+            grads.append(self.saved_weights[0].grad.data.clone().detach().reshape(-1))
+            grads.append(self.saved_weights[-1].grad.data.clone().detach().reshape(-1))
         else:
-            for alphas in self.weights_grad:
-                grads.append(alphas.reshape(-1))
+            for alphas in self.saved_weights:
+                grads.append(alphas.grad.data.clone().detach().reshape(-1))
 
         return grads, None
 
