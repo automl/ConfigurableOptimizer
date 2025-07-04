@@ -6,7 +6,7 @@ from typing import Any
 
 from typing_extensions import override
 
-from confopt.enums import SamplerType, SearchSpaceType
+from confopt.enums import SamplerType, TrainerPresetType
 from confopt.searchspace.common import LambdaReg
 from confopt.searchspace.darts.core.genotypes import DARTSGenotype
 from confopt.utils import get_num_classes
@@ -28,14 +28,14 @@ class DARTSProfile(BaseProfile, ABC):
 
     def __init__(
         self,
-        searchspace_type: str | SearchSpaceType,
+        trainer_preset: str | TrainerPresetType,
         epochs: int,
         use_lambda_regularizer: bool = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(
             self.SAMPLER_TYPE,
-            searchspace_type,
+            trainer_preset,
             epochs,
             **kwargs,
         )
@@ -97,7 +97,7 @@ class DARTSProfile(BaseProfile, ABC):
 
         Example:
             >>> from confopt.profile import DARTSProfile
-            >>> darts_profile = DARTSProfile(searchspace='darts', epochs=50)
+            >>> darts_profile = DARTSProfile(trainer_preset='darts', epochs=50)
             >>> darts_profile.configure_sampler(arch_combine_fn='sigmoid')
 
         The accepted keyword arguments should align with the sampler's configuration and
@@ -128,7 +128,7 @@ class GDASProfile(BaseProfile, ABC):
 
     def __init__(
         self,
-        searchspace_type: str | SearchSpaceType,
+        trainer_preset: str | TrainerPresetType,
         epochs: int,
         tau_min: float = 0.1,
         tau_max: float = 10,
@@ -139,7 +139,7 @@ class GDASProfile(BaseProfile, ABC):
 
         super().__init__(
             self.SAMPLER_TYPE,
-            searchspace_type,
+            trainer_preset,
             epochs,
             **kwargs,
         )
@@ -188,7 +188,7 @@ class GDASProfile(BaseProfile, ABC):
 
         Example:
             >>> from confopt.profile import GDASProfile
-            >>> gdas_profile = GDASProfile(searchspace='darts', epochs=50)
+            >>> gdas_profile = GDASProfile(trainer_preset='darts', epochs=50)
             >>> gdas_profile.configure_sampler(tau_min=02, tau_max=20)
 
         The accepted keyword arguments should align with the sampler's configuration and
@@ -229,7 +229,7 @@ class SNASProfile(BaseProfile, ABC):
 
     def __init__(
         self,
-        searchspace_type: str | SearchSpaceType,
+        trainer_preset: str | TrainerPresetType,
         epochs: int,
         temp_init: float = 1.0,
         temp_min: float = 0.03,
@@ -243,7 +243,7 @@ class SNASProfile(BaseProfile, ABC):
 
         super().__init__(  # type: ignore
             self.SAMPLER_TYPE,
-            searchspace_type,
+            trainer_preset,
             epochs,
             **kwargs,
         )
@@ -306,13 +306,13 @@ class DRNASProfile(BaseProfile, ABC):
 
     def __init__(
         self,
-        searchspace_type: str | SearchSpaceType,
+        trainer_preset: str | TrainerPresetType,
         epochs: int,
         **kwargs: Any,
     ) -> None:
         super().__init__(  # type: ignore
             self.SAMPLER_TYPE,
-            searchspace_type,
+            trainer_preset,
             epochs,
             **kwargs,
         )
@@ -416,7 +416,7 @@ class DRNASProfile(BaseProfile, ABC):
 
         Example:
             >>> from confopt.profile import DRNASProfile
-            >>> drnas_profile = DRNASProfile(searchspace='darts', epochs=50)
+            >>> drnas_profile = DRNASProfile(trainer_preset='darts', epochs=50)
             >>> drnas_profile.configure_sampler(arch_combine_fn='sigmoid')
 
         The accepted keyword arguments should align with the sampler's configuration and
@@ -437,7 +437,7 @@ class CompositeProfile(BaseProfile, ABC):
 
     def __init__(
         self,
-        searchspace_type: str | SearchSpaceType,
+        trainer_preset: str | TrainerPresetType,
         samplers: list[str | SamplerType],
         epochs: int,
         # GDAS configs
@@ -464,7 +464,7 @@ class CompositeProfile(BaseProfile, ABC):
 
         super().__init__(  # type: ignore
             self.SAMPLER_TYPE,
-            searchspace_type,
+            trainer_preset,
             epochs,
             **kwargs,
         )
@@ -576,21 +576,21 @@ class CompositeProfile(BaseProfile, ABC):
 class DiscreteProfile:
     def __init__(
         self,
-        searchspace_type: str | SearchSpaceType,
+        trainer_preset: str | TrainerPresetType,
         domain: str | None = None,
         **kwargs: Any,
     ) -> None:
-        self.searchspace_type = (
-            SearchSpaceType(searchspace_type)
-            if isinstance(searchspace_type, str)
-            else searchspace_type
+        self.trainer_preset = (
+            TrainerPresetType(trainer_preset)
+            if isinstance(trainer_preset, str)
+            else trainer_preset
         )
         assert isinstance(
-            self.searchspace_type, SearchSpaceType
-        ), f"Invalid searchspace type: {searchspace_type}"
+            self.trainer_preset, TrainerPresetType
+        ), f"Invalid trainer_preset type: {trainer_preset}"
         self.domain = domain
         self._initialize_trainer_config()
-        self._initializa_genotype()
+        self._initialize_genotype()
         self.configure_trainer(**kwargs)
 
     def get_trainer_config(self) -> dict:
@@ -627,7 +627,7 @@ class DiscreteProfile:
             None
         """
         default_train_config = {
-            "searchspace": self.searchspace_type,
+            "searchspace": self.trainer_preset,
             "lr": 0.025,
             "epochs": 100,
             "optim": "sgd",
@@ -654,7 +654,7 @@ class DiscreteProfile:
         }
         self.train_config = default_train_config
 
-    def _initializa_genotype(self) -> None:
+    def _initialize_genotype(self) -> None:
         """Initializes the genotype for the discrete profile.
         This method sets the genotype of the best DARTS supernet found
         after 50 epochs of running the DARTS optimizer. Thus it is only
@@ -739,7 +739,7 @@ class DiscreteProfile:
 
         Args:
             **config: Arbitrary keyword arguments. Possible depend on the \
-                the search space type. For more information please check the \
+                the trainer preset type. For more information please check the \
                 Parameters of the supernet of each search space.
 
 
@@ -767,7 +767,7 @@ class DiscreteProfile:
             self.extra_config.update(config)
 
     def get_searchspace_config(self, dataset_str: str) -> dict:
-        """Returns the search space configuration based on the search space type.
+        """Returns the search space configuration based on the trainer preset type.
 
         Args:
             dataset_str (str): The dataset string.
@@ -781,27 +781,27 @@ class DiscreteProfile:
             would be passed to as the arguments for creating the new discrete
             model object.
         """
-        if self.searchspace_type == SearchSpaceType.NB201:
+        if self.trainer_preset == TrainerPresetType.NB201:
             searchspace_config = {
                 "N": 5,  # num_cells
                 "C": 16,  # channels
                 "num_classes": get_num_classes(dataset_str),
             }
-        elif self.searchspace_type == SearchSpaceType.DARTS:
+        elif self.trainer_preset == TrainerPresetType.DARTS:
             searchspace_config = {
                 "C": 36,  # init channels
                 "layers": 20,  # number of layers
                 "auxiliary": False,
                 "num_classes": get_num_classes(dataset_str),
             }
-        elif self.searchspace_type == SearchSpaceType.TNB101:
+        elif self.trainer_preset == TrainerPresetType.TNB101:
             assert self.domain is not None, "domain must be specified"
             searchspace_config = {
                 "domain": self.domain,  # type: ignore
                 "num_classes": get_num_classes(dataset_str, domain=self.domain),
             }
         else:
-            raise ValueError("search space is not correct")
+            raise ValueError("trainer preset is not correct")
         if hasattr(self, "searchspace_config"):
             searchspace_config.update(self.searchspace_config)
         return searchspace_config

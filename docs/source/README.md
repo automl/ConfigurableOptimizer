@@ -53,10 +53,10 @@ Below is a snippet that demonstrates how we run a vanilla-DARTS experiment.
 ```python 
 from confopt.profile import DARTSProfile
 from confopt.train import Experiment
-from confopt.enums import SearchSpaceType, DatasetType
+from confopt.enums import TrainerPresetType, SearchSpaceType, DatasetType
 
 profile = DARTSProfile(
-        searchspace_type=SearchSpaceType.DARTS,
+        trainer_preset=TrainerPresetType.DARTS,
         epochs=3
 )
 

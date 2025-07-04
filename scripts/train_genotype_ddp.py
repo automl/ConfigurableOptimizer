@@ -1,9 +1,10 @@
+from confopt.enums import TrainerPresetType
 from confopt.profile.profiles import DiscreteProfile
 from confopt.train import Experiment
 from confopt.train.experiment import DatasetType, SearchSpaceType
 
 if __name__ == "__main__":
-    profile = DiscreteProfile(searchspace_type=SearchSpaceType.DARTS)
+    profile = DiscreteProfile(trainer_preset=TrainerPresetType.DARTS)
     config = profile.get_trainer_config()
     profile.configure_trainer(use_ddp=True)
     config.update({"genotype": profile.get_genotype()})

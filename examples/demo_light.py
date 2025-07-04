@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from confopt.profile import GDASProfile
 from confopt.train import Experiment
-from confopt.enums import SearchSpaceType, DatasetType
+from confopt.enums import SearchSpaceType, TrainerPresetType, DatasetType
 
 if __name__ == "__main__":
     profile = GDASProfile(
-        searchspace_type=SearchSpaceType.DARTS,
+        trainer_preset=TrainerPresetType.DARTS,
         epochs=3,
     )
 

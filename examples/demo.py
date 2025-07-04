@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from confopt.profile import DARTSProfile, DRNASProfile, GDASProfile, ReinMaxProfile
 from confopt.train import Experiment
-from confopt.enums import DatasetType, SearchSpaceType
+from confopt.enums import DatasetType, TrainerPresetType, SearchSpaceType
 
 if __name__ == "__main__":
     searchspace = SearchSpaceType.DARTS
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     }
 
     profile = DRNASProfile(
-        searchspace_type=searchspace,
+        trainer_preset=TrainerPresetType.DARTS,
         epochs=10,
         oles=True,
         calc_gm_score=True,
