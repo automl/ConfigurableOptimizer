@@ -49,7 +49,8 @@ class DARTSProfile(BaseProfile, ABC):
 
     def get_config(self) -> dict:
         config = super().get_config()
-        config["lambda_regularizer"] = self.lambda_regularizer_config
+        if self.lambda_regularizer_config:
+            config["lambda_regularizer"] = self.lambda_regularizer_config
 
         return config
 
