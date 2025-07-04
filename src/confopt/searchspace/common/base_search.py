@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable, Literal
 
 import numpy as np
 import torch
-import torch.nn as nn  # noqa: PLR0402
+from torch import nn
 
 from confopt.utils import AverageMeter, reset_gm_score_attributes
 
@@ -171,11 +171,11 @@ class GradientMatchingScoreSupport(ModelWrapper):
 
 @dataclass
 class LambdaReg:
-    epsilon_base: float = 0.001
+    epsilon_base: float = 0.0001
     epsilon: float = 0.0
     corr_type: str = "corr"
-    strength: float = 0.125
-    enabled: bool = True
+    strength: float = 0.25
+    enabled: bool = False
 
 
 class LambdaDARTSSupport(ModelWrapper):
@@ -214,6 +214,9 @@ class LambdaDARTSSupport(ModelWrapper):
     def get_perturbations(self) -> list[torch.Tensor]:
         grads_normal, grads_reduce = self.model.get_arch_grads()
         alpha_normal = self.arch_parameters[0]
+
+        if grads_reduce is not None:
+            alphas_reduce = self.arch_parameters[1]
 
         def get_perturbation_for_cell(
             layer_gradients: list[torch.Tensor],
@@ -254,11 +257,18 @@ class LambdaDARTSSupport(ModelWrapper):
             return perturbations
 
         pert_normal = get_perturbation_for_cell(grads_normal)
+        # pert_reduce = (
+        #     get_perturbation_for_cell(grads_reduce)
+        #     if grads_reduce is not None
+        #     else None
+        # )
+
         pert_reduce = (
-            get_perturbation_for_cell(grads_reduce)
+            [torch.zeros_like(alphas_reduce) for _ in grads_reduce]
             if grads_reduce is not None
             else None
         )
+
         pert_denom = (
             pert_normal + pert_reduce if pert_reduce is not None else pert_normal
         )
@@ -309,9 +319,11 @@ class LambdaDARTSSupport(ModelWrapper):
         )
 
         reg_grad = [
-            (f - b).div_(2 * self.lambda_reg.epsilon)
-            if (f is not None and b is not None)
-            else 0.0
+            (
+                (f - b).div_(2 * self.lambda_reg.epsilon)
+                if (f is not None and b is not None)
+                else 0.0
+            )
             for f, b in zip(forward_grads, backward_grads)
         ]
         for param, grad in zip(self.model_weight_parameters(), reg_grad):
@@ -322,15 +334,21 @@ class LambdaDARTSSupport(ModelWrapper):
 class LayerAlignmentScoreSupport(ModelWrapper):
     def __init__(self, model: nn.Module):
         super().__init__(model)
+        self.corr_types = ["train", "valid"]
         self.score_types = ["mean", "first_last"]
         self.cell_types = ["normal", "reduce"]
+
         self.layer_alignment_meters: dict[str, dict] = {
-            score_type: {} for score_type in self.score_types
+            corr_types: {} for corr_types in self.corr_types
         }
 
-        for score_type in self.score_types:
-            for cell_type in self.cell_types:
-                self.layer_alignment_meters[score_type][cell_type] = AverageMeter()
+        for corr_type in self.corr_types:
+            for score_type in self.score_types:
+                self.layer_alignment_meters[corr_type][score_type] = {}
+                for cell_type in self.cell_types:
+                    self.layer_alignment_meters[corr_type][score_type][
+                        cell_type
+                    ] = AverageMeter()
 
     def get_layer_alignment_scores_as_strings(self) -> list[str]:
         """Get the layer alignment scores of the model as strings.
@@ -341,38 +359,58 @@ class LayerAlignmentScoreSupport(ModelWrapper):
         """
         layer_alignment_scores = []
 
-        for score_type in self.score_types:
-            for cell_type in self.cell_types:
-                layer_alignment_scores.append(
-                    f"Layer Alignment Score ({score_type}) for cell type: {cell_type}: "
-                    + f"{self.layer_alignment_meters[score_type][cell_type].avg:.4f}"
-                )
+        for corr_type in self.corr_types:
+            for score_type in self.score_types:
+                for cell_type in self.cell_types:
+                    score = self.layer_alignment_meters[corr_type][score_type][
+                        cell_type
+                    ].avg
+                    layer_alignment_scores.append(
+                        f"Layer Alignment Score [{corr_type}] - ({score_type}) "
+                        f"for cell type: {cell_type}: "
+                        f"{score:.4f}"
+                    )
 
         return layer_alignment_scores
 
     def reset_layer_alignment_scores(self) -> None:
         """Reset the layer alignment scores of the model."""
-        for score_type in self.score_types:
-            for cell_type in self.cell_types:
-                self.layer_alignment_meters[score_type][cell_type].reset()
+        for corr_type in self.corr_types:
+            for score_type in self.score_types:
+                for cell_type in self.cell_types:
+                    self.layer_alignment_meters[corr_type][score_type][
+                        cell_type
+                    ].reset()
 
-    def update_layer_alignment_scores(self) -> None:
+    def update_layer_alignment_scores(
+        self,
+        corr_type: Literal["train", "valid"],
+        n: int,
+    ) -> None:
         """Update the layer alignment scores of the model."""
         # Update the "mean" scores
         score_normal, score_reduce = self.get_mean_layer_alignment_score()
-        self.layer_alignment_meters["mean"]["normal"].update(val=score_normal)
-        self.layer_alignment_meters["mean"]["reduce"].update(val=score_reduce)
+        self.layer_alignment_meters[corr_type]["mean"]["normal"].update(
+            val=score_normal,
+            n=n,
+        )
+        self.layer_alignment_meters[corr_type]["mean"]["reduce"].update(
+            val=score_reduce,
+            n=n,
+        )
 
         # Update the "first_last" scores
         (
             score_normal_first,
             score_normal_last,
         ) = self.get_first_and_last_layer_alignment_score()
-        self.layer_alignment_meters["first_last"]["normal"].update(
-            val=score_normal_first
+        self.layer_alignment_meters[corr_type]["first_last"]["normal"].update(
+            val=score_normal_first,
+            n=n,
         )
-        self.layer_alignment_meters["first_last"]["reduce"].update(
-            val=score_normal_last
+        self.layer_alignment_meters[corr_type]["first_last"]["reduce"].update(
+            val=score_normal_last,
+            n=n,
         )
 
     def get_layer_alignment_scores(self) -> dict[str, Any]:
@@ -383,11 +421,15 @@ class LayerAlignmentScoreSupport(ModelWrapper):
             the model.
         """
         layer_alignment_scores = {}
-        for score_type in self.score_types:
-            for cell_type in self.cell_types:
-                layer_alignment_scores[
-                    f"layer_alignment_scores/{score_type}/{cell_type}"
-                ] = self.layer_alignment_meters[score_type][cell_type].avg
+
+        for corr_type in self.corr_types:
+            for score_type in self.score_types:
+                for cell_type in self.cell_types:
+                    layer_alignment_scores[
+                        f"layer_alignment_scores/{corr_type}/{score_type}/{cell_type}"
+                    ] = self.layer_alignment_meters[corr_type][score_type][
+                        cell_type
+                    ].avg
 
         return layer_alignment_scores
 

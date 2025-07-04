@@ -389,7 +389,7 @@ class ConfigurableTrainer:
             epoch_time.update(time.time() - start_time)
             start_time = time.time()
 
-    def _train_epoch(  # noqa: C901
+    def _train_epoch(  # noqa: C901, PLR0915
         self,
         search_space_handler: SearchSpaceHandler,
         train_loader: DataLoader,
@@ -476,6 +476,11 @@ class ConfigurableTrainer:
                     early_stop_threshold=oles_threshold,
                 )  # type: ignore
 
+            if isinstance(unwrapped_network, LayerAlignmentScoreSupport):
+                unwrapped_network.update_layer_alignment_scores(
+                    corr_type="valid", n=arch_inputs.size(0)
+                )
+
             # update the model weights
             w_optimizer.zero_grad()
 
@@ -485,7 +490,9 @@ class ConfigurableTrainer:
             base_loss.backward()
 
             if isinstance(unwrapped_network, LayerAlignmentScoreSupport):
-                unwrapped_network.update_layer_alignment_scores()
+                unwrapped_network.update_layer_alignment_scores(
+                    corr_type="train", n=arch_inputs.size(0)
+                )
 
             if isinstance(unwrapped_network, LambdaDARTSSupport):
                 unwrapped_network.add_lambda_regularization(
