@@ -184,16 +184,14 @@ def calc_layer_alignment_score(layer_gradients: list[torch.Tensor]) -> float:
     if len(layer_gradients) < 2:
         return float("nan")
 
-    scale = len(layer_gradients) * (len(layer_gradients) - 1) / 2
-    score = 0
+    res = []
+    norms = [layer_gradient.norm() for layer_gradient in layer_gradients]
     for i in range(len(layer_gradients)):
         for j in range(i + 1, len(layer_gradients)):
             g, g_ = layer_gradients[i], layer_gradients[j]
-            numerator = torch.dot(g, g_)
-            denominator = g.norm(p=2.0) * g_.norm(p=2.0)
-            score += numerator / denominator
-    assert score.shape == torch.Size([])  # type: ignore
-    return score.item() / scale  # type: ignore
+            res.append((torch.dot(g, g_) / (norms[i] * norms[j])).item())
+
+    return sum(res) / len(res)
 
 
 def reset_gm_score_attributes(module: torch.nn.Module) -> None:

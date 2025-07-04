@@ -67,6 +67,7 @@ from confopt.searchspace import (
     SearchSpace,
     TransNASBench101SearchSpace,
 )
+from confopt.searchspace.common import LambdaReg
 from confopt.train import ConfigurableTrainer, DiscreteTrainer
 from confopt.train.projection import PerturbationArchSelection
 from confopt.train.search_space_handler import SearchSpaceHandler
@@ -322,6 +323,7 @@ class Experiment:
         self._set_lora_toggler(config.get("lora", {}), config.get("lora_extra", {}))
         self._set_weight_entangler()
         self._set_regularizer(config.get("regularization", {}))
+        self._set_lambda_regularizer(config.get("lambda_regularizer", {}))
         self._set_dynamic_explorer(config.get("dynamic_exploration", {}))
         self._set_profile(config)
         self._set_early_stopper(
@@ -485,6 +487,9 @@ class Experiment:
             loss_weight=config["loss_weight"],
         )
 
+    def _set_lambda_regularizer(self, config: dict) -> None:
+        self.lambda_regularizer = None if len(config) == 0 else LambdaReg(**config)
+
     def _set_dynamic_explorer(self, config: dict) -> None:
         self.dynamic_explorer: DynamicAttentionExplorer | None = None
         if config:
@@ -510,6 +515,7 @@ class Experiment:
             pruner=self.pruner,
             is_arch_attention_enabled=config.get("is_arch_attention_enabled", False),
             regularizer=self.regularizer,
+            lambda_regularizer=self.lambda_regularizer,
             use_auxiliary_skip_connection=config.get(
                 "use_auxiliary_skip_connection", False
             ),
