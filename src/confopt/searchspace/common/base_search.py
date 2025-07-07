@@ -183,6 +183,7 @@ class LambdaDARTSSupport(ModelWrapper):
         super().__init__(model)
         self._assert_model_has_implementation()
         self.lambda_reg = LambdaReg()
+        self.lambda_strength = 0.0
 
     def get_cells(self, cell_type: str | None = None) -> list[torch.nn.Module] | None:
         return self.model.get_cells(cell_type)
@@ -328,7 +329,13 @@ class LambdaDARTSSupport(ModelWrapper):
         ]
         for param, grad in zip(self.model_weight_parameters(), reg_grad):
             if param.grad is not None:
-                param.grad.data.add_(self.lambda_reg.strength * grad)
+                param.grad.data.add_(self.lambda_strength * grad)
+
+    def update_strength(self, epoch: int, total_epochs: int) -> None:
+        # epoch is 1-indexed here
+        self.lambda_strength = (
+            self.lambda_reg.strength * (epoch - 1) / (total_epochs - 1)
+        )
 
 
 class LayerAlignmentScoreSupport(ModelWrapper):

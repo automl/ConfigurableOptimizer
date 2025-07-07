@@ -220,6 +220,10 @@ class ConfigurableTrainer:
                 search_space_handler, network, calling_frequency="epoch"
             )
 
+            # Update Lambda-Regularization strength
+            if isinstance(unwrapped_network, LambdaDARTSSupport):
+                unwrapped_network.update_strength(epoch, total_epochs=self.epochs)
+
             # Reset WandB Log dictionary
             self.logger.reset_wandb_logs()
 
