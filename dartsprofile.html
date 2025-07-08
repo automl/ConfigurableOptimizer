@@ -51,7 +51,9 @@
 <li class="toctree-l3"><a class="reference internal" href="#confopt.profile.DARTSProfile"><code class="docutils literal notranslate"><span class="pre">DARTSProfile</span></code></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DARTSProfile.__init__"><code class="docutils literal notranslate"><span class="pre">DARTSProfile.__init__()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DARTSProfile._initialize_sampler_config"><code class="docutils literal notranslate"><span class="pre">DARTSProfile._initialize_sampler_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DARTSProfile.configure_lambda_regularizer"><code class="docutils literal notranslate"><span class="pre">DARTSProfile.configure_lambda_regularizer()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DARTSProfile.configure_sampler"><code class="docutils literal notranslate"><span class="pre">DARTSProfile.configure_sampler()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#confopt.profile.DARTSProfile.get_config"><code class="docutils literal notranslate"><span class="pre">DARTSProfile.get_config()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -95,7 +97,7 @@
 <h1>DARTS Profile<a class="headerlink" href="#darts-profile" title="Link to this heading"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="confopt.profile.DARTSProfile">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">confopt.profile.</span></span><span class="sig-name descname"><span class="pre">DARTSProfile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">trainer_preset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">TrainerPresetType</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epochs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#confopt.profile.DARTSProfile" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">confopt.profile.</span></span><span class="sig-name descname"><span class="pre">DARTSProfile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">trainer_preset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">TrainerPresetType</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epochs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_lambda_regularizer</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#confopt.profile.DARTSProfile" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="baseprofile.html#confopt.profile.BaseProfile" title="confopt.profile.base.BaseProfile"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseProfile</span></code></a>, <code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></p>
 <p>Train Profile class for DARTS (Differentiable Architecture Search).
 It inherits from the BaseProfile class and sets the sampler config for DARTS
@@ -111,6 +113,11 @@ sampler.</p>
 <span class="sig-name descname"><span class="pre">_initialize_sampler_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#confopt.profile.DARTSProfile._initialize_sampler_config" title="Link to this definition"></a></dt>
 <dd><p>Initializes the sampler configuration for DARTS.</p>
 </dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.DARTSProfile.configure_lambda_regularizer">
+<span class="sig-name descname"><span class="pre">configure_lambda_regularizer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#confopt.profile.DARTSProfile.configure_lambda_regularizer" title="Link to this definition"></a></dt>
+<dd></dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="confopt.profile.DARTSProfile.configure_sampler">
@@ -139,6 +146,20 @@ the attributes can be configured dynamically.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="confopt.profile.DARTSProfile.get_config">
+<span class="sig-name descname"><span class="pre">get_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#confopt.profile.DARTSProfile.get_config" title="Link to this definition"></a></dt>
+<dd><p>This method returns a dictionary representation of the Profile class.         The configurations are used for training the supernet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>None</strong></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>dict</em> – A dictionary representation of the Profile class.</p>
 </dd>
 </dl>
 </dd></dl>
