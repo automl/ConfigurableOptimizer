@@ -18,12 +18,16 @@ from confopt.oneshot.regularizer import Regularizer
 from confopt.oneshot.weightentangler import WeightEntangler
 from confopt.searchspace import DARTSSearchSpace
 from confopt.searchspace.common import (
+    LambdaReg,
     LoRALayer,
     OperationBlock,
     OperationChoices,
     SearchSpace,
 )
-from confopt.searchspace.common.base_search import ArchAttentionSupport
+from confopt.searchspace.common.base_search import (
+    ArchAttentionSupport,
+    LambdaDARTSSupport,
+)
 
 
 class SearchSpaceHandler:
@@ -40,6 +44,7 @@ class SearchSpaceHandler:
         lora_toggler: LoRAToggler | None = None,
         is_arch_attention_enabled: bool = False,
         regularizer: Regularizer | None = None,
+        lambda_regularizer: LambdaReg | None = None,
         use_auxiliary_skip_connection: bool = False,
         dynamic_explorer: DynamicAttentionExplorer | None = None,
     ) -> None:
@@ -53,6 +58,7 @@ class SearchSpaceHandler:
         self.pruner = pruner
         self.lora_toggler = lora_toggler
         self.regularizer = regularizer
+        self.lambda_regularizer = lambda_regularizer
 
         self.is_argmax_sampler = False
         if isinstance(self.sampler, GDASSampler):
@@ -63,7 +69,7 @@ class SearchSpaceHandler:
 
         self.dynamic_explorer = dynamic_explorer
 
-    def adapt_search_space(self, search_space: SearchSpace) -> None:
+    def adapt_search_space(self, search_space: SearchSpace) -> None:  # noqa: C901
         if hasattr(search_space.model, "edge_normalization"):
             search_space.model.edge_normalization = self.edge_normalization
 
@@ -98,6 +104,12 @@ class SearchSpaceHandler:
             search_space, ArchAttentionSupport
         ):
             search_space.set_arch_attention(True)
+
+        if isinstance(search_space, LambdaDARTSSupport) and isinstance(
+            self.lambda_regularizer, LambdaReg
+        ):
+            search_space.set_lambda_darts_params(self.lambda_regularizer)
+            search_space.enable_lambda_darts()
 
         if self.dynamic_explorer:
             search_space.components.append(self.dynamic_explorer)

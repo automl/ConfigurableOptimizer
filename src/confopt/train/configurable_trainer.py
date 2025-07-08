@@ -19,6 +19,7 @@ from confopt.searchspace import SearchSpace
 from confopt.searchspace.common.base_search import (
     GradientMatchingScoreSupport,
     GradientStatsSupport,
+    LambdaDARTSSupport,
     LayerAlignmentScoreSupport,
     OperationStatisticsSupport,
 )
@@ -219,6 +220,10 @@ class ConfigurableTrainer:
                 search_space_handler, network, calling_frequency="epoch"
             )
 
+            # Update Lambda-Regularization strength
+            if isinstance(unwrapped_network, LambdaDARTSSupport):
+                unwrapped_network.update_strength(epoch, total_epochs=self.epochs)
+
             # Reset WandB Log dictionary
             self.logger.reset_wandb_logs()
 
@@ -388,7 +393,7 @@ class ConfigurableTrainer:
             epoch_time.update(time.time() - start_time)
             start_time = time.time()
 
-    def _train_epoch(  # noqa: C901
+    def _train_epoch(  # noqa: C901, PLR0915
         self,
         search_space_handler: SearchSpaceHandler,
         train_loader: DataLoader,
@@ -404,17 +409,17 @@ class ConfigurableTrainer:
         oles_frequency: int = 20,
         oles_threshold: float = 0.4,
     ) -> tuple[TrainingMetrics, TrainingMetrics]:
-        data_time, batch_time = AverageMeter(), AverageMeter()
-        base_losses, base_top1, base_top5 = (
-            AverageMeter(),
-            AverageMeter(),
-            AverageMeter(),
-        )
-        arch_losses, arch_top1, arch_top5 = (
-            AverageMeter(),
-            AverageMeter(),
-            AverageMeter(),
-        )
+        (
+            data_time,
+            batch_time,
+            base_losses,
+            base_top1,
+            base_top5,
+            arch_losses,
+            arch_top1,
+            arch_top5,
+        ) = (AverageMeter() for _ in range(8))
+
         network.train()
         unwrapped_network = unwrap_model(network)
         end = time.time()
@@ -475,6 +480,11 @@ class ConfigurableTrainer:
                     early_stop_threshold=oles_threshold,
                 )  # type: ignore
 
+            if isinstance(unwrapped_network, LayerAlignmentScoreSupport):
+                unwrapped_network.update_layer_alignment_scores(
+                    corr_type="valid", n=arch_inputs.size(0)
+                )
+
             # update the model weights
             w_optimizer.zero_grad()
 
@@ -484,7 +494,14 @@ class ConfigurableTrainer:
             base_loss.backward()
 
             if isinstance(unwrapped_network, LayerAlignmentScoreSupport):
-                unwrapped_network.update_layer_alignment_scores()
+                unwrapped_network.update_layer_alignment_scores(
+                    corr_type="train", n=arch_inputs.size(0)
+                )
+
+            if isinstance(unwrapped_network, LambdaDARTSSupport):
+                unwrapped_network.add_lambda_regularization(
+                    base_inputs, base_targets, criterion
+                )
 
             torch.nn.utils.clip_grad_norm_(
                 unwrapped_network.model_weight_parameters(), 5
@@ -516,18 +533,6 @@ class ConfigurableTrainer:
             end = time.time()
 
             if step % print_freq == 0 or step + 1 == len(train_loader):
-                # Tstr = f"Time {batch_time.val:.2f} ({batch_time.avg:.2f})" \
-                #     +   f"Data {data_time.val:.2f} ({data_time.avg:.2f})"
-
-                # Wstr = f"Base [Loss {loss.val:.3f} ({loss.avg:.3f})  Prec@1" \
-                #     +   f"{top1.val:.2f} ({top1.avg:.2f}) Prec@5 {top5.val:.2f}" \
-                #     +   f"({top5.avg:.2f})]"
-
-                # Astr = f"Arch [Loss {loss.val:.3f} ({loss.avg:.3f})  Prec@1" \
-                #     +   f"{top1.val:.2f} ({top1.avg:.2f}) Prec@5 {top5.val:.2f}" \
-                #     +   f"({top5.avg:.2f})]"
-
-                # logger.log(Sstr + " " + Tstr + " " + Wstr + " " + Astr)
                 ...
 
             if self.debug_mode and step > DEBUG_STEPS:
